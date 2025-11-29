@@ -1,0 +1,44 @@
+import { useState, useEffect } from 'react';
+import { RealizatorCard } from './RealizatorCard';
+import { api } from '@/lib/api';
+import { KPIMetrics } from '@/utils/kpiCalculations';
+
+interface RealizatorCardWithKPIProps {
+  realtor: {
+    id: string;
+    name: string;
+    email: string;
+    level: number;
+    confidence?: boolean;
+    salesResilience?: boolean;
+    successMindset?: boolean;
+    avatar?: string;
+  };
+  onClick?: () => void;
+}
+
+export const RealizatorCardWithKPI = ({ realtor, onClick }: RealizatorCardWithKPIProps) => {
+  const [metrics, setMetrics] = useState<KPIMetrics>({
+    realtors: 1,
+    deals: 0,
+    diagnoses: 0,
+    successRate: 0,
+    totalDealValue: 0,
+    levelDistribution: {}
+  });
+
+  useEffect(() => {
+    const fetchKPI = async () => {
+      try {
+        const kpi = await api.getRealtorKPI(realtor.id);
+        setMetrics(kpi);
+      } catch (error) {
+        console.error('Error fetching realtor KPI:', error);
+      }
+    };
+    fetchKPI();
+  }, [realtor.id]);
+
+  return <RealizatorCard realtor={realtor} metrics={metrics} onClick={onClick} />;
+};
+

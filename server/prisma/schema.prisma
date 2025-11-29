@@ -1,0 +1,175 @@
+// Prisma schema базиран на Supabase структурата
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AppRole {
+  admin
+  realtor
+}
+
+model Profile {
+  id        String   @id @default(uuid())
+  fullName  String   @map("full_name") @db.Text
+  email     String   @unique @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user      User?     @relation
+  userRoles UserRole[]
+  realtor   Realtor?
+  teams     Team[]   @relation("TeamLeader")
+
+  @@map("profiles")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique @db.Text
+  password  String   @db.Text
+  profileId String   @unique @map("profile_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("users")
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  role      AppRole
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@map("user_roles")
+}
+
+model Country {
+  id        String   @id @default(uuid())
+  name      String   @unique @db.Text
+  code      String   @unique @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  cities City[]
+
+  @@map("countries")
+}
+
+model City {
+  id        String   @id @default(uuid())
+  name      String   @db.Text
+  countryId String   @map("country_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  country  Country  @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  offices  Office[]
+
+  @@unique([name, countryId])
+  @@map("cities")
+}
+
+model Office {
+  id        String   @id @default(uuid())
+  name      String   @db.Text
+  cityId    String   @map("city_id")
+  address   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  city  City   @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  teams Team[]
+
+  @@unique([name, cityId])
+  @@map("offices")
+}
+
+model Team {
+  id        String    @id @default(uuid())
+  name      String    @db.Text
+  officeId  String    @map("office_id")
+  leaderId  String?   @map("leader_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  office   Office    @relation(fields: [officeId], references: [id], onDelete: Cascade)
+  leader   Profile?  @relation("TeamLeader", fields: [leaderId], references: [id], onDelete: SetNull)
+  realtors Realtor[]
+
+  @@unique([name, officeId])
+  @@map("teams")
+}
+
+model Realtor {
+  id             String   @id @default(uuid())
+  userId         String   @unique @map("user_id")
+  teamId         String?  @map("team_id")
+  level          Int      @default(1)
+  hireDate       DateTime @default(now()) @map("hire_date") @db.Date
+  confidence     Boolean  @default(false)
+  salesResilience Boolean @default(false) @map("sales_resilience")
+  successMindset Boolean  @default(false) @map("success_mindset")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user          Profile         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team          Team?           @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  deals         Deal[]
+  diagnoses     Diagnosis[]
+  trainingProgress TrainingProgress[]
+
+  @@map("realtors")
+}
+
+model Deal {
+  id         String   @id @default(uuid())
+  realtorId  String   @map("realtor_id")
+  clientName String   @map("client_name") @db.Text
+  dealValue  Decimal  @map("deal_value") @db.Decimal(12, 2)
+  commission Decimal? @db.Decimal(12, 2)
+  dealDate   DateTime @default(now()) @map("deal_date") @db.Date
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  realtor Realtor @relation(fields: [realtorId], references: [id], onDelete: Cascade)
+
+  @@map("deals")
+}
+
+model Diagnosis {
+  id            String   @id @default(uuid())
+  realtorId     String   @map("realtor_id")
+  clientName    String   @map("client_name") @db.Text
+  diagnosisDate DateTime @default(now()) @map("diagnosis_date") @db.Date
+  status        String   @default("active") @db.Text
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  realtor Realtor @relation(fields: [realtorId], references: [id], onDelete: Cascade)
+
+  @@map("diagnoses")
+}
+
+model TrainingProgress {
+  id                String   @id @default(uuid())
+  realtorId         String   @map("realtor_id")
+  section           String   @db.Text
+  subsection        String   @db.Text
+  lectureCompleted  Boolean  @default(false) @map("lecture_completed")
+  videoCompleted    Boolean  @default(false) @map("video_completed")
+  practicalCompleted Boolean @default(false) @map("practical_completed")
+  handoverCompleted Boolean  @default(false) @map("handover_completed")
+  examCompleted     Boolean  @default(false) @map("exam_completed")
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  realtor Realtor @relation(fields: [realtorId], references: [id], onDelete: Cascade)
+
+  @@unique([realtorId, section, subsection], name: "realtor_section_subsection_unique")
+  @@map("training_progress")
+}
+
