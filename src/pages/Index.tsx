@@ -2,16 +2,28 @@ import { useState, useEffect } from 'react';
 import { useNavigate as useRouterNavigate } from 'react-router-dom';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
+import { Settings } from 'lucide-react';
 import { OfficeCard } from '@/components/OfficeCard';
 import { TeamLeaderCard } from '@/components/TeamLeaderCard';
 import { AgentCard } from '@/components/AgentCard';
 import { AgentDetailDialog } from '@/components/AgentDetailDialog';
 import { TrainingCalendar } from '@/components/TrainingCalendar';
 import { TrainingGroupDetail } from '@/components/TrainingGroupDetail';
+import { TopologySidebar } from '@/components/TopologySidebar';
 import { mockTrainingGroups } from '@/data/trainingData';
 import { transformOffices } from '@/utils/dataTransform';
 import { Office, TeamLeader, Agent, TrainingGroup } from '@/types';
-import { ChevronLeft, Home, BarChart3, GraduationCap, Calendar, LogOut } from 'lucide-react';
+import { ChevronLeft, Home, BarChart3, GraduationCap, Calendar, LogOut, Menu } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
 
 type ViewType = 'offices' | 'leaders' | 'agents' | 'training';
@@ -24,7 +36,15 @@ const Index = () => {
   useEffect(() => {
     // Check authentication
     supabaseApi.getCurrentUser()
-      .then(async () => {
+      .then(async (userData) => {
+        // Set user info
+        if (userData.user) {
+          setUserInfo({
+            fullName: userData.user.fullName,
+            email: userData.user.email,
+            role: userData.user.roles?.[0] === 'admin' ? 'Администратор' : 'Реализатор'
+          });
+        }
         // Fetch offices with full structure
         try {
           const dbOffices = await supabaseApi.getAllOfficesFull();
@@ -48,6 +68,9 @@ const Index = () => {
   const [selectedTrainingGroup, setSelectedTrainingGroup] = useState<TrainingGroup | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [trainingDialogOpen, setTrainingDialogOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userInfo, setUserInfo] = useState<{fullName: string; email: string; role: string} | null>(null);
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const handleOfficeClick = (office: Office) => {
     setSelectedOffice(office);
     setCurrentView('leaders');
@@ -100,55 +123,112 @@ const Index = () => {
     if (selectedLeader) parts.push(selectedLeader.name);
     return parts.join(' / ');
   };
-  return <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card shadow-sm">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <img src={logo} alt="HRCO Logo" className="h-16 w-16 object-contain" />
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={() => setCurrentView('training')} variant={currentView === 'training' ? 'default' : 'outline'} size="sm">
-                <GraduationCap className="h-4 w-4 mr-2" />
-                Обучения
-              </Button>
-              <Button onClick={() => navigate('/training-calendar')} variant="outline" size="sm">
-                <Calendar className="h-4 w-4 mr-2" />
-                Календар
-              </Button>
-              <Button onClick={() => navigate('/interviews')} variant="outline" size="sm">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Интервюта
-              </Button>
-              <Button onClick={() => navigate('/analytics')} variant="outline" size="sm">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Аналитика
-              </Button>
-              <Button onClick={handleLogout} variant="outline" size="sm">
-                <LogOut className="h-4 w-4 mr-2" />
-                Изход
-              </Button>
-              {currentView !== 'offices' && <>
-                  <Button onClick={handleHome} variant="outline" size="sm">
-                    <Home className="h-4 w-4 mr-2" />
-                    Начало
-                  </Button>
-                  <Button onClick={handleBack} variant="outline" size="sm">
-                    <ChevronLeft className="h-4 w-4 mr-2" />
-                    Назад
-                  </Button>
-                </>}
+  return <div className="min-h-screen bg-background flex">
+      {/* Topology Sidebar */}
+      <TopologySidebar
+        offices={offices}
+        onOfficeClick={handleOfficeClick}
+        onLeaderClick={handleLeaderClick}
+        onAgentClick={handleAgentClick}
+        selectedOfficeId={selectedOffice?.id}
+        selectedLeaderId={selectedLeader?.id}
+        selectedAgentId={selectedAgent?.id}
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+      />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <header className="border-b border-border bg-card shadow-sm sticky top-0 z-30">
+          <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-6">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="h-8 w-8 sm:h-9 sm:w-9"
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+                <img src={logo} alt="HRCO Logo" className="h-10 w-10 sm:h-12 sm:w-12 lg:h-16 lg:w-16 object-contain flex-shrink-0" />
+              </div>
+              <div className="flex gap-1 sm:gap-2 flex-wrap">
+                <Button onClick={() => setCurrentView('training')} variant={currentView === 'training' ? 'default' : 'outline'} size="sm" className="text-xs sm:text-sm">
+                  <GraduationCap className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Обучения</span>
+                </Button>
+                <Button onClick={() => navigate('/training-calendar')} variant="outline" size="sm" className="text-xs sm:text-sm">
+                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Календар</span>
+                </Button>
+                <Button onClick={() => navigate('/interviews')} variant="outline" size="sm" className="text-xs sm:text-sm">
+                  <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Интервюта</span>
+                </Button>
+                <Button onClick={() => navigate('/analytics')} variant="outline" size="sm" className="text-xs sm:text-sm">
+                  <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Аналитика</span>
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6 sm:h-7 sm:w-7">
+                          <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userInfo?.email || 'user'}`} />
+                          <AvatarFallback className="text-[10px] sm:text-xs">
+                            {userInfo?.fullName?.split(' ').map(n => n[0]).join('') || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="hidden sm:inline">{userInfo?.fullName || 'Акаунт'}</span>
+                        <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </div>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium">{userInfo?.fullName || 'Потребител'}</p>
+                        <p className="text-xs text-muted-foreground">{userInfo?.email || ''}</p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-xs text-muted-foreground">
+                      Роля: {userInfo?.role || 'Неизвестна'}
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Настройки на акаунта
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Изход
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {currentView !== 'offices' && <>
+                    <Button onClick={handleHome} variant="outline" size="sm" className="text-xs sm:text-sm">
+                      <Home className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Начало</span>
+                    </Button>
+                    <Button onClick={handleBack} variant="outline" size="sm" className="text-xs sm:text-sm">
+                      <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Назад</span>
+                    </Button>
+                  </>}
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+        {/* Main Content */}
+        <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 flex-1">
         {currentView === 'training' && <TrainingCalendar groups={mockTrainingGroups} onGroupClick={handleTrainingGroupClick} />}
 
-        {currentView === 'offices' && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {currentView === 'offices' && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
             {offices.length === 0 && !loading ? (
               <div className="col-span-full text-center text-muted-foreground py-8">
                 Няма налични офиси
@@ -158,11 +238,11 @@ const Index = () => {
             )}
           </div>}
 
-        {currentView === 'leaders' && selectedOffice && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {currentView === 'leaders' && selectedOffice && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
             {selectedOffice.teamLeaders.map(leader => <TeamLeaderCard key={leader.id} leader={leader} onClick={() => handleLeaderClick(leader)} />)}
           </div>}
 
-        {currentView === 'agents' && selectedLeader && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {currentView === 'agents' && selectedLeader && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
             {selectedLeader.teamMembers.map(agent => <AgentCard key={agent.id} agent={agent} onClick={() => handleAgentClick(agent)} />)}
           </div>}
       </main>
@@ -171,14 +251,15 @@ const Index = () => {
       <AgentDetailDialog agent={selectedAgent} open={dialogOpen} onOpenChange={setDialogOpen} />
       <TrainingGroupDetail group={selectedTrainingGroup} open={trainingDialogOpen} onOpenChange={setTrainingDialogOpen} />
 
-      {/* Footer */}
-      <footer className="border-t border-border bg-card mt-12">
-        <div className="container mx-auto px-4 py-6">
-          <p className="text-center text-sm text-muted-foreground">
-            Разработено от Octa Investment Group
-          </p>
-        </div>
-      </footer>
+        {/* Footer */}
+        <footer className="border-t border-border bg-card mt-12">
+          <div className="container mx-auto px-4 py-6">
+            <p className="text-center text-sm text-muted-foreground">
+              Разработено от Octa Investment Group
+            </p>
+          </div>
+        </footer>
+      </div>
     </div>;
 };
 export default Index;

@@ -2,14 +2,30 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { Button } from '@/components/ui/button';
-import { LogOut, ChevronLeft, Home, Plus, Pencil, Trash2, Calendar } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
+import { UserManagementDialog } from '@/components/UserManagementDialog';
+import { Settings, Users } from 'lucide-react';
+import { LogOut, ChevronLeft, Home, Plus, Pencil, Trash2, Calendar, Menu, User, ChevronDown } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
 import { CreateEditDialog } from '@/components/admin/CreateEditDialog';
+import { AddPersonToTeamDialog } from '@/components/admin/AddPersonToTeamDialog';
 import { CountryCardWithKPI } from '@/components/cards/CountryCardWithKPI';
 import { CityCardWithKPI } from '@/components/cards/CityCardWithKPI';
 import { OfficeCardWithKPI } from '@/components/cards/OfficeCardWithKPI';
 import { TeamCardWithKPI } from '@/components/cards/TeamCardWithKPI';
 import { RealizatorCardWithKPI } from '@/components/cards/RealizatorCardWithKPI';
+import { TopologySidebar } from '@/components/TopologySidebar';
+import { transformOffices } from '@/utils/dataTransform';
+import { Office, TeamLeader, Agent } from '@/types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,6 +92,7 @@ interface AdminDashboardProps {
 const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const navigate = useNavigate();
   const [currentView, setCurrentView] = useState<ViewLevel>('countries');
+  const [userInfo, setUserInfo] = useState<{fullName: string; email: string; role: string} | null>(null);
   const [countries, setCountries] = useState<Country[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [offices, setOffices] = useState<Office[]>([]);
@@ -86,6 +103,10 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
   const [selectedOffice, setSelectedOffice] = useState<Office | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [topologyOffices, setTopologyOffices] = useState<Office[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [userManagementOpen, setUserManagementOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [kpiMetrics, setKpiMetrics] = useState<KPIMetrics | null>(null);
@@ -93,12 +114,40 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [addPersonDialogOpen, setAddPersonDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [parentOptions, setParentOptions] = useState<Array<{ id: string; name: string }>>([]);
 
   useEffect(() => {
     fetchCountries();
+    fetchTopologyData();
+    fetchUserInfo();
   }, []);
+
+  const fetchUserInfo = async () => {
+    try {
+      const { user } = await supabaseApi.getCurrentUser();
+      if (user) {
+        setUserInfo({
+          fullName: user.fullName,
+          email: user.email,
+          role: 'Администратор'
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+    }
+  };
+
+  const fetchTopologyData = async () => {
+    try {
+      const dbOffices = await supabaseApi.getAllOfficesFull();
+      const transformedOffices = transformOffices(dbOffices);
+      setTopologyOffices(transformedOffices);
+    } catch (error) {
+      console.error('Error fetching topology data:', error);
+    }
+  };
 
   const fetchCountries = async () => {
     setLoading(true);
@@ -391,58 +440,185 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
       fetchOffices(selectedCity.id);
     } else if (currentView === 'teams' && selectedOffice) {
       fetchTeams(selectedOffice.id);
+    } else if (currentView === 'realtors' && selectedTeam) {
+      fetchRealtors(selectedTeam.id);
+    }
+  };
+
+  const handleTopologyOfficeClick = async (office: Office) => {
+    // Find the city and country for this office
+    const dbOffices = await supabaseApi.getAllOfficesFull();
+    const dbOffice = dbOffices.find((o: any) => o.id === office.id);
+    if (dbOffice?.city) {
+      const city = dbOffice.city;
+      const country = city.country;
+      if (country) {
+        setSelectedCountry({ id: country.id, name: country.name, code: country.code || '' });
+        fetchCities(country.id);
+      }
+      if (city) {
+        setSelectedCity({ id: city.id, name: city.name, country_id: country.id });
+        fetchOffices(city.id);
+      }
+      setSelectedOffice({ id: office.id, name: office.name, city_id: city.id, address: dbOffice.address || null });
+      fetchTeams(office.id);
+      setCurrentView('teams');
+    }
+  };
+
+  const handleTopologyLeaderClick = async (leader: TeamLeader) => {
+    // Find the team for this leader
+    const office = topologyOffices.find((o) => o.teamLeaders.some((l) => l.id === leader.id));
+    if (office) {
+      await handleTopologyOfficeClick(office);
+      // Find and select the team
+      const teams = await supabaseApi.getTeamsByOffice(office.id);
+      const team = teams.find((t: any) => t.leaderId === leader.id);
+      if (team) {
+        setSelectedTeam({ id: team.id, name: team.name, office_id: office.id, leader_id: team.leaderId || null });
+        fetchRealtors(team.id);
+        setCurrentView('realtors');
+      }
+    }
+  };
+
+  const handleTopologyAgentClick = async (agent: Agent) => {
+    // Find the team for this agent
+    const office = topologyOffices.find((o) => 
+      o.teamLeaders.some((l) => l.teamMembers.some((a) => a.id === agent.id))
+    );
+    if (office) {
+      handleTopologyOfficeClick(office);
+      // Find and select the team and realtor
+      const teams = await supabaseApi.getTeamsByOffice(office.id);
+      for (const team of teams) {
+        const realtors = await supabaseApi.getRealtorsByTeam(team.id);
+        const realtor = realtors.find((r: any) => r.profile?.id === agent.id);
+        if (realtor) {
+          setSelectedTeam({ id: team.id, name: team.name, office_id: office.id, leader_id: team.leaderId || null });
+          fetchRealtors(team.id);
+          setCurrentView('realtors');
+          break;
+        }
+      }
     }
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card shadow-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <img src={logo} alt="Logo" className="h-12 w-12 object-contain" />
-              <div>
-                <h1 className="text-lg font-semibold text-foreground">Админ Панел</h1>
-                <p className="text-xs text-muted-foreground">{getBreadcrumb()}</p>
+    <div className="min-h-screen bg-background flex">
+      {/* Topology Sidebar */}
+      <TopologySidebar
+        offices={topologyOffices}
+        onOfficeClick={handleTopologyOfficeClick}
+        onLeaderClick={handleTopologyLeaderClick}
+        onAgentClick={handleTopologyAgentClick}
+        selectedOfficeId={selectedOffice?.id}
+        selectedLeaderId={selectedTeam?.leader_id || undefined}
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+      />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+      <header className="border-b border-border bg-card shadow-sm sticky top-0 z-30">
+        <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="h-8 w-8 sm:h-9 sm:w-9"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+              <img src={logo} alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 object-contain flex-shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground truncate">Админ Панел</h1>
+                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{getBreadcrumb()}</p>
               </div>
             </div>
             <div className="flex gap-2">
-              <Button onClick={() => navigate('/training-calendar')} variant="outline" size="sm">
-                <Calendar className="h-4 w-4 mr-2" />
-                Календар
+              <Button onClick={() => navigate('/training-calendar')} variant="outline" size="sm" className="text-xs sm:text-sm">
+                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Календар</span>
               </Button>
               {currentView !== 'countries' && (
                 <>
-                  <Button onClick={handleHome} variant="outline" size="sm">
-                    <Home className="h-4 w-4 mr-2" />
-                    Начало
+                  <Button onClick={handleHome} variant="outline" size="sm" className="text-xs sm:text-sm">
+                    <Home className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Начало</span>
                   </Button>
-                  <Button onClick={handleBack} variant="outline" size="sm">
-                    <ChevronLeft className="h-4 w-4 mr-2" />
-                    Назад
+                  <Button onClick={handleBack} variant="outline" size="sm" className="text-xs sm:text-sm">
+                    <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Назад</span>
                   </Button>
                 </>
               )}
               {currentView !== 'realtors' && (
-                <Button onClick={handleCreate} variant="default" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Добави
+                <Button onClick={handleCreate} variant="default" size="sm" className="text-xs sm:text-sm">
+                  <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Добави</span>
                 </Button>
               )}
-              <Button onClick={handleLogout} variant="outline" size="sm">
-                <LogOut className="h-4 w-4 mr-2" />
-                Изход
-              </Button>
+              {currentView === 'realtors' && selectedTeam && (
+                <Button onClick={() => setAddPersonDialogOpen(true)} variant="default" size="sm" className="text-xs sm:text-sm">
+                  <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Добави човек</span>
+                </Button>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6 sm:h-7 sm:w-7">
+                        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userInfo?.email || 'user'}`} />
+                        <AvatarFallback className="text-[10px] sm:text-xs">
+                          {userInfo?.fullName?.split(' ').map(n => n[0]).join('') || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="hidden sm:inline">{userInfo?.fullName || 'Акаунт'}</span>
+                      <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium">{userInfo?.fullName || 'Потребител'}</p>
+                      <p className="text-xs text-muted-foreground">{userInfo?.email || ''}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    Роля: {userInfo?.role || 'Неизвестна'}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Настройки на акаунта
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setUserManagementOpen(true)}>
+                    <Users className="h-4 w-4 mr-2" />
+                    Управление на акаунти
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Изход
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 space-y-8">
+      <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
         {loading ? (
           <div className="text-center text-muted-foreground">Зареждане...</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
             {currentView === 'countries' && countries.map((country) => (
               <div key={country.id} className="relative group">
                 <CountryCardWithKPI
@@ -640,6 +816,35 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add Person to Team Dialog */}
+      {selectedTeam && (
+        <AddPersonToTeamDialog
+          open={addPersonDialogOpen}
+          onOpenChange={setAddPersonDialogOpen}
+          teamId={selectedTeam.id}
+          teamName={selectedTeam.name}
+          onSuccess={handleDialogSuccess}
+        />
+      )}
+
+      {/* Account Settings Dialog */}
+      {userInfo && (
+        <AccountSettingsDialog
+          open={accountSettingsOpen}
+          onOpenChange={setAccountSettingsOpen}
+          userInfo={userInfo}
+          onUpdate={fetchUserInfo}
+        />
+      )}
+
+      {/* User Management Dialog */}
+      <UserManagementDialog
+        open={userManagementOpen}
+        onOpenChange={setUserManagementOpen}
+        onUpdate={fetchUserInfo}
+      />
+      </div>
     </div>
   );
 };

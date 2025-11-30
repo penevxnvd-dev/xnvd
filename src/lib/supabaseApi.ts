@@ -7,6 +7,11 @@ type TablesInsert<T extends keyof Database['public']['Tables']> = Database['publ
 type TablesUpdate<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update'];
 
 class SupabaseApiClient {
+  // Expose supabase client
+  get supabase() {
+    return supabase;
+  }
+
   // Auth methods
   async login(email: string, password: string) {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -392,6 +397,45 @@ class SupabaseApiClient {
     return { success: true };
   }
 
+  // Get all team leaders
+  async getAllTeamLeaders() {
+    const { data: teams, error } = await supabase
+      .from('teams')
+      .select(`
+        leader_id,
+        leader:profiles!teams_leader_id_fkey (
+          id,
+          full_name,
+          email
+        )
+      `)
+      .not('leader_id', 'is', null);
+
+    if (error) {
+      console.error('Error fetching team leaders:', error);
+      throw error;
+    }
+
+    // Extract unique leaders
+    const leadersMap = new Map<string, { id: string; fullName: string; email: string }>();
+    (teams || []).forEach((team: any) => {
+      if (team.leader && team.leader.id) {
+        leadersMap.set(team.leader.id, {
+          id: team.leader.id,
+          fullName: team.leader.full_name || 'Неизвестен',
+          email: team.leader.email || '',
+        });
+      }
+    });
+
+    const leaders = Array.from(leadersMap.values()).sort((a, b) => 
+      a.fullName.localeCompare(b.fullName)
+    );
+
+    console.log('Fetched team leaders:', leaders);
+    return leaders;
+  }
+
   // Realtors
   async getRealtorsByTeam(teamId: string) {
     const { data, error } = await supabase
@@ -408,6 +452,208 @@ class SupabaseApiClient {
 
     if (error) throw error;
     return data || [];
+  }
+
+  // Get all profiles that can be added to a team (not realtors or realtors without team)
+  async getAvailableProfilesForTeam() {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      throw new Error('Not authenticated');
+    }
+
+    // Get all profiles
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select(`
+        id,
+        full_name,
+        email,
+        realtors (id, team_id)
+      `)
+      .order('full_name', { ascending: true });
+
+    if (profilesError) throw profilesError;
+
+    // Filter to get profiles that are not realtors or realtors without a team
+    return (profiles || []).filter((profile: any) => {
+      const realtor = profile.realtors?.[0];
+      return !realtor || !realtor.team_id;
+    }).map((profile: any) => ({
+      id: profile.id,
+      fullName: profile.full_name,
+      email: profile.email,
+      isRealtor: !!profile.realtors?.[0],
+      realtorId: profile.realtors?.[0]?.id || null,
+    }));
+  }
+
+  // Add person to team (create realtor if needed, or update existing realtor)
+  async addPersonToTeam(userId: string, teamId: string, level: number = 1) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      throw new Error('Not authenticated');
+    }
+
+    // Check if realtor already exists
+    const { data: existingRealtor, error: checkError } = await supabase
+      .from('realtors')
+      .select('id')
+      .eq('user_id', userId)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      throw checkError;
+    }
+
+    if (existingRealtor) {
+      // Update existing realtor
+      const { data: updatedRealtor, error: updateError } = await supabase
+        .from('realtors')
+        .update({ team_id: teamId, level })
+        .eq('id', existingRealtor.id)
+        .select(`
+          *,
+          profile:profiles!realtors_user_id_fkey (
+            full_name,
+            email
+          )
+        `)
+        .single();
+
+      if (updateError) throw updateError;
+      return updatedRealtor;
+    } else {
+      // Create new realtor
+      const { data: newRealtor, error: createError } = await supabase
+        .from('realtors')
+        .insert({
+          user_id: userId,
+          team_id: teamId,
+          level,
+        })
+        .select(`
+          *,
+          profile:profiles!realtors_user_id_fkey (
+            full_name,
+            email
+          )
+        `)
+        .single();
+
+      if (createError) throw createError;
+      return newRealtor;
+    }
+  }
+
+  // Create account and add to team
+  async createAccountAndAddToTeam(
+    fullName: string,
+    email: string,
+    password: string,
+    teamId: string,
+    level: number = 1
+  ): Promise<string> {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      throw new Error('Not authenticated');
+    }
+
+    // Check if user with this email already exists
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .single();
+
+    if (existingProfile) {
+      throw new Error('Потребител с този имейл вече съществува');
+    }
+
+    // Create user in Supabase Auth (requires admin client, but we'll use signUp)
+    // Note: This might require server-side implementation for admin user creation
+    // For now, we'll use the regular signUp which requires email confirmation
+    const { data: authData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+        },
+        email_redirect_to: window.location.origin,
+      },
+    });
+
+    if (signUpError) {
+      throw new Error(`Грешка при създаване на акаунт: ${signUpError.message}`);
+    }
+
+    if (!authData.user) {
+      throw new Error('Неуспешно създаване на акаунт');
+    }
+
+    // Wait a bit for the profile trigger to create the profile
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Verify profile was created
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', authData.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      // If profile wasn't created by trigger, create it manually
+      const { error: createProfileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: authData.user.id,
+          full_name: fullName,
+          email: email,
+        });
+
+      if (createProfileError) {
+        throw new Error(`Грешка при създаване на профил: ${createProfileError.message}`);
+      }
+    }
+
+    // Create realtor entry
+    const { data: newRealtor, error: realtorError } = await supabase
+      .from('realtors')
+      .insert({
+        user_id: authData.user.id,
+        team_id: teamId,
+        level,
+      })
+      .select('id')
+      .single();
+
+    if (realtorError) {
+      throw new Error(`Грешка при добавяне към екип: ${realtorError.message}`);
+    }
+
+    return authData.user.id;
+  }
+
+  // Remove person from team
+  async removePersonFromTeam(realtorId: string) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      throw new Error('Not authenticated');
+    }
+
+    const { data, error } = await supabase
+      .from('realtors')
+      .update({ team_id: null })
+      .eq('id', realtorId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   }
 
   async getCurrentRealtor() {

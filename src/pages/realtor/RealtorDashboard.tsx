@@ -3,9 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
+import { Settings } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { LogOut, TrendingUp, Users, Target, CheckCircle2, XCircle, BookOpen, Calendar } from 'lucide-react';
+import { LogOut, TrendingUp, Users, Target, CheckCircle2, XCircle, BookOpen, Calendar, ChevronDown } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
 import { trainingStructure, calculateTrainingProgress, TrainingSection } from '@/data/trainingStructure';
 import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
@@ -54,6 +65,7 @@ interface TrainingProgress {
 const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
   const navigate = useNavigate();
   const [realtorData, setRealtorData] = useState<RealtorData | null>(null);
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [diagnoses, setDiagnoses] = useState<Diagnosis[]>([]);
   const [loading, setLoading] = useState(true);
@@ -257,46 +269,80 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card shadow-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <img src={logo} alt="Logo" className="h-12 w-12 object-contain" />
-              <div>
-                <h1 className="text-lg font-semibold text-foreground">
+        <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+              <img src={logo} alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 object-contain flex-shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground truncate">
                   {realtorData.user.fullName}
                 </h1>
-                <p className="text-xs text-muted-foreground">Ниво {realtorData.level}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Ниво {realtorData.level}</p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button onClick={() => navigate('/training-calendar')} variant="outline" size="sm">
-                <Calendar className="h-4 w-4 mr-2" />
-                Календар
+            <div className="flex gap-1 sm:gap-2 flex-wrap">
+              <Button onClick={() => navigate('/training-calendar')} variant="outline" size="sm" className="text-xs sm:text-sm">
+                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Календар</span>
               </Button>
-              <Button onClick={() => navigate('/training')} variant="outline" size="sm">
-                <BookOpen className="h-4 w-4 mr-2" />
-                Обучение
+              <Button onClick={() => navigate('/training')} variant="outline" size="sm" className="text-xs sm:text-sm">
+                <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Обучение</span>
               </Button>
-              <Button onClick={handleLogout} variant="outline" size="sm">
-                <LogOut className="h-4 w-4 mr-2" />
-                Изход
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6 sm:h-7 sm:w-7">
+                        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${realtorData.user.email}`} />
+                        <AvatarFallback className="text-[10px] sm:text-xs">
+                          {realtorData.user.fullName.split(' ').map(n => n[0]).join('')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="hidden sm:inline">{realtorData.user.fullName}</span>
+                      <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium">{realtorData.user.fullName}</p>
+                      <p className="text-xs text-muted-foreground">{realtorData.user.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    Роля: Реализатор • Ниво: {realtorData.level}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Настройки на акаунта
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Изход
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 space-y-8">
+      <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Сделки този месец</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Сделки този месец</CardTitle>
               <TrendingUp className="h-4 w-4 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{deals.length}</div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <div className="text-xl sm:text-2xl font-bold">{deals.length}</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
                 Обща стойност: {getTotalDealValue().toLocaleString()} лв
               </p>
             </CardContent>
@@ -304,12 +350,12 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Диагнози</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Диагнози</CardTitle>
               <Users className="h-4 w-4 text-accent" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{diagnoses.length}</div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <div className="text-xl sm:text-2xl font-bold">{diagnoses.length}</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
                 Активни запитвания
               </p>
             </CardContent>
@@ -317,12 +363,12 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Успеваемост</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Успеваемост</CardTitle>
               <Target className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{calculateSuccessRate()}%</div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <div className="text-xl sm:text-2xl font-bold">{calculateSuccessRate()}%</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
                 Сделки / Диагнози
               </p>
             </CardContent>
@@ -332,7 +378,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
         {/* Personal Qualities */}
         <Card>
           <CardHeader>
-            <CardTitle>Личностни качества</CardTitle>
+            <CardTitle className="text-sm sm:text-base">Личностни качества</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <QualityIndicator active={realtorData.confidence} label="Увереност" />
@@ -344,7 +390,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
         {/* Recent Deals */}
         <Card>
           <CardHeader>
-            <CardTitle>Последни сделки</CardTitle>
+            <CardTitle className="text-sm sm:text-base">Последни сделки</CardTitle>
           </CardHeader>
           <CardContent>
             {deals.length > 0 ? (
@@ -377,7 +423,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
         {/* Recent Diagnoses */}
         <Card>
           <CardHeader>
-            <CardTitle>Последни диагнози</CardTitle>
+            <CardTitle className="text-sm sm:text-base">Последни диагнози</CardTitle>
           </CardHeader>
           <CardContent>
             {diagnoses.length > 0 ? (
@@ -439,6 +485,27 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
           </div>
         </div>
       </main>
+
+      {/* Account Settings Dialog */}
+      {realtorData && (
+        <AccountSettingsDialog
+          open={accountSettingsOpen}
+          onOpenChange={setAccountSettingsOpen}
+          userInfo={{
+            fullName: realtorData.user.fullName,
+            email: realtorData.user.email,
+          }}
+          onUpdate={async () => {
+            // Refetch realtor data
+            try {
+              const data = await supabaseApi.getRealtorData(userId);
+              setRealtorData(data);
+            } catch (error) {
+              console.error('Error refetching realtor data:', error);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

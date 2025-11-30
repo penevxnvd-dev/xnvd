@@ -16,8 +16,9 @@ import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, Command
 import { Calendar as CalendarIcon, Users, Award, BookOpen, UserPlus, Clock, Edit, Trash2, Plus, ChevronLeft, ChevronRight, PlayCircle, CheckCircle2, Search, Filter, Download, Printer, Copy, Grid3x3, List, Calendar, BarChart3, Bell, X, MoreVertical, LayoutGrid, LayoutList, GripVertical } from 'lucide-react';
 import { TrainingGroup } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
+import { supabaseApi } from '@/lib/supabaseApi';
 import { format, addDays, nextMonday, nextDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, startOfWeek, endOfWeek, addMonths, subMonths, parse, differenceInDays, isPast, isFuture } from 'date-fns';
 import { bg } from 'date-fns/locale';
 import {
@@ -91,8 +92,57 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
     name: '',
     phone: '',
     position: '',
-    selectedDate: ''
+    selectedDate: '',
+    email: ''
   });
+  const [selectedLeader, setSelectedLeader] = useState<string>('');
+  const [availableLeaders, setAvailableLeaders] = useState<Array<{ id: string; fullName: string; email: string }>>([]);
+  
+  // Load team leaders from database
+  useEffect(() => {
+    const fetchLeaders = async () => {
+      try {
+        console.log('Fetching team leaders from database...');
+        const leaders = await supabaseApi.getAllTeamLeaders();
+        console.log('Fetched leaders:', leaders);
+        
+        if (leaders && leaders.length > 0) {
+          setAvailableLeaders(leaders);
+          if (!selectedLeader) {
+            setSelectedLeader(leaders[0].fullName);
+          }
+        } else {
+          console.log('No leaders from DB, trying fallback from groups');
+          // Fallback to leaders from existing groups
+          const leadersFromGroups = [...new Set(groups.map(g => g.leader).filter(Boolean))];
+          console.log('Leaders from groups:', leadersFromGroups);
+          if (leadersFromGroups.length > 0) {
+            setAvailableLeaders(leadersFromGroups.map(name => ({ id: `leader-${name}`, fullName: name, email: '' })));
+            if (!selectedLeader) {
+              setSelectedLeader(leadersFromGroups[0]);
+            }
+          } else {
+            console.log('No leaders found anywhere');
+            setAvailableLeaders([]);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching team leaders:', error);
+        // Fallback to leaders from existing groups
+        const leadersFromGroups = [...new Set(groups.map(g => g.leader).filter(Boolean))];
+        if (leadersFromGroups.length > 0) {
+          setAvailableLeaders(leadersFromGroups.map(name => ({ id: `leader-${name}`, fullName: name, email: '' })));
+          if (!selectedLeader) {
+            setSelectedLeader(leadersFromGroups[0]);
+          }
+        } else {
+          setAvailableLeaders([]);
+        }
+      }
+    };
+    
+    fetchLeaders();
+  }, [groups]);
 
   const [registeredTrainees, setRegisteredTrainees] = useState<Array<{
     id: string;
@@ -118,6 +168,16 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
     name: '',
     phone: '',
     position: ''
+  });
+  const [selectedGroupForDetails, setSelectedGroupForDetails] = useState<TrainingGroup | null>(null);
+  const [isGroupDetailsDialogOpen, setIsGroupDetailsDialogOpen] = useState(false);
+  const [selectedGroupForAddTrainee, setSelectedGroupForAddTrainee] = useState<TrainingGroup | null>(null);
+  const [isAddTraineeToGroupDialogOpen, setIsAddTraineeToGroupDialogOpen] = useState(false);
+  const [newTraineeForGroup, setNewTraineeForGroup] = useState({
+    name: '',
+    phone: '',
+    position: '',
+    email: ''
   });
 
   // Изчисляване на следващия понеделник и четвъртък
@@ -930,14 +990,26 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                                     return (
                                       <div
                                         key={idx}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          // If completed, show details. Otherwise, allow adding trainee
+                                          if (isCompleted) {
+                                            setSelectedGroupForDetails(group);
+                                            setIsGroupDetailsDialogOpen(true);
+                                          } else {
+                                            setSelectedGroupForAddTrainee(group);
+                                            setIsAddTraineeToGroupDialogOpen(true);
+                                          }
+                                        }}
                                         className={`
                                           text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1
-                                          font-medium group/item relative
-                                          transition-all duration-200 hover:scale-105
-                                          ${isActive ? 'bg-green-500/20 dark:bg-green-500/30 text-green-700 dark:text-green-300 border border-green-500/30' : ''}
-                                          ${isCompleted ? 'bg-gray-400/20 dark:bg-gray-600/30 text-gray-600 dark:text-gray-400 border border-gray-400/30' : ''}
-                                          ${isUpcoming ? 'bg-blue-500/20 dark:bg-blue-500/30 text-blue-700 dark:text-blue-300 border border-blue-500/30' : ''}
+                                          font-medium group/item relative cursor-pointer
+                                          transition-all duration-200 hover:scale-105 hover:shadow-md
+                                          ${isActive ? 'bg-green-500 text-white border border-green-600 shadow-sm' : ''}
+                                          ${isCompleted ? 'bg-gray-500 text-white border border-gray-600 shadow-sm' : ''}
+                                          ${isUpcoming ? 'bg-blue-500 text-white border border-blue-600 shadow-sm' : ''}
                                         `}
+                                        title={isCompleted ? 'Виж детайли' : 'Добави курсист в групата'}
                                       >
                                         {isActive && <PlayCircle className="h-2.5 w-2.5 flex-shrink-0" />}
                                         {isCompleted && <CheckCircle2 className="h-2.5 w-2.5 flex-shrink-0" />}
@@ -951,9 +1023,9 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                                           </span>
                                         )}
                                         {isActive && (
-                                          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500/50 rounded-b-md">
+                                          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-600/50 rounded-b-md">
                                             <div 
-                                              className="h-full bg-green-500 rounded-b-md transition-all duration-300"
+                                              className="h-full bg-white/80 rounded-b-md transition-all duration-300"
                                               style={{ width: `${progress}%` }}
                                             />
                                           </div>
@@ -1256,56 +1328,157 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                     </h4>
                     <form onSubmit={(e) => {
                       e.preventDefault();
-                      if (newTrainee.name && newTrainee.phone && newTrainee.position && selectedDate) {
-                        const dateStr = format(selectedDate, 'dd.MM.yyyy');
-                        const selectedDay = isMonday ? 'monday' : 'thursday';
-                        const newEntry = {
+                      if (newTrainee.name && newTrainee.phone && newTrainee.position && selectedDate && selectedLeader) {
+                        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+                        const dateKey = format(selectedDate, 'yyyy-MM-dd');
+                        
+                        // Check if group exists for this date
+                        const existingGroup = groups.find(g => g.startDate === dateKey);
+                        
+                        const newTraineeData = {
                           id: `trainee-${Date.now()}`,
                           name: newTrainee.name,
                           phone: newTrainee.phone,
                           position: newTrainee.position,
-                          selectedDate: selectedDay
+                          email: newTrainee.email || '',
+                          level: 'Чирак' as const,
+                          trainingStage: 1 as const,
+                          dateOfHiring: new Date().toISOString().split('T')[0],
+                          department: '',
+                          skills: [],
+                          deals: [],
+                          levelHistory: []
                         };
-                        setRegisteredTrainees([...registeredTrainees, newEntry]);
+                        
+                        if (existingGroup) {
+                          // Add to existing group
+                          const updatedGroups = groups.map(g => 
+                            g.id === existingGroup.id
+                              ? { ...g, trainees: [...g.trainees, newTraineeData] }
+                              : g
+                          );
+                          onUpdateGroups?.(updatedGroups);
+                          toast({
+                            title: "Курсист добавен!",
+                            description: `${newTrainee.name} е добавен/а към групата на ${existingGroup.leader}.`,
+                          });
+                        } else {
+                          // Create new group
+                          const newGroup: TrainingGroup = {
+                            id: `group-${Date.now()}`,
+                            startDate: dateKey,
+                            leader: selectedLeader,
+                            leaderId: `leader-${selectedLeader}`,
+                            currentDay: 0,
+                            status: 'предстояща' as any,
+                            trainees: [newTraineeData]
+                          };
+                          onUpdateGroups?.([...groups, newGroup]);
+                          toast({
+                            title: "Група създадена!",
+                            description: `Нова група с ръководител ${selectedLeader} е създадена за ${format(selectedDate, 'dd.MM.yyyy', { locale: bg })}.`,
+                          });
+                        }
+                        
+                        setNewTrainee({ name: '', phone: '', position: '', selectedDate: '', email: '' });
+                        setIsDateDialogOpen(false);
+                      } else {
                         toast({
-                          title: "Курсист записан успешно!",
-                          description: `${newTrainee.name} е добавен/а към групата за ${dateStr}.`,
+                          title: "Моля попълнете всички полета",
+                          description: "Име, телефон, позиция и ръководител са задължителни.",
+                          variant: "destructive"
                         });
-                        setNewTrainee({ name: '', phone: '', position: '', selectedDate: '' });
                       }
-                    }} className="space-y-3">
-                      <div className="grid grid-cols-3 gap-3">
+                    }} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
-                          <Label htmlFor="dialog-name">Име и фамилия</Label>
+                          <Label htmlFor="dialog-name">Име и фамилия *</Label>
                           <Input
                             id="dialog-name"
                             value={newTrainee.name}
                             onChange={(e) => setNewTrainee({ ...newTrainee, name: e.target.value })}
+                            placeholder="Иван Иванов"
                             required
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="dialog-phone">Телефон</Label>
+                          <Label htmlFor="dialog-phone">Телефон *</Label>
                           <Input
                             id="dialog-phone"
                             value={newTrainee.phone}
                             onChange={(e) => setNewTrainee({ ...newTrainee, phone: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="dialog-position">Позиция</Label>
-                          <Input
-                            id="dialog-position"
-                            value={newTrainee.position}
-                            onChange={(e) => setNewTrainee({ ...newTrainee, position: e.target.value })}
+                            placeholder="+359 888 123 456"
                             required
                           />
                         </div>
                       </div>
-                      <Button type="submit" className="w-full">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="dialog-position">Позиция *</Label>
+                          <Input
+                            id="dialog-position"
+                            value={newTrainee.position}
+                            onChange={(e) => setNewTrainee({ ...newTrainee, position: e.target.value })}
+                            placeholder="Реализатор"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="dialog-email">Имейл</Label>
+                          <Input
+                            id="dialog-email"
+                            type="email"
+                            value={newTrainee.email}
+                            onChange={(e) => setNewTrainee({ ...newTrainee, email: e.target.value })}
+                            placeholder="ivan@example.com"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="dialog-leader">Ръководител на групата *</Label>
+                        {availableLeaders.length > 0 ? (
+                          <Select value={selectedLeader} onValueChange={setSelectedLeader} required>
+                            <SelectTrigger id="dialog-leader">
+                              <SelectValue placeholder="Избери ръководител..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableLeaders.map((leader) => (
+                                <SelectItem key={leader.id} value={leader.fullName}>
+                                  {leader.fullName}
+                                  {leader.email && ` (${leader.email})`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div className="space-y-2">
+                            <Input
+                              id="dialog-leader"
+                              value={selectedLeader}
+                              onChange={(e) => setSelectedLeader(e.target.value)}
+                              placeholder="Въведете име на ръководител"
+                              required
+                            />
+                            <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded-md border border-yellow-200 dark:border-yellow-800">
+                              <p className="text-xs text-yellow-800 dark:text-yellow-200 font-medium mb-1">
+                                ⚠️ Няма налични лидери на екипи
+                              </p>
+                              <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                                Моля въведете име на ръководител ръчно или отидете в админ панела и създайте екипи с назначени лидери.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-3 rounded-md border border-blue-200 dark:border-blue-800">
+                        <CalendarIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <span>
+                          Дата: <strong>{format(selectedDate, 'EEEE, d MMMM yyyy', { locale: bg })}</strong>
+                        </span>
+                      </div>
+                      <Button type="submit" className="w-full" size="lg">
                         <UserPlus className="h-4 w-4 mr-2" />
-                        Запиши курсист
+                        {dayGroups.length === 0 ? 'Създай група и запиши курсист' : 'Запиши курсист в група'}
                       </Button>
                     </form>
                   </Card>
@@ -1519,6 +1692,253 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
           })()}
         </DialogContent>
       </Dialog>
+
+      {/* Add Trainee to Group Dialog */}
+      <Dialog open={isAddTraineeToGroupDialogOpen} onOpenChange={setIsAddTraineeToGroupDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-4 w-4" />
+              Добави курсист в група
+            </DialogTitle>
+          </DialogHeader>
+          {selectedGroupForAddTrainee && (
+            <div className="space-y-4 mt-4">
+              <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-md border border-blue-200 dark:border-blue-800">
+                <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                  Група: {selectedGroupForAddTrainee.leader}
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                  Дата: {format(parse(selectedGroupForAddTrainee.startDate, 'yyyy-MM-dd', new Date()), 'dd.MM.yyyy', { locale: bg })}
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  Текущи курсисти: {selectedGroupForAddTrainee.trainees?.length || 0}
+                </p>
+              </div>
+              
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (newTraineeForGroup.name && newTraineeForGroup.phone && newTraineeForGroup.position) {
+                  const newTraineeData = {
+                    id: `trainee-${Date.now()}`,
+                    name: newTraineeForGroup.name,
+                    phone: newTraineeForGroup.phone,
+                    position: newTraineeForGroup.position,
+                    email: newTraineeForGroup.email || '',
+                    level: 'Чирак' as const,
+                    trainingStage: 1 as const,
+                    dateOfHiring: new Date().toISOString().split('T')[0],
+                    department: '',
+                    skills: [],
+                    deals: [],
+                    levelHistory: []
+                  };
+                  
+                  const updatedGroups = groups.map(g => 
+                    g.id === selectedGroupForAddTrainee.id
+                      ? { ...g, trainees: [...g.trainees, newTraineeData] }
+                      : g
+                  );
+                  
+                  onUpdateGroups?.(updatedGroups);
+                  toast({
+                    title: "Курсист добавен!",
+                    description: `${newTraineeForGroup.name} е добавен/а към групата на ${selectedGroupForAddTrainee.leader}.`,
+                  });
+                  
+                  setNewTraineeForGroup({ name: '', phone: '', position: '', email: '' });
+                  setIsAddTraineeToGroupDialogOpen(false);
+                  setSelectedGroupForAddTrainee(null);
+                } else {
+                  toast({
+                    title: "Моля попълнете всички задължителни полета",
+                    variant: "destructive"
+                  });
+                }
+              }} className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="group-trainee-name">Име и фамилия *</Label>
+                    <Input
+                      id="group-trainee-name"
+                      value={newTraineeForGroup.name}
+                      onChange={(e) => setNewTraineeForGroup({ ...newTraineeForGroup, name: e.target.value })}
+                      placeholder="Иван Иванов"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="group-trainee-phone">Телефон *</Label>
+                    <Input
+                      id="group-trainee-phone"
+                      value={newTraineeForGroup.phone}
+                      onChange={(e) => setNewTraineeForGroup({ ...newTraineeForGroup, phone: e.target.value })}
+                      placeholder="+359 888 123 456"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="group-trainee-position">Позиция *</Label>
+                    <Input
+                      id="group-trainee-position"
+                      value={newTraineeForGroup.position}
+                      onChange={(e) => setNewTraineeForGroup({ ...newTraineeForGroup, position: e.target.value })}
+                      placeholder="Реализатор"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="group-trainee-email">Имейл</Label>
+                    <Input
+                      id="group-trainee-email"
+                      type="email"
+                      value={newTraineeForGroup.email}
+                      onChange={(e) => setNewTraineeForGroup({ ...newTraineeForGroup, email: e.target.value })}
+                      placeholder="ivan@example.com"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => {
+                      setIsAddTraineeToGroupDialogOpen(false);
+                      setNewTraineeForGroup({ name: '', phone: '', position: '', email: '' });
+                      setSelectedGroupForAddTrainee(null);
+                    }}
+                  >
+                    Отказ
+                  </Button>
+                  <Button type="submit" className="flex-1">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Добави курсист
+                  </Button>
+                </div>
+              </form>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Group Details Dialog */}
+      <Dialog open={isGroupDetailsDialogOpen} onOpenChange={setIsGroupDetailsDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {selectedGroupForDetails && (
+                  <>
+                    {selectedGroupForDetails.status === 'активна' && (
+                      <Badge className="bg-green-500 text-white">
+                        <PlayCircle className="h-3 w-3 mr-1" />
+                        Активна
+                      </Badge>
+                    )}
+                    {selectedGroupForDetails.status === 'завършена' && (
+                      <Badge className="bg-gray-500 text-white">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Завършена
+                      </Badge>
+                    )}
+                    {(!selectedGroupForDetails.status || selectedGroupForDetails.status === 'предстояща') && (
+                      <Badge className="bg-blue-500 text-white">
+                        <Clock className="h-3 w-3 mr-1" />
+                        Предстояща
+                      </Badge>
+                    )}
+                    <span>Група: {selectedGroupForDetails.leader}</span>
+                  </>
+                )}
+              </DialogTitle>
+            </DialogHeader>
+            {selectedGroupForDetails && (
+              <div className="space-y-4 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Ръководител</Label>
+                    <p className="font-semibold">{selectedGroupForDetails.leader}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Дата на започване</Label>
+                    <p className="font-semibold">
+                      {format(parse(selectedGroupForDetails.startDate, 'yyyy-MM-dd', new Date()), 'dd.MM.yyyy', { locale: bg })}
+                    </p>
+                  </div>
+                  {selectedGroupForDetails.status === 'активна' && (
+                    <div>
+                      <Label className="text-sm text-muted-foreground">Текущ ден</Label>
+                      <p className="font-semibold">Ден {selectedGroupForDetails.currentDay} от 3</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {getTrainingDayLabel(selectedGroupForDetails.currentDay)}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Брой курсисти</Label>
+                    <p className="font-semibold">{selectedGroupForDetails.trainees?.length || 0}</p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <Label className="text-base font-semibold mb-3 block">Записани курсисти</Label>
+                  {selectedGroupForDetails.trainees && selectedGroupForDetails.trainees.length > 0 ? (
+                    <div className="space-y-2">
+                      {selectedGroupForDetails.trainees.map((trainee, idx) => (
+                        <Card key={trainee.id || idx} className="p-3">
+                          <div className="flex items-start gap-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage src={trainee.avatar} alt={trainee.name} />
+                              <AvatarFallback className="bg-primary/10 text-primary">
+                                {trainee.name
+                                  .split(' ')
+                                  .map((n) => n[0])
+                                  .join('')}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <p className="font-semibold">{trainee.name}</p>
+                              <p className="text-sm text-muted-foreground">{trainee.position}</p>
+                              {trainee.phone && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  📞 {trainee.phone}
+                                </p>
+                              )}
+                              {trainee.email && (
+                                <p className="text-xs text-muted-foreground">
+                                  ✉️ {trainee.email}
+                                </p>
+                              )}
+                            </div>
+                            <Badge variant="outline">{trainee.level || 'Курсист'}</Badge>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>Няма записани курсисти в тази група</p>
+                    </div>
+                  )}
+                </div>
+
+                {selectedGroupForDetails.status === 'активна' && (
+                  <div className="border-t pt-4">
+                    <Label className="text-sm text-muted-foreground mb-2 block">Прогрес на обучението</Label>
+                    <Progress value={(selectedGroupForDetails.currentDay / 3) * 100} className="h-2" />
+                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>Ден {selectedGroupForDetails.currentDay} от 3</span>
+                      <span>{Math.round((selectedGroupForDetails.currentDay / 3) * 100)}%</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Drag Overlay */}
         <DragOverlay>
