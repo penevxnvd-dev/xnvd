@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
 import { UserManagementDialog } from '@/components/UserManagementDialog';
 import { Settings, Users } from 'lucide-react';
-import { LogOut, ChevronLeft, Home, Plus, Pencil, Trash2, Calendar, Menu, User, ChevronDown } from 'lucide-react';
+import { LogOut, ChevronLeft, Home, Plus, Pencil, Trash2, Calendar, Menu, User, ChevronDown, FileText, Target, CheckCircle2, XCircle, Award, TrendingUp } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
 import { CreateEditDialog } from '@/components/admin/CreateEditDialog';
 import { AddPersonToTeamDialog } from '@/components/admin/AddPersonToTeamDialog';
@@ -44,9 +47,14 @@ import {
   calculateCountryKPI,
   RealtorData,
   KPIMetrics,
+  formatSuccessRate,
 } from '@/utils/kpiCalculations';
+import { trainingStructure, calculateTrainingProgress, TrainingSection } from '@/data/trainingStructure';
+import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
+import { Progress } from '@/components/ui/progress';
+import { BookOpen } from 'lucide-react';
 
-type ViewLevel = 'countries' | 'cities' | 'offices' | 'teams' | 'realtors';
+type ViewLevel = 'countries' | 'cities' | 'offices' | 'teams' | 'realtors' | 'realtor-detail';
 
 interface Country {
   id: string;
@@ -79,6 +87,9 @@ interface Realtor {
   userId: string;
   teamId: string | null;
   level: number;
+  confidence?: boolean;
+  salesResilience?: boolean;
+  successMindset?: boolean;
   user: {
     fullName: string;
     email: string;
@@ -103,6 +114,12 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
   const [selectedOffice, setSelectedOffice] = useState<Office | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [selectedRealtor, setSelectedRealtor] = useState<Realtor | null>(null);
+  const [selectedRealtorKPI, setSelectedRealtorKPI] = useState<KPIMetrics | null>(null);
+  const [selectedRealtorDeals, setSelectedRealtorDeals] = useState<any[]>([]);
+  const [selectedRealtorDiagnoses, setSelectedRealtorDiagnoses] = useState<any[]>([]);
+  const [selectedRealtorTrainingData, setSelectedRealtorTrainingData] = useState<TrainingSection[]>(trainingStructure);
+  const [selectedRealtorTrainingProgress, setSelectedRealtorTrainingProgress] = useState(0);
   const [topologyOffices, setTopologyOffices] = useState<Office[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
@@ -303,6 +320,14 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   };
 
   const handleBack = () => {
+    if (currentView === 'realtor-detail') {
+      setCurrentView('realtors');
+      setSelectedRealtor(null);
+      setSelectedRealtorKPI(null);
+      setSelectedRealtorDeals([]);
+      setSelectedRealtorDiagnoses([]);
+      return;
+    }
     if (currentView === 'realtors') {
       setCurrentView('teams');
       setSelectedTeam(null);
@@ -343,10 +368,14 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
 
   const getBreadcrumb = () => {
     const parts = ['Начало'];
-    if (selectedCountry) parts.push(selectedCountry.name);
-    if (selectedCity) parts.push(selectedCity.name);
-    if (selectedOffice) parts.push(selectedOffice.name);
-    if (selectedTeam) parts.push(selectedTeam.name);
+    if (currentView === 'realtor-detail' && selectedRealtor) {
+      parts.push(selectedRealtor.user.fullName);
+    } else {
+      if (selectedCountry) parts.push(selectedCountry.name);
+      if (selectedCity) parts.push(selectedCity.name);
+      if (selectedOffice) parts.push(selectedOffice.name);
+      if (selectedTeam) parts.push(selectedTeam.name);
+    }
     return parts.join(' / ');
   };
 
@@ -545,17 +574,17 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
               </Button>
               {currentView !== 'countries' && (
                 <>
-                  <Button onClick={handleHome} variant="outline" size="sm" className="text-xs sm:text-sm">
-                    <Home className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    <span className="hidden sm:inline">Начало</span>
+                  <Button onClick={handleHome} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
+                    <Home className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                    <span>Начало</span>
                   </Button>
-                  <Button onClick={handleBack} variant="outline" size="sm" className="text-xs sm:text-sm">
-                    <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    <span className="hidden sm:inline">Назад</span>
+                  <Button onClick={handleBack} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
+                    <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                    <span>Назад</span>
                   </Button>
                 </>
               )}
-              {currentView !== 'realtors' && (
+              {currentView !== 'realtors' && currentView !== 'realtor-detail' && (
                 <Button onClick={handleCreate} variant="default" size="sm" className="text-xs sm:text-sm">
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   <span className="hidden sm:inline">Добави</span>
@@ -764,10 +793,273 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                     salesResilience: false,
                     successMindset: false
                   }}
-                  onClick={() => navigate('/training')}
+                  onClick={async () => {
+                    // Fetch full realtor data with all fields
+                    try {
+                      const { data: fullRealtor } = await supabaseApi.supabase
+                        .from('realtors')
+                        .select('*, profile:profiles!realtors_user_id_fkey(*)')
+                        .eq('id', realtor.id)
+                        .single();
+                      
+                      if (fullRealtor) {
+                        setSelectedRealtor({
+                          ...realtor,
+                          confidence: fullRealtor.confidence || false,
+                          salesResilience: fullRealtor.sales_resilience || false,
+                          successMindset: fullRealtor.success_mindset || false,
+                        });
+                      } else {
+                        setSelectedRealtor(realtor);
+                      }
+                      
+                      const kpi = await supabaseApi.getRealtorKPI(realtor.id);
+                      setSelectedRealtorKPI(kpi);
+                      
+                      // Fetch deals and diagnoses
+                      const { data: deals } = await supabaseApi.supabase
+                        .from('deals')
+                        .select('*')
+                        .eq('realtor_id', realtor.id)
+                        .order('deal_date', { ascending: false });
+                      
+                      const { data: diagnoses } = await supabaseApi.supabase
+                        .from('diagnoses')
+                        .select('*')
+                        .eq('realtor_id', realtor.id)
+                        .order('diagnosis_date', { ascending: false });
+                      
+                      setSelectedRealtorDeals(deals || []);
+                      setSelectedRealtorDiagnoses(diagnoses || []);
+                      
+                      // Fetch training progress
+                      const { data: trainingProgress } = await supabaseApi.supabase
+                        .from('training_progress')
+                        .select('*')
+                        .eq('realtor_id', realtor.id);
+                      
+                      if (trainingProgress) {
+                        const updatedTrainingData = trainingStructure.map((section) => ({
+                          ...section,
+                          subsections: section.subsections.map((subsection) => {
+                            const progressItem = trainingProgress.find(
+                              (p: any) => p.section === section.id && p.subsection === subsection.id
+                            );
+                            return {
+                              ...subsection,
+                              progress: progressItem
+                                ? {
+                                    lecture: progressItem.lecture_completed || false,
+                                    video: progressItem.video_completed || false,
+                                    practical: progressItem.practical_completed || false,
+                                    handover: progressItem.handover_completed || false,
+                                    exam: progressItem.exam_completed || false,
+                                  }
+                                : subsection.progress,
+                            };
+                          }),
+                        }));
+                        setSelectedRealtorTrainingData(updatedTrainingData);
+                        setSelectedRealtorTrainingProgress(calculateTrainingProgress(updatedTrainingData));
+                      } else {
+                        setSelectedRealtorTrainingData(trainingStructure);
+                        setSelectedRealtorTrainingProgress(0);
+                      }
+                      
+                      setCurrentView('realtor-detail');
+                    } catch (error) {
+                      console.error('Error fetching realtor details:', error);
+                      toast.error('Грешка при зареждане на детайли');
+                    }
+                  }}
                 />
               )
             ))}
+          </div>
+        )}
+
+        {/* Realtor Detail View */}
+        {!loading && currentView === 'realtor-detail' && selectedRealtor && selectedRealtorKPI && (
+          <div className="space-y-4 sm:space-y-6">
+            {/* Overall Training Progress - At the very top with realtor info */}
+            <Card>
+              <CardHeader className="p-3 sm:p-6">
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-3 sm:mb-4">
+                  <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 flex-wrap">
+                    <h2 className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-gray-900 dark:text-gray-50 break-words flex-1 min-w-0">
+                      {selectedRealtor.user.fullName}
+                    </h2>
+                    <Badge className={cn(
+                      "text-[9px] sm:text-[10px] md:text-xs border font-medium flex-shrink-0",
+                      selectedRealtor.level === 1 ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800' :
+                      (selectedRealtor.level === 2 || selectedRealtor.level === 3) ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800' :
+                      'bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800'
+                    )}>
+                      {(selectedRealtor.level === 4 || selectedRealtor.level === 5) && <Award className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />}
+                      {selectedRealtor.level === 1 ? 'Чирак' : (selectedRealtor.level === 2 || selectedRealtor.level === 3) ? 'Реализатор' : 'Елит'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-baseline gap-1.5 flex-shrink-0">
+                    <TrendingUp className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-base font-semibold text-emerald-600 dark:text-emerald-400">
+                      {formatSuccessRate(selectedRealtorKPI.successRate)}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Stats */}
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-3 sm:mb-4">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded bg-purple-50 dark:bg-purple-950/30">
+                        <Target className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <span className="text-[9px] sm:text-[10px] md:text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide break-words">
+                        Диагнози
+                      </span>
+                    </div>
+                    <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-50">{selectedRealtorKPI.diagnoses}</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded bg-green-50 dark:bg-green-950/30">
+                        <FileText className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <span className="text-[9px] sm:text-[10px] md:text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide break-words">
+                        Сделки
+                      </span>
+                    </div>
+                    <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-50">{selectedRealtorKPI.deals}</p>
+                  </div>
+                </div>
+
+                {/* Training Progress Header */}
+                <div className="flex items-center justify-between flex-wrap gap-2 pt-3 border-t border-gray-100 dark:border-gray-800">
+                  <CardTitle className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs md:text-sm lg:text-base break-words">
+                    <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 flex-shrink-0" />
+                    <span>Обучение - Етап 1</span>
+                  </CardTitle>
+                  <Badge variant="secondary" className="text-[10px] sm:text-xs md:text-sm lg:text-base flex-shrink-0">
+                    {selectedRealtorTrainingProgress}%
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-6 pt-0">
+                <Progress value={selectedRealtorTrainingProgress} className="h-2 sm:h-3 mb-3 sm:mb-4" />
+                <p className="text-[9px] sm:text-[10px] md:text-xs lg:text-sm text-muted-foreground break-words">
+                  Завършени {Math.round((selectedRealtorTrainingProgress / 100) * 17)} от 17 подточки
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Qualities - Separate section */}
+            <div className="p-3 sm:p-6 space-y-4">
+              <div className="pt-3 border-t border-gray-100 dark:border-gray-800">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[9px] sm:text-[10px] md:text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide break-words">
+                    Лични качества
+                  </span>
+                  <span className="text-[9px] sm:text-[10px] md:text-xs font-bold text-gray-900 dark:text-gray-50">
+                    {[selectedRealtor.confidence, selectedRealtor.salesResilience, selectedRealtor.successMindset].filter(Boolean).length}/3
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between py-1.5">
+                    <span className="text-[9px] sm:text-[10px] md:text-xs text-gray-700 dark:text-gray-300 break-words">Увереност</span>
+                    {selectedRealtor.confidence ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between py-1.5">
+                    <span className="text-[9px] sm:text-[10px] md:text-xs text-gray-700 dark:text-gray-300 break-words">Търговски непукизъм</span>
+                    {selectedRealtor.salesResilience ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between py-1.5">
+                    <span className="text-[9px] sm:text-[10px] md:text-xs text-gray-700 dark:text-gray-300 break-words">Успешен начин на мислене</span>
+                    {selectedRealtor.successMindset ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Deals List - Only show if there are deals */}
+            {selectedRealtorDeals.length > 0 && (
+              <Card>
+                <CardHeader className="p-3 sm:p-6">
+                  <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base break-words">Сделки</CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 sm:p-6 pt-0">
+                  <div className="space-y-2 sm:space-y-3">
+                    {selectedRealtorDeals.map((deal) => (
+                      <div
+                        key={deal.id}
+                        className="flex items-center justify-between p-2 sm:p-3 bg-muted/50 rounded-lg gap-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] sm:text-xs md:text-sm font-medium break-words">{deal.client_name}</p>
+                          <p className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground">
+                            {new Date(deal.deal_date).toLocaleDateString('bg-BG')}
+                          </p>
+                        </div>
+                        <Badge variant="secondary" className="text-[9px] sm:text-[10px] md:text-xs flex-shrink-0">
+                          {Number(deal.deal_value).toLocaleString()} лв
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Diagnoses List - Only show if there are diagnoses */}
+            {selectedRealtorDiagnoses.length > 0 && (
+              <Card>
+                <CardHeader className="p-3 sm:p-6">
+                  <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base break-words">Диагнози</CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 sm:p-6 pt-0">
+                  <div className="space-y-2 sm:space-y-3">
+                    {selectedRealtorDiagnoses.map((diagnosis) => (
+                      <div
+                        key={diagnosis.id}
+                        className="flex items-center justify-between p-2 sm:p-3 bg-muted/50 rounded-lg gap-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] sm:text-xs md:text-sm font-medium break-words">{diagnosis.client_name}</p>
+                          <p className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground">
+                            {new Date(diagnosis.diagnosis_date).toLocaleDateString('bg-BG')}
+                          </p>
+                        </div>
+                        <Badge className="text-[9px] sm:text-[10px] md:text-xs flex-shrink-0">{diagnosis.status}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Training Sections - Below realtor info */}
+            <div className="space-y-3 sm:space-y-4">
+              {selectedRealtorTrainingData.map((section) => (
+                <TrainingSectionCard
+                  key={section.id}
+                  section={section}
+                  onProgressUpdate={() => {}} // Read-only in detail view
+                  editable={false}
+                />
+              ))}
+            </div>
           </div>
         )}
 

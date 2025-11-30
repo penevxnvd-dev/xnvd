@@ -36,10 +36,10 @@ export const CountryCard = ({ country, metrics, onClick }: CountryCardProps) => 
               <Map className="h-4.5 w-4.5 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-              <CardTitle className="text-base font-semibold text-gray-900 dark:text-gray-50 truncate">
+              <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-gray-900 dark:text-gray-50 break-words">
                 {country.name}
               </CardTitle>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Код: {country.code}</p>
+              <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-500 dark:text-gray-400 mt-0.5 break-words">Код: {country.code}</p>
             </div>
           </div>
           <div className="flex items-baseline gap-1.5 flex-shrink-0">

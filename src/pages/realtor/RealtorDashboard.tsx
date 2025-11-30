@@ -16,10 +16,13 @@ import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
 import { Settings } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { LogOut, TrendingUp, Users, Target, CheckCircle2, XCircle, BookOpen, Calendar, ChevronDown } from 'lucide-react';
+import { LogOut, TrendingUp, Users, Target, CheckCircle2, XCircle, BookOpen, Calendar, ChevronDown, Menu } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
 import { trainingStructure, calculateTrainingProgress, TrainingSection } from '@/data/trainingStructure';
 import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
+import { TopologySidebar } from '@/components/TopologySidebar';
+import { transformOffices } from '@/utils/dataTransform';
+import { Office, Agent } from '@/types';
 import { toast } from 'sonner';
 
 interface RealtorData {
@@ -71,6 +74,9 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
   const [loading, setLoading] = useState(true);
   const [trainingData, setTrainingData] = useState<TrainingSection[]>(trainingStructure);
   const [trainingProgress, setTrainingProgress] = useState(0);
+  const [topologyOffices, setTopologyOffices] = useState<Office[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchRealtorData();
@@ -79,8 +85,33 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
   useEffect(() => {
     if (realtorData?.id) {
       fetchTrainingProgress();
+      fetchTopologyData();
     }
-  }, [realtorData?.id]);
+  }, [realtorData?.id, realtorData?.user?.email]);
+
+  const fetchTopologyData = async () => {
+    try {
+      const dbOffices = await supabaseApi.getAllOfficesFull();
+      const transformedOffices = transformOffices(dbOffices);
+      setTopologyOffices(transformedOffices);
+      
+      // Find and select current realtor in topology by user email
+      if (realtorData?.user?.email) {
+        for (const office of transformedOffices) {
+          for (const leader of office.teamLeaders) {
+            const agent = leader.teamMembers.find((a: Agent) => a.email === realtorData.user.email);
+            if (agent) {
+              setSelectedAgentId(agent.id);
+              break;
+            }
+          }
+          if (selectedAgentId) break;
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching topology data:', error);
+    }
+  };
 
   const fetchRealtorData = async () => {
     setLoading(true);
@@ -90,7 +121,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
       const realtorProfile = await supabaseApi.getCurrentRealtor();
 
       if (realtorProfile) {
-        setRealtorData({
+        const realtorDataObj = {
           id: realtorProfile.id,
           level: realtorProfile.level,
           confidence: realtorProfile.confidence || false,
@@ -100,7 +131,8 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
             fullName: realtorProfile.user.fullName,
             email: realtorProfile.user.email
           }
-        });
+        };
+        setRealtorData(realtorDataObj);
 
         // Fetch deals and diagnoses
         const [dealsData, diagnosesData] = await Promise.all([
@@ -236,12 +268,12 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
   };
 
   const QualityIndicator = ({ active, label }: { active: boolean; label: string }) => (
-    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-      <span className="text-sm font-medium">{label}</span>
+    <div className="flex items-center justify-between p-2 sm:p-3 bg-muted/50 rounded-lg">
+      <span className="text-[10px] sm:text-xs md:text-sm font-medium break-words">{label}</span>
       {active ? (
-        <CheckCircle2 className="h-5 w-5 text-success" />
+        <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-success flex-shrink-0 ml-2" />
       ) : (
-        <XCircle className="h-5 w-5 text-destructive" />
+        <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-destructive flex-shrink-0 ml-2" />
       )}
     </div>
   );
@@ -267,40 +299,56 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex">
+      <TopologySidebar
+        offices={topologyOffices}
+        selectedAgentId={selectedAgentId || undefined}
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+      />
+      
+      <div className="flex-1 flex flex-col">
       <header className="border-b border-border bg-card shadow-sm sticky top-0 z-10">
         <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="p-1.5 sm:p-2 flex-shrink-0"
+              >
+                <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
               <img src={logo} alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 object-contain flex-shrink-0" />
-              <div className="min-w-0">
-                <h1 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground truncate">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-foreground break-words">
                   {realtorData.user.fullName}
                 </h1>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Ниво {realtorData.level}</p>
+                <p className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground">Ниво {realtorData.level}</p>
               </div>
             </div>
             <div className="flex gap-1 sm:gap-2 flex-wrap">
-              <Button onClick={() => navigate('/training-calendar')} variant="outline" size="sm" className="text-xs sm:text-sm">
-                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Календар</span>
+              <Button onClick={() => navigate('/training-calendar')} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
+                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                <span>Календар</span>
               </Button>
-              <Button onClick={() => navigate('/training')} variant="outline" size="sm" className="text-xs sm:text-sm">
-                <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Обучение</span>
+              <Button onClick={() => navigate('/training')} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
+                <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                <span>Обучение</span>
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6 sm:h-7 sm:w-7">
+                  <Button variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <Avatar className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7">
                         <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${realtorData.user.email}`} />
-                        <AvatarFallback className="text-[10px] sm:text-xs">
+                        <AvatarFallback className="text-[9px] sm:text-[10px] md:text-xs">
                           {realtorData.user.fullName.split(' ').map(n => n[0]).join('')}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="hidden sm:inline">{realtorData.user.fullName}</span>
-                      <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="break-words max-w-[100px] sm:max-w-[150px] md:max-w-none">{realtorData.user.fullName}</span>
+                      <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
@@ -336,39 +384,39 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Сделки този месец</CardTitle>
-              <TrendingUp className="h-4 w-4 text-success" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
+              <CardTitle className="text-[10px] sm:text-xs md:text-sm font-medium break-words">Сделки този месец</CardTitle>
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-success flex-shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">{deals.length}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <div className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold">{deals.length}</div>
+              <p className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground mt-1 break-words">
                 Обща стойност: {getTotalDealValue().toLocaleString()} лв
               </p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Диагнози</CardTitle>
-              <Users className="h-4 w-4 text-accent" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
+              <CardTitle className="text-[10px] sm:text-xs md:text-sm font-medium break-words">Диагнози</CardTitle>
+              <Users className="h-3 w-3 sm:h-4 sm:w-4 text-accent flex-shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">{diagnoses.length}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <div className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold">{diagnoses.length}</div>
+              <p className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground mt-1 break-words">
                 Активни запитвания
               </p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Успеваемост</CardTitle>
-              <Target className="h-4 w-4 text-primary" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
+              <CardTitle className="text-[10px] sm:text-xs md:text-sm font-medium break-words">Успеваемост</CardTitle>
+              <Target className="h-3 w-3 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">{calculateSuccessRate()}%</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <div className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold">{calculateSuccessRate()}%</div>
+              <p className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground mt-1 break-words">
                 Сделки / Диагнози
               </p>
             </CardContent>
@@ -377,10 +425,10 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
 
         {/* Personal Qualities */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-sm sm:text-base">Личностни качества</CardTitle>
+          <CardHeader className="p-3 sm:p-6">
+            <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base break-words">Личностни качества</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2 sm:space-y-3 p-3 sm:p-6 pt-0">
             <QualityIndicator active={realtorData.confidence} label="Увереност" />
             <QualityIndicator active={realtorData.salesResilience} label="Търговски непукизъм" />
             <QualityIndicator active={realtorData.successMindset} label="Успешен начин на мислене" />
@@ -389,31 +437,31 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
 
         {/* Recent Deals */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-sm sm:text-base">Последни сделки</CardTitle>
+          <CardHeader className="p-3 sm:p-6">
+            <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base break-words">Последни сделки</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 sm:p-6 pt-0">
             {deals.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 {deals.slice(0, 5).map((deal) => (
                   <div
                     key={deal.id}
-                    className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                    className="flex items-center justify-between p-2 sm:p-3 bg-muted/50 rounded-lg gap-2"
                   >
-                    <div>
-                      <p className="font-medium">{deal.clientName}</p>
-                      <p className="text-xs text-muted-foreground">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] sm:text-xs md:text-sm font-medium break-words">{deal.clientName}</p>
+                      <p className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground">
                         {new Date(deal.dealDate).toLocaleDateString('bg-BG')}
                       </p>
                     </div>
-                    <Badge variant="secondary">
+                    <Badge variant="secondary" className="text-[9px] sm:text-[10px] md:text-xs flex-shrink-0">
                       {deal.dealValue.toLocaleString()} лв
                     </Badge>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">
+              <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground text-center py-4 break-words">
                 Все още няма сделки за този месец
               </p>
             )}
@@ -422,29 +470,29 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
 
         {/* Recent Diagnoses */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-sm sm:text-base">Последни диагнози</CardTitle>
+          <CardHeader className="p-3 sm:p-6">
+            <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base break-words">Последни диагнози</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 sm:p-6 pt-0">
             {diagnoses.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 {diagnoses.slice(0, 5).map((diagnosis) => (
                   <div
                     key={diagnosis.id}
-                    className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                    className="flex items-center justify-between p-2 sm:p-3 bg-muted/50 rounded-lg gap-2"
                   >
-                    <div>
-                      <p className="font-medium">{diagnosis.clientName}</p>
-                      <p className="text-xs text-muted-foreground">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] sm:text-xs md:text-sm font-medium break-words">{diagnosis.clientName}</p>
+                      <p className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground">
                         {new Date(diagnosis.diagnosisDate).toLocaleDateString('bg-BG')}
                       </p>
                     </div>
-                    <Badge>{diagnosis.status}</Badge>
+                    <Badge className="text-[9px] sm:text-[10px] md:text-xs flex-shrink-0">{diagnosis.status}</Badge>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">
+              <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground text-center py-4 break-words">
                 Все още няма диагнози за този месец
               </p>
             )}
@@ -452,22 +500,22 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
         </Card>
 
         {/* Training Structure */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5" />
-                  Обучение - Етап 1
+            <CardHeader className="p-3 sm:p-6">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs md:text-sm lg:text-base break-words">
+                  <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 flex-shrink-0" />
+                  <span>Обучение - Етап 1</span>
                 </CardTitle>
-                <Badge variant="secondary" className="text-lg">
+                <Badge variant="secondary" className="text-[10px] sm:text-xs md:text-sm lg:text-base flex-shrink-0">
                   {trainingProgress}%
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent>
-              <Progress value={trainingProgress} className="h-3" />
-              <p className="text-sm text-muted-foreground mt-2">
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <Progress value={trainingProgress} className="h-2 sm:h-3" />
+              <p className="text-[9px] sm:text-[10px] md:text-xs lg:text-sm text-muted-foreground mt-1.5 sm:mt-2 break-words">
                 Завършени {Math.round((trainingProgress / 100) * 17)} от 17 подточки
               </p>
             </CardContent>
@@ -506,6 +554,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
           }}
         />
       )}
+      </div>
     </div>
   );
 };

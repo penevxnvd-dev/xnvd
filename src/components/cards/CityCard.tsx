@@ -36,11 +36,11 @@ export const CityCard = ({ city, metrics, onClick }: CityCardProps) => {
               <MapPin className="h-4.5 w-4.5 text-accent" />
             </div>
             <div className="flex-1 min-w-0">
-              <CardTitle className="text-base font-semibold text-gray-900 dark:text-gray-50 truncate">
+              <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-gray-900 dark:text-gray-50 break-words">
                 {city.name}
               </CardTitle>
               {city.countryName && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{city.countryName}</p>
+                <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-500 dark:text-gray-400 mt-0.5 break-words">{city.countryName}</p>
               )}
             </div>
           </div>

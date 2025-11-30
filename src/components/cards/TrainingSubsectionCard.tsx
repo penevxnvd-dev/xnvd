@@ -32,80 +32,85 @@ export const TrainingSubsectionCard = ({
 
   return (
     <Card className="transition-all duration-300 hover:shadow-lg">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base">{subsection.title}</CardTitle>
-          <Badge variant={completed ? "default" : "outline"} className={completed ? "bg-success" : ""}>
+      <CardHeader className="p-3 sm:p-6">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base min-w-0 flex-1 break-words">{subsection.title}</CardTitle>
+          <Badge variant={completed ? "default" : "outline"} className={`${completed ? "bg-success" : ""} text-[9px] sm:text-[10px] md:text-xs flex-shrink-0`}>
             {completed ? (
               <>
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                Завършено
+                <CheckCircle2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-1" />
+                <span>Завършено</span>
               </>
             ) : (
-              <Circle className="h-3 w-3" />
+              <Circle className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
             )}
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-6">
         {/* Progress Table - Horizontal with Progress Bar */}
-        <div className="w-full space-y-3">
-          <div className="overflow-x-auto">
+        <div className="w-full space-y-2 sm:space-y-3">
+          <div className="overflow-x-auto -mx-3 sm:-mx-6 px-3 sm:px-6">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-center">Лекция</TableHead>
-                  <TableHead className="text-center">Видео</TableHead>
-                  <TableHead className="text-center">Практическо</TableHead>
-                  <TableHead className="text-center">Предаване</TableHead>
-                  <TableHead className="text-center">Изпит</TableHead>
+                  <TableHead className="text-center text-[10px] sm:text-xs">Лекция</TableHead>
+                  <TableHead className="text-center text-[10px] sm:text-xs">Видео</TableHead>
+                  <TableHead className="text-center text-[10px] sm:text-xs">Практическо</TableHead>
+                  <TableHead className="text-center text-[10px] sm:text-xs">Предаване</TableHead>
+                  <TableHead className="text-center text-[10px] sm:text-xs">Изпит</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 <TableRow>
-                  <TableCell className="text-center">
+                  <TableCell className="text-center p-2 sm:p-4">
                     <Checkbox
                       checked={lecture}
                       disabled={!editable}
                       onCheckedChange={(checked) =>
                         onProgressUpdate(sectionId, subsection.id, 'lecture', checked as boolean)
                       }
+                      className="scale-90 sm:scale-100"
                     />
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className="text-center p-2 sm:p-4">
                     <Checkbox
                       checked={video}
                       disabled={!editable}
                       onCheckedChange={(checked) =>
                         onProgressUpdate(sectionId, subsection.id, 'video', checked as boolean)
                       }
+                      className="scale-90 sm:scale-100"
                     />
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className="text-center p-2 sm:p-4">
                     <Checkbox
                       checked={practical}
                       disabled={!editable}
                       onCheckedChange={(checked) =>
                         onProgressUpdate(sectionId, subsection.id, 'practical', checked as boolean)
                       }
+                      className="scale-90 sm:scale-100"
                     />
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className="text-center p-2 sm:p-4">
                     <Checkbox
                       checked={handover}
                       disabled={!editable}
                       onCheckedChange={(checked) =>
                         onProgressUpdate(sectionId, subsection.id, 'handover', checked as boolean)
                       }
+                      className="scale-90 sm:scale-100"
                     />
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className="text-center p-2 sm:p-4">
                     <Checkbox
                       checked={exam}
                       disabled={!editable}
                       onCheckedChange={(checked) =>
                         onProgressUpdate(sectionId, subsection.id, 'exam', checked as boolean)
                       }
+                      className="scale-90 sm:scale-100"
                     />
                   </TableCell>
                 </TableRow>
@@ -115,15 +120,15 @@ export const TrainingSubsectionCard = ({
           
           {/* Horizontal Progress Bar */}
           <div className="pt-2 border-t border-border">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+              <span className="text-[9px] sm:text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wide break-words">
                 Прогрес
               </span>
-              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="text-[9px] sm:text-[10px] md:text-xs font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0 ml-2">
                 {Math.round(progressPercentage)}%
               </span>
             </div>
-            <Progress value={progressPercentage} className="h-2" />
+            <Progress value={progressPercentage} className="h-1.5 sm:h-2" />
           </div>
         </div>
       </CardContent>

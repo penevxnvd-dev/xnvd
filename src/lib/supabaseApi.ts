@@ -663,7 +663,8 @@ class SupabaseApiClient {
       throw new Error('Not authenticated');
     }
 
-    const { data: realtor, error } = await supabase
+    // Try with foreign key relation first
+    let { data: realtor, error } = await supabase
       .from('realtors')
       .select(`
         *,
@@ -674,6 +675,34 @@ class SupabaseApiClient {
       `)
       .eq('user_id', user.id)
       .single();
+
+    // If that fails (406 error), try without the relation
+    if (error && (error.code === 'PGRST116' || error.message?.includes('406'))) {
+      const { data: realtorData, error: realtorError } = await supabase
+        .from('realtors')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (realtorError) throw realtorError;
+      
+      // Fetch profile separately
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', user.id)
+        .single();
+
+      return {
+        ...realtorData,
+        salesResilience: realtorData.sales_resilience || false,
+        successMindset: realtorData.success_mindset || false,
+        user: {
+          fullName: profile?.full_name || '',
+          email: profile?.email || '',
+        },
+      };
+    }
 
     if (error) throw error;
     if (!realtor) throw new Error('Realtor not found');
@@ -911,14 +940,153 @@ class SupabaseApiClient {
     return progress;
   }
 
-  // KPI endpoints - using RPC functions
+  // KPI endpoints - using RPC functions with fallback to direct calculation
+  async getRealtorKPI(realtorId: string) {
+    const { data, error } = await supabase.rpc('get_realtor_kpi', {
+      p_realtor_id: realtorId,
+    });
+
+    // If RPC function doesn't exist (404) or other RPC errors, fallback to direct calculation
+    if (error) {
+      const errorObj = error as any;
+      const isNotFound = error.code === 'P0001' || 
+                        error.code === '42883' || 
+                        error.code === '42P01' ||
+                        error.message?.includes('does not exist') ||
+                        error.message?.includes('function') ||
+                        error.message?.includes('not found') ||
+                        errorObj.status === 404 ||
+                        errorObj.statusCode === 404 ||
+                        errorObj.code === '404' ||
+                        String(errorObj).includes('404');
+      
+      if (isNotFound) {
+        console.warn('RPC function not found, calculating KPI directly');
+        return this.calculateRealtorKPIDirectly(realtorId);
+      }
+      // For any other error, also try fallback as last resort
+      console.warn('RPC error, falling back to direct calculation:', error);
+      try {
+        return await this.calculateRealtorKPIDirectly(realtorId);
+      } catch (fallbackError) {
+        throw error; // Throw original error if fallback also fails
+      }
+    }
+    
+    return data;
+  }
+
+  private async calculateRealtorKPIDirectly(realtorId: string) {
+    const currentMonth = new Date();
+    currentMonth.setDate(1);
+    currentMonth.setHours(0, 0, 0, 0);
+
+    const { data: deals, error: dealsError } = await supabase
+      .from('deals')
+      .select('deal_value, deal_date')
+      .eq('realtor_id', realtorId)
+      .gte('deal_date', currentMonth.toISOString().split('T')[0]);
+
+    const { data: diagnoses, error: diagnosesError } = await supabase
+      .from('diagnoses')
+      .select('diagnosis_date')
+      .eq('realtor_id', realtorId)
+      .gte('diagnosis_date', currentMonth.toISOString().split('T')[0]);
+
+    if (dealsError || diagnosesError) {
+      throw dealsError || diagnosesError;
+    }
+
+    const dealsCount = deals?.length || 0;
+    const diagnosesCount = diagnoses?.length || 0;
+    const totalDealValue = deals?.reduce((sum, deal) => sum + Number(deal.deal_value), 0) || 0;
+    const successRate = diagnosesCount > 0 ? Math.round((dealsCount / diagnosesCount) * 100) : 0;
+
+    return {
+      realtors: 1,
+      deals: dealsCount,
+      diagnoses: diagnosesCount,
+      successRate,
+      totalDealValue,
+      levelDistribution: {},
+    };
+  }
+
   async getTeamKPI(teamId: string) {
     const { data, error } = await supabase.rpc('get_team_kpi', {
       p_team_id: teamId,
     });
 
-    if (error) throw error;
+    if (error) {
+      const errorObj = error as any;
+      const isNotFound = error.code === 'P0001' || 
+                        error.code === '42883' || 
+                        error.code === '42P01' ||
+                        error.message?.includes('does not exist') ||
+                        error.message?.includes('function') ||
+                        error.message?.includes('not found') ||
+                        errorObj.status === 404 ||
+                        errorObj.statusCode === 404 ||
+                        errorObj.code === '404' ||
+                        String(errorObj).includes('404');
+      
+      if (isNotFound) {
+        console.warn('RPC function not found, calculating KPI directly');
+        return this.calculateTeamKPIDirectly(teamId);
+      }
+      console.warn('RPC error, falling back to direct calculation:', error);
+      try {
+        return await this.calculateTeamKPIDirectly(teamId);
+      } catch (fallbackError) {
+        throw error;
+      }
+    }
+    
     return data;
+  }
+
+  private async calculateTeamKPIDirectly(teamId: string) {
+    const realtors = await this.getRealtorsByTeam(teamId);
+    const currentMonth = new Date();
+    currentMonth.setDate(1);
+    currentMonth.setHours(0, 0, 0, 0);
+
+    let totalDeals = 0;
+    let totalDiagnoses = 0;
+    let totalDealValue = 0;
+    const levelDistribution: Record<number, number> = {};
+
+    for (const realtor of realtors) {
+      const { data: deals } = await supabase
+        .from('deals')
+        .select('deal_value, deal_date')
+        .eq('realtor_id', realtor.id)
+        .gte('deal_date', currentMonth.toISOString().split('T')[0]);
+
+      const { data: diagnoses } = await supabase
+        .from('diagnoses')
+        .select('diagnosis_date')
+        .eq('realtor_id', realtor.id)
+        .gte('diagnosis_date', currentMonth.toISOString().split('T')[0]);
+
+      totalDeals += deals?.length || 0;
+      totalDiagnoses += diagnoses?.length || 0;
+      totalDealValue += deals?.reduce((sum, deal) => sum + Number(deal.deal_value), 0) || 0;
+
+      const level = (realtor as any).level || 1;
+      levelDistribution[level] = (levelDistribution[level] || 0) + 1;
+    }
+
+    const successRate = totalDiagnoses > 0 ? Math.round((totalDeals / totalDiagnoses) * 100) : 0;
+
+    return {
+      realtors: realtors.length,
+      deals: totalDeals,
+      diagnoses: totalDiagnoses,
+      successRate,
+      totalDealValue,
+      levelDistribution,
+    };
   }
 
   async getOfficeKPI(officeId: string) {
@@ -926,8 +1094,57 @@ class SupabaseApiClient {
       p_office_id: officeId,
     });
 
-    if (error) throw error;
+    if (error) {
+      const isNotFound = error.code === 'P0001' || 
+                        error.code === '42883' || 
+                        error.message?.includes('does not exist') ||
+                        error.message?.includes('function') ||
+                        error.code === '42P01' ||
+                        (error as any).status === 404 ||
+                        (error as any).statusCode === 404;
+      
+      if (isNotFound) {
+        console.warn('RPC function not found, calculating KPI directly');
+        return this.calculateOfficeKPIDirectly(officeId);
+      }
+      throw error;
+    }
+    
     return data;
+  }
+
+  private async calculateOfficeKPIDirectly(officeId: string) {
+    const teams = await this.getTeamsByOffice(officeId);
+    let totalRealtors = 0;
+    let totalDeals = 0;
+    let totalDiagnoses = 0;
+    let totalDealValue = 0;
+    const levelDistribution: Record<number, number> = {};
+    const currentMonth = new Date();
+    currentMonth.setDate(1);
+    currentMonth.setHours(0, 0, 0, 0);
+
+    for (const team of teams) {
+      const teamKPI = await this.calculateTeamKPIDirectly(team.id);
+      totalRealtors += teamKPI.realtors;
+      totalDeals += teamKPI.deals;
+      totalDiagnoses += teamKPI.diagnoses;
+      totalDealValue += teamKPI.totalDealValue;
+      Object.keys(teamKPI.levelDistribution).forEach(level => {
+        levelDistribution[Number(level)] = (levelDistribution[Number(level)] || 0) + teamKPI.levelDistribution[Number(level)];
+      });
+    }
+
+    const successRate = totalDiagnoses > 0 ? Math.round((totalDeals / totalDiagnoses) * 100) : 0;
+
+    return {
+      realtors: totalRealtors,
+      deals: totalDeals,
+      diagnoses: totalDiagnoses,
+      successRate,
+      totalDealValue,
+      levelDistribution,
+    };
   }
 
   async getCityKPI(cityId: string) {
@@ -935,8 +1152,54 @@ class SupabaseApiClient {
       p_city_id: cityId,
     });
 
-    if (error) throw error;
+    if (error) {
+      const isNotFound = error.code === 'P0001' || 
+                        error.code === '42883' || 
+                        error.message?.includes('does not exist') ||
+                        error.message?.includes('function') ||
+                        error.code === '42P01' ||
+                        (error as any).status === 404 ||
+                        (error as any).statusCode === 404;
+      
+      if (isNotFound) {
+        console.warn('RPC function not found, calculating KPI directly');
+        return this.calculateCityKPIDirectly(cityId);
+      }
+      throw error;
+    }
+    
     return data;
+  }
+
+  private async calculateCityKPIDirectly(cityId: string) {
+    const offices = await this.getOfficesByCity(cityId);
+    let totalRealtors = 0;
+    let totalDeals = 0;
+    let totalDiagnoses = 0;
+    let totalDealValue = 0;
+    const levelDistribution: Record<number, number> = {};
+
+    for (const office of offices) {
+      const officeKPI = await this.calculateOfficeKPIDirectly(office.id);
+      totalRealtors += officeKPI.realtors;
+      totalDeals += officeKPI.deals;
+      totalDiagnoses += officeKPI.diagnoses;
+      totalDealValue += officeKPI.totalDealValue;
+      Object.keys(officeKPI.levelDistribution).forEach(level => {
+        levelDistribution[Number(level)] = (levelDistribution[Number(level)] || 0) + officeKPI.levelDistribution[Number(level)];
+      });
+    }
+
+    const successRate = totalDiagnoses > 0 ? Math.round((totalDeals / totalDiagnoses) * 100) : 0;
+
+    return {
+      realtors: totalRealtors,
+      deals: totalDeals,
+      diagnoses: totalDiagnoses,
+      successRate,
+      totalDealValue,
+      levelDistribution,
+    };
   }
 
   async getCountryKPI(countryId: string) {
@@ -944,17 +1207,54 @@ class SupabaseApiClient {
       p_country_id: countryId,
     });
 
-    if (error) throw error;
+    if (error) {
+      const isNotFound = error.code === 'P0001' || 
+                        error.code === '42883' || 
+                        error.message?.includes('does not exist') ||
+                        error.message?.includes('function') ||
+                        error.code === '42P01' ||
+                        (error as any).status === 404 ||
+                        (error as any).statusCode === 404;
+      
+      if (isNotFound) {
+        console.warn('RPC function not found, calculating KPI directly');
+        return this.calculateCountryKPIDirectly(countryId);
+      }
+      throw error;
+    }
+    
     return data;
   }
 
-  async getRealtorKPI(realtorId: string) {
-    const { data, error } = await supabase.rpc('get_realtor_kpi', {
-      p_realtor_id: realtorId,
-    });
+  private async calculateCountryKPIDirectly(countryId: string) {
+    const cities = await this.getCitiesByCountry(countryId);
+    let totalRealtors = 0;
+    let totalDeals = 0;
+    let totalDiagnoses = 0;
+    let totalDealValue = 0;
+    const levelDistribution: Record<number, number> = {};
 
-    if (error) throw error;
-    return data;
+    for (const city of cities) {
+      const cityKPI = await this.calculateCityKPIDirectly(city.id);
+      totalRealtors += cityKPI.realtors;
+      totalDeals += cityKPI.deals;
+      totalDiagnoses += cityKPI.diagnoses;
+      totalDealValue += cityKPI.totalDealValue;
+      Object.keys(cityKPI.levelDistribution).forEach(level => {
+        levelDistribution[Number(level)] = (levelDistribution[Number(level)] || 0) + cityKPI.levelDistribution[Number(level)];
+      });
+    }
+
+    const successRate = totalDiagnoses > 0 ? Math.round((totalDeals / totalDiagnoses) * 100) : 0;
+
+    return {
+      realtors: totalRealtors,
+      deals: totalDeals,
+      diagnoses: totalDiagnoses,
+      successRate,
+      totalDealValue,
+      levelDistribution,
+    };
   }
 }
 

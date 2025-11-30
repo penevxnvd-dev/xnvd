@@ -62,12 +62,12 @@ export const RealizatorCard = ({ realtor, metrics, onClick }: RealizatorCardProp
     >
       <CardHeader className="pb-3.5 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <CardTitle className="text-base font-semibold text-gray-900 dark:text-gray-50 truncate">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 flex-wrap">
+            <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-gray-900 dark:text-gray-50 break-words flex-1 min-w-0">
               {realtor.name}
             </CardTitle>
-            <Badge className={cn("text-xs border font-medium", getLevelColor(realtor.level))}>
-              {level === 'Елит' && <Award className="h-3 w-3 mr-1" />}
+            <Badge className={cn("text-[9px] sm:text-[10px] md:text-xs border font-medium flex-shrink-0", getLevelColor(realtor.level))}>
+              {level === 'Елит' && <Award className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />}
               {level}
             </Badge>
           </div>

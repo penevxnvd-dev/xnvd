@@ -121,7 +121,7 @@ export const trainingStructure: TrainingSection[] = [
   },
   {
     id: 'translator-conversation',
-    title: 'Разговор преводач',
+    title: 'Разговор продавач',
     subsections: [
       {
         id: 'main-script',

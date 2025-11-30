@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { LogOut, BookOpen } from 'lucide-react';
+import { LogOut, BookOpen, ArrowLeft } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
 import { trainingStructure, calculateTrainingProgress, TrainingSection } from '@/data/trainingStructure';
 import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
@@ -176,36 +176,40 @@ const TrainingPage = () => {
                 <p className="text-xs text-muted-foreground">Проследяване на обучителен прогрес</p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button onClick={() => navigate('/')} variant="outline" size="sm">
+            <div className="flex gap-1.5 sm:gap-2 flex-wrap">
+              <Button onClick={() => navigate('/')} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
+                <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                <span>Назад</span>
+              </Button>
+              <Button onClick={() => navigate('/')} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
                 Начало
               </Button>
-              <Button onClick={handleLogout} variant="outline" size="sm">
-                <LogOut className="h-4 w-4 mr-2" />
-                Изход
+              <Button onClick={handleLogout} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
+                <LogOut className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                <span>Изход</span>
               </Button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 space-y-8">
+      <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
         {/* Прогрес бар */}
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5" />
-                Общ прогрес на обучението
+          <CardHeader className="p-3 sm:p-6">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs md:text-sm lg:text-base">
+                <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 flex-shrink-0" />
+                <span className="break-words">Общ прогрес на обучението</span>
               </CardTitle>
-              <Badge variant="secondary" className="text-lg">
+              <Badge variant="secondary" className="text-[10px] sm:text-xs md:text-sm lg:text-base flex-shrink-0">
                 {progress}%
               </Badge>
             </div>
           </CardHeader>
-          <CardContent>
-            <Progress value={progress} className="h-3" />
-            <p className="text-sm text-muted-foreground mt-2">
+          <CardContent className="p-3 sm:p-6">
+            <Progress value={progress} className="h-2 sm:h-3" />
+            <p className="text-[9px] sm:text-[10px] md:text-xs lg:text-sm text-muted-foreground mt-1.5 sm:mt-2 break-words">
               Завършени {Math.round((progress / 100) * 17)} от 17 подточки
             </p>
           </CardContent>
