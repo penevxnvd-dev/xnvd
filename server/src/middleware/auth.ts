@@ -1,8 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { supabaseAdmin } from '../lib/supabase.js';
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -21,16 +18,25 @@ export const authenticate = async (
       return res.status(401).json({ error: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
-    req.userId = decoded.userId;
+    // Verify token with Supabase
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
-    // Fetch user role
-    const userRole = await prisma.userRole.findFirst({
-      where: { userId: decoded.userId },
-      select: { role: true }
-    });
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
 
-    req.userRole = userRole?.role as 'admin' | 'realtor' | undefined;
+    req.userId = user.id;
+
+    // Fetch user role from Supabase
+    const { data: userRole, error: roleError } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+
+    if (!roleError && userRole) {
+      req.userRole = userRole.role as 'admin' | 'realtor';
+    }
 
     next();
   } catch (error) {

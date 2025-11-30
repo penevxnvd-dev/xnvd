@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '@/lib/api';
+import { supabaseApi } from '@/lib/supabaseApi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ChevronLeft, Home, LogOut } from 'lucide-react';
@@ -51,8 +51,8 @@ const LevelDetailPage = ({
     }
   };
 
-  const handleLogout = () => {
-    api.logout();
+  const handleLogout = async () => {
+    await supabaseApi.logout();
     navigate('/auth');
   };
 

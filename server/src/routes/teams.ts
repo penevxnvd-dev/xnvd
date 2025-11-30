@@ -1,19 +1,21 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Get teams by office
 router.get('/office/:officeId', authenticate, async (req, res) => {
   try {
     const { officeId } = req.params;
-    const teams = await prisma.team.findMany({
-      where: { officeId },
-      orderBy: { name: 'asc' }
-    });
-    res.json(teams);
+    const { data: teams, error } = await supabaseAdmin
+      .from('teams')
+      .select('*')
+      .eq('office_id', officeId)
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+    res.json(teams || []);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -23,9 +25,13 @@ router.get('/office/:officeId', authenticate, async (req, res) => {
 router.post('/', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { name, officeId, leaderId } = req.body;
-    const team = await prisma.team.create({
-      data: { name, officeId, leaderId }
-    });
+    const { data: team, error } = await supabaseAdmin
+      .from('teams')
+      .insert({ name, office_id: officeId, leader_id: leaderId })
+      .select()
+      .single();
+
+    if (error) throw error;
     res.json(team);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -37,10 +43,14 @@ router.put('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => 
   try {
     const { id } = req.params;
     const { name, leaderId } = req.body;
-    const team = await prisma.team.update({
-      where: { id },
-      data: { name, leaderId }
-    });
+    const { data: team, error } = await supabaseAdmin
+      .from('teams')
+      .update({ name, leader_id: leaderId })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
     res.json(team);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -51,9 +61,12 @@ router.put('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => 
 router.delete('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    await prisma.team.delete({
-      where: { id }
-    });
+    const { error } = await supabaseAdmin
+      .from('teams')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

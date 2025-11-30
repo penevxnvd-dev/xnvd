@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '@/lib/api';
+import { supabaseApi } from '@/lib/supabaseApi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -75,15 +75,15 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
     
     try {
       // Fetch realtor profile
-      const realtorProfile = await api.getCurrentRealtor();
+      const realtorProfile = await supabaseApi.getCurrentRealtor();
 
       if (realtorProfile) {
         setRealtorData({
           id: realtorProfile.id,
           level: realtorProfile.level,
-          confidence: realtorProfile.confidence,
-          salesResilience: realtorProfile.salesResilience,
-          successMindset: realtorProfile.successMindset,
+          confidence: realtorProfile.confidence || false,
+          salesResilience: realtorProfile.salesResilience || false,
+          successMindset: realtorProfile.successMindset || false,
           user: {
             fullName: realtorProfile.user.fullName,
             email: realtorProfile.user.email
@@ -92,22 +92,22 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
 
         // Fetch deals and diagnoses
         const [dealsData, diagnosesData] = await Promise.all([
-          api.getMyDeals(),
-          api.getMyDiagnoses()
+          supabaseApi.getMyDeals(),
+          supabaseApi.getMyDiagnoses()
         ]);
 
         setDeals(dealsData.map((deal: any) => ({
           id: deal.id,
-          clientName: deal.clientName,
-          dealValue: Number(deal.dealValue),
-          dealDate: deal.dealDate
+          clientName: deal.client_name,
+          dealValue: Number(deal.deal_value),
+          dealDate: deal.deal_date
         })));
 
         setDiagnoses(diagnosesData.map((diag: any) => ({
           id: diag.id,
-          clientName: diag.clientName,
+          clientName: diag.client_name,
           status: diag.status,
-          diagnosisDate: diag.diagnosisDate
+          diagnosisDate: diag.diagnosis_date
         })));
       }
     } catch (error) {
@@ -121,7 +121,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
     if (!realtorData?.id) return;
 
     try {
-      const progressData = await api.getTrainingProgress();
+      const progressData = await supabaseApi.getTrainingProgress();
 
       if (progressData) {
         const updatedData = trainingData.map((section) => ({
@@ -191,7 +191,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
         ?.subsections.find((ss) => ss.id === subsectionId);
 
       if (subsection) {
-        await api.updateTrainingProgress({
+        await supabaseApi.updateTrainingProgress({
           section: sectionId,
           subsection: subsectionId,
           lectureCompleted: subsection.progress.lecture,
@@ -209,8 +209,8 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
     }
   };
 
-  const handleLogout = () => {
-    api.logout();
+  const handleLogout = async () => {
+    await supabaseApi.logout();
     navigate('/auth');
   };
 

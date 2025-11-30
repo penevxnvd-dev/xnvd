@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "@/lib/api";
+import { supabaseApi } from "@/lib/supabaseApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,16 +19,13 @@ const Auth = () => {
 
   useEffect(() => {
     // Check if user is already logged in
-    const token = localStorage.getItem('token');
-    if (token) {
-      api.getCurrentUser()
-        .then(() => {
-          navigate("/");
-        })
-        .catch(() => {
-          localStorage.removeItem('token');
-        });
-    }
+    supabaseApi.getCurrentUser()
+      .then(() => {
+        navigate("/");
+      })
+      .catch(() => {
+        // Not logged in, stay on auth page
+      });
   }, [navigate]);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -37,14 +34,14 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        await api.login(email, password);
+        await supabaseApi.login(email, password);
         toast({
           title: "Успешно влизане",
           description: "Добре дошли!",
         });
         navigate("/");
       } else {
-        await api.register(email, password, fullName || email);
+        await supabaseApi.register(email, password, fullName || email);
         toast({
           title: "Успешна регистрация",
           description: "Акаунтът е създаден успешно!",

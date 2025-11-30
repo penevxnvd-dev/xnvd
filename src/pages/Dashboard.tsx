@@ -6,15 +6,15 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, AlertCircle } from 'lucide-react';
-import { api } from '@/lib/api';
+import { supabaseApi } from '@/lib/supabaseApi';
 import logo from '@/assets/logo.jpeg';
 
 const Dashboard = () => {
   const { role, loading, userId } = useUserRole();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    api.logout();
+  const handleLogout = async () => {
+    await supabaseApi.logout();
     navigate('/auth');
   };
 

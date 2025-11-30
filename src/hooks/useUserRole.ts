@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { api } from '@/lib/api';
+import { supabaseApi } from '@/lib/supabaseApi';
+import { supabase } from '@/integrations/supabase/client';
 
 export type UserRole = 'admin' | 'realtor' | null;
 
@@ -11,32 +12,34 @@ export const useUserRole = () => {
   useEffect(() => {
     const fetchUserRole = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          setRole(null);
-          setLoading(false);
-          return;
-        }
-
-        const { user } = await api.getCurrentUser();
+        const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           setRole(null);
+          setUserId(null);
           setLoading(false);
           return;
         }
 
-        setUserId(user.id);
+        const { user: userData } = await supabaseApi.getCurrentUser();
+        if (!userData) {
+          setRole(null);
+          setUserId(null);
+          setLoading(false);
+          return;
+        }
+
+        setUserId(userData.id);
 
         // Check user role
-        if (user.roles && user.roles.length > 0) {
-          setRole(user.roles[0] as UserRole);
+        if (userData.roles && userData.roles.length > 0) {
+          setRole(userData.roles[0] as UserRole);
         } else {
           setRole(null);
         }
       } catch (error) {
         console.error('Error fetching user role:', error);
         setRole(null);
-        localStorage.removeItem('token');
+        setUserId(null);
       } finally {
         setLoading(false);
       }
@@ -44,10 +47,20 @@ export const useUserRole = () => {
 
     fetchUserRole();
 
-    // Check for token changes periodically
-    const interval = setInterval(fetchUserRole, 60000); // Check every minute
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        fetchUserRole();
+      } else {
+        setRole(null);
+        setUserId(null);
+        setLoading(false);
+      }
+    });
 
-    return () => clearInterval(interval);
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   return { role, loading, userId };

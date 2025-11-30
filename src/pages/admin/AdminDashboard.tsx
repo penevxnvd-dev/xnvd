@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '@/lib/api';
+import { supabaseApi } from '@/lib/supabaseApi';
 import { Button } from '@/components/ui/button';
 import { LogOut, ChevronLeft, Home, Plus, Pencil, Trash2, Calendar } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
@@ -103,7 +103,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const fetchCountries = async () => {
     setLoading(true);
     try {
-      const data = await api.getCountries();
+      const data = await supabaseApi.getCountries();
       setCountries(data);
     } catch (error) {
       console.error('Error fetching countries:', error);
@@ -115,7 +115,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const fetchCities = async (countryId: string) => {
     setLoading(true);
     try {
-      const data = await api.getCitiesByCountry(countryId);
+      const data = await supabaseApi.getCitiesByCountry(countryId);
       setCities(data.map((city: any) => ({
         id: city.id,
         name: city.name,
@@ -131,7 +131,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const fetchOffices = async (cityId: string) => {
     setLoading(true);
     try {
-      const data = await api.getOfficesByCity(cityId);
+      const data = await supabaseApi.getOfficesByCity(cityId);
       setOffices(data.map((office: any) => ({
         id: office.id,
         name: office.name,
@@ -148,7 +148,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const fetchTeams = async (officeId: string) => {
     setLoading(true);
     try {
-      const data = await api.getTeamsByOffice(officeId);
+      const data = await supabaseApi.getTeamsByOffice(officeId);
       setTeams(data.map((team: any) => ({
         id: team.id,
         name: team.name,
@@ -165,7 +165,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const fetchRealtors = async (teamId: string) => {
     setLoading(true);
     try {
-      const data = await api.getRealtorsByTeam(teamId);
+      const data = await supabaseApi.getRealtorsByTeam(teamId);
       setRealtors(data.map((realtor: any) => ({
         id: realtor.id,
         userId: realtor.userId,
@@ -179,7 +179,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
       
       // Изчисляване на KPI за екипа
       try {
-        const kpi = await api.getTeamKPI(teamId);
+        const kpi = await supabaseApi.getTeamKPI(teamId);
         setKpiMetrics(kpi);
         setShowKPI(true);
       } catch (error) {
@@ -195,7 +195,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
 
   const fetchCountryKPI = async (countryId: string) => {
     try {
-      const kpi = await api.getCountryKPI(countryId);
+      const kpi = await supabaseApi.getCountryKPI(countryId);
       setKpiMetrics(kpi);
       setShowKPI(true);
     } catch (error) {
@@ -213,7 +213,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
 
   const fetchCityKPI = async (cityId: string) => {
     try {
-      const kpi = await api.getCityKPI(cityId);
+      const kpi = await supabaseApi.getCityKPI(cityId);
       setKpiMetrics(kpi);
       setShowKPI(true);
     } catch (error) {
@@ -231,7 +231,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
 
   const fetchOfficeKPI = async (officeId: string) => {
     try {
-      const kpi = await api.getOfficeKPI(officeId);
+      const kpi = await supabaseApi.getOfficeKPI(officeId);
       setKpiMetrics(kpi);
       setShowKPI(true);
     } catch (error) {
@@ -287,8 +287,8 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     fetchCountries();
   };
 
-  const handleLogout = () => {
-    api.logout();
+  const handleLogout = async () => {
+    await supabaseApi.logout();
     navigate('/auth');
   };
 
@@ -345,13 +345,13 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
 
     try {
       if (currentView === 'countries') {
-        await api.deleteCountry(selectedItem.id);
+        await supabaseApi.deleteCountry(selectedItem.id);
       } else if (currentView === 'cities') {
-        await api.deleteCity(selectedItem.id);
+        await supabaseApi.deleteCity(selectedItem.id);
       } else if (currentView === 'offices') {
-        await api.deleteOffice(selectedItem.id);
+        await supabaseApi.deleteOffice(selectedItem.id);
       } else if (currentView === 'teams') {
-        await api.deleteTeam(selectedItem.id);
+        await supabaseApi.deleteTeam(selectedItem.id);
       }
 
       toast.success('Успешно изтрито');

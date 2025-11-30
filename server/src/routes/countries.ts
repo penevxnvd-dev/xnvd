@@ -1,17 +1,19 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Get all countries
 router.get('/', authenticate, async (req, res) => {
   try {
-    const countries = await prisma.country.findMany({
-      orderBy: { name: 'asc' }
-    });
-    res.json(countries);
+    const { data: countries, error } = await supabaseAdmin
+      .from('countries')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+    res.json(countries || []);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -21,9 +23,13 @@ router.get('/', authenticate, async (req, res) => {
 router.post('/', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { name, code } = req.body;
-    const country = await prisma.country.create({
-      data: { name, code }
-    });
+    const { data: country, error } = await supabaseAdmin
+      .from('countries')
+      .insert({ name, code })
+      .select()
+      .single();
+
+    if (error) throw error;
     res.json(country);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -35,10 +41,14 @@ router.put('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => 
   try {
     const { id } = req.params;
     const { name, code } = req.body;
-    const country = await prisma.country.update({
-      where: { id },
-      data: { name, code }
-    });
+    const { data: country, error } = await supabaseAdmin
+      .from('countries')
+      .update({ name, code })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
     res.json(country);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -49,9 +59,12 @@ router.put('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => 
 router.delete('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    await prisma.country.delete({
-      where: { id }
-    });
+    const { error } = await supabaseAdmin
+      .from('countries')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

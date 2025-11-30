@@ -1,18 +1,19 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate, requireRealtor, requireAdmin, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Get deals for current realtor
 router.get('/me', authenticate, requireRealtor, async (req: AuthRequest, res) => {
   try {
-    const realtor = await prisma.realtor.findUnique({
-      where: { userId: req.userId! }
-    });
+    const { data: realtor, error: realtorError } = await supabaseAdmin
+      .from('realtors')
+      .select('id')
+      .eq('user_id', req.userId!)
+      .single();
 
-    if (!realtor) {
+    if (realtorError || !realtor) {
       return res.status(404).json({ error: 'Realtor not found' });
     }
 
@@ -20,17 +21,15 @@ router.get('/me', authenticate, requireRealtor, async (req: AuthRequest, res) =>
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    const deals = await prisma.deal.findMany({
-      where: {
-        realtorId: realtor.id,
-        dealDate: {
-          gte: startOfMonth
-        }
-      },
-      orderBy: { dealDate: 'desc' }
-    });
+    const { data: deals, error } = await supabaseAdmin
+      .from('deals')
+      .select('*')
+      .eq('realtor_id', realtor.id)
+      .gte('deal_date', startOfMonth.toISOString().split('T')[0])
+      .order('deal_date', { ascending: false });
 
-    res.json(deals);
+    if (error) throw error;
+    res.json(deals || []);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -39,22 +38,22 @@ router.get('/me', authenticate, requireRealtor, async (req: AuthRequest, res) =>
 // Get all deals (admin only)
 router.get('/', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const deals = await prisma.deal.findMany({
-      include: {
-        realtor: {
-          include: {
-            user: {
-              select: {
-                fullName: true,
-                email: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: { dealDate: 'desc' }
-    });
-    res.json(deals);
+    const { data: deals, error } = await supabaseAdmin
+      .from('deals')
+      .select(`
+        *,
+        realtor:realtors (
+          *,
+          profile:profiles!realtors_user_id_fkey (
+            full_name,
+            email
+          )
+        )
+      `)
+      .order('deal_date', { ascending: false });
+
+    if (error) throw error;
+    res.json(deals || []);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -63,25 +62,30 @@ router.get('/', authenticate, requireAdmin, async (req: AuthRequest, res) => {
 // Create deal
 router.post('/', authenticate, requireRealtor, async (req: AuthRequest, res) => {
   try {
-    const realtor = await prisma.realtor.findUnique({
-      where: { userId: req.userId! }
-    });
+    const { data: realtor, error: realtorError } = await supabaseAdmin
+      .from('realtors')
+      .select('id')
+      .eq('user_id', req.userId!)
+      .single();
 
-    if (!realtor) {
+    if (realtorError || !realtor) {
       return res.status(404).json({ error: 'Realtor not found' });
     }
 
     const { clientName, dealValue, commission, dealDate } = req.body;
-    const deal = await prisma.deal.create({
-      data: {
-        realtorId: realtor.id,
-        clientName,
-        dealValue: parseFloat(dealValue),
+    const { data: deal, error } = await supabaseAdmin
+      .from('deals')
+      .insert({
+        realtor_id: realtor.id,
+        client_name: clientName,
+        deal_value: parseFloat(dealValue),
         commission: commission ? parseFloat(commission) : null,
-        dealDate: dealDate ? new Date(dealDate) : new Date()
-      }
-    });
+        deal_date: dealDate ? dealDate : new Date().toISOString().split('T')[0]
+      })
+      .select()
+      .single();
 
+    if (error) throw error;
     res.json(deal);
   } catch (error: any) {
     res.status(500).json({ error: error.message });

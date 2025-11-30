@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { api } from '@/lib/api';
+import { supabaseApi } from '@/lib/supabaseApi';
 import { toast } from 'sonner';
 
 interface CreateEditDialogProps {
@@ -85,25 +85,25 @@ export const CreateEditDialog = ({
       if (editData) {
         // Редактиране
         if (type === 'country') {
-          await api.updateCountry(editData.id, { name, code });
+          await supabaseApi.updateCountry(editData.id, { name, code });
         } else if (type === 'city') {
-          await api.updateCity(editData.id, { name });
+          await supabaseApi.updateCity(editData.id, { name });
         } else if (type === 'office') {
-          await api.updateOffice(editData.id, { name, address });
+          await supabaseApi.updateOffice(editData.id, { name, address });
         } else if (type === 'team') {
-          await api.updateTeam(editData.id, { name });
+          await supabaseApi.updateTeam(editData.id, { name });
         }
         toast.success('Успешно обновено');
       } else {
         // Създаване
         if (type === 'country') {
-          await api.createCountry({ name, code });
+          await supabaseApi.createCountry({ name, code });
         } else if (type === 'city') {
-          await api.createCity({ name, countryId: parentId });
+          await supabaseApi.createCity({ name, countryId: parentId });
         } else if (type === 'office') {
-          await api.createOffice({ name, cityId: parentId, address });
+          await supabaseApi.createOffice({ name, cityId: parentId, address });
         } else if (type === 'team') {
-          await api.createTeam({ name, officeId: parentId });
+          await supabaseApi.createTeam({ name, officeId: parentId });
         }
         toast.success('Успешно създадено');
       }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { RealizatorCard } from './RealizatorCard';
-import { api } from '@/lib/api';
+import { supabaseApi } from '@/lib/supabaseApi';
 import { KPIMetrics } from '@/utils/kpiCalculations';
 
 interface RealizatorCardWithKPIProps {
@@ -30,7 +30,7 @@ export const RealizatorCardWithKPI = ({ realtor, onClick }: RealizatorCardWithKP
   useEffect(() => {
     const fetchKPI = async () => {
       try {
-        const kpi = await api.getRealtorKPI(realtor.id);
+        const kpi = await supabaseApi.getRealtorKPI(realtor.id);
         setMetrics(kpi);
       } catch (error) {
         console.error('Error fetching realtor KPI:', error);

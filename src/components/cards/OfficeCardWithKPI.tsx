@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { OfficeCard } from './OfficeCard';
-import { api } from '@/lib/api';
+import { supabaseApi } from '@/lib/supabaseApi';
 import { KPIMetrics } from '@/utils/kpiCalculations';
 
 interface OfficeCardWithKPIProps {
@@ -25,7 +25,7 @@ export const OfficeCardWithKPI = ({ office, onClick }: OfficeCardWithKPIProps) =
   useEffect(() => {
     const fetchKPI = async () => {
       try {
-        const kpi = await api.getOfficeKPI(office.id);
+        const kpi = await supabaseApi.getOfficeKPI(office.id);
         setMetrics(kpi);
       } catch (error) {
         console.error('Error fetching office KPI:', error);

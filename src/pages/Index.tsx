@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate as useRouterNavigate } from 'react-router-dom';
-import { api } from '@/lib/api';
+import { supabaseApi } from '@/lib/supabaseApi';
 import { Button } from '@/components/ui/button';
 import { OfficeCard } from '@/components/OfficeCard';
 import { TeamLeaderCard } from '@/components/TeamLeaderCard';
@@ -23,29 +23,23 @@ const Index = () => {
   
   useEffect(() => {
     // Check authentication
-    const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/auth');
-    } else {
-      api.getCurrentUser()
-        .then(async () => {
-          // Fetch offices with full structure
-          try {
-            const dbOffices = await api.getAllOfficesFull();
-            const transformedOffices = transformOffices(dbOffices);
-            setOffices(transformedOffices);
-          } catch (error) {
-            console.error('Error fetching offices:', error);
-            // Fallback to empty array
-            setOffices([]);
-          }
-          setLoading(false);
-        })
-        .catch(() => {
-          localStorage.removeItem('token');
-          navigate('/auth');
-        });
-    }
+    supabaseApi.getCurrentUser()
+      .then(async () => {
+        // Fetch offices with full structure
+        try {
+          const dbOffices = await supabaseApi.getAllOfficesFull();
+          const transformedOffices = transformOffices(dbOffices);
+          setOffices(transformedOffices);
+        } catch (error) {
+          console.error('Error fetching offices:', error);
+          // Fallback to empty array
+          setOffices([]);
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        navigate('/auth');
+      });
   }, [navigate]);
   const [currentView, setCurrentView] = useState<ViewType>('offices');
   const [selectedOffice, setSelectedOffice] = useState<Office | null>(null);
@@ -87,8 +81,8 @@ const Index = () => {
     setSelectedLeader(null);
   };
 
-  const handleLogout = () => {
-    api.logout();
+  const handleLogout = async () => {
+    await supabaseApi.logout();
     navigate('/auth');
   };
 

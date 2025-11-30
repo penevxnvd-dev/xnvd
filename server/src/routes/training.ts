@@ -1,9 +1,8 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate, requireRealtor, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Get training progress
 router.get('/progress', authenticate, requireRealtor, async (req: AuthRequest, res) => {

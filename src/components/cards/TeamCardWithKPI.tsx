@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TeamCard } from './TeamCard';
-import { api } from '@/lib/api';
+import { supabaseApi } from '@/lib/supabaseApi';
 import { KPIMetrics } from '@/utils/kpiCalculations';
 
 interface TeamCardWithKPIProps {
@@ -25,7 +25,7 @@ export const TeamCardWithKPI = ({ team, onClick }: TeamCardWithKPIProps) => {
   useEffect(() => {
     const fetchKPI = async () => {
       try {
-        const kpi = await api.getTeamKPI(team.id);
+        const kpi = await supabaseApi.getTeamKPI(team.id);
         setMetrics(kpi);
       } catch (error) {
         console.error('Error fetching team KPI:', error);

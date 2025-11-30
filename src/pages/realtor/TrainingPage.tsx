@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '@/lib/api';
+import { supabaseApi } from '@/lib/supabaseApi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -41,10 +41,10 @@ const TrainingPage = () => {
 
   const fetchUserData = async () => {
     try {
-      const { user } = await api.getCurrentUser();
+      const { user } = await supabaseApi.getCurrentUser();
       if (user) {
         setUserId(user.id);
-        const realtor = await api.getCurrentRealtor();
+        const realtor = await supabaseApi.getCurrentRealtor();
         if (realtor) {
           setRealtorId(realtor.id);
         }
@@ -60,7 +60,7 @@ const TrainingPage = () => {
     if (!realtorId) return;
 
     try {
-      const progressData = await api.getTrainingProgress();
+      const progressData = await supabaseApi.getTrainingProgress();
 
       if (progressData) {
         // Обновяване на структурата с данни от базата
@@ -133,7 +133,7 @@ const TrainingPage = () => {
         ?.subsections.find((ss) => ss.id === subsectionId);
 
       if (subsection) {
-        await api.updateTrainingProgress({
+        await supabaseApi.updateTrainingProgress({
           section: sectionId,
           subsection: subsectionId,
           lectureCompleted: subsection.progress.lecture,
@@ -151,8 +151,8 @@ const TrainingPage = () => {
     }
   };
 
-  const handleLogout = () => {
-    api.logout();
+  const handleLogout = async () => {
+    await supabaseApi.logout();
     navigate('/auth');
   };
 

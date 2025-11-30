@@ -1,11 +1,8 @@
 import express from 'express';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import { supabaseAdmin } from '../lib/supabase.js';
 import { z } from 'zod';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -24,64 +21,84 @@ router.post('/register', async (req, res) => {
     const { email, password, fullName } = registerSchema.parse(req.body);
 
     // Check if user exists
-    const existingProfile = await prisma.profile.findUnique({
-      where: { email }
-    });
+    const { data: existingProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .single();
 
     if (existingProfile) {
       return res.status(400).json({ error: 'User already exists' });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create profile and user
-    const profile = await prisma.profile.create({
-      data: {
-        email,
-        fullName,
-        user: {
-          create: {
-            email,
-            password: hashedPassword
-          }
-        }
-      },
-      include: {
-        user: true
+    // Create user with Supabase Auth
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // Auto-confirm email
+      user_metadata: {
+        full_name: fullName
       }
     });
 
-    // Create JWT token
-    const token = jwt.sign(
-      { userId: profile.id },
-      process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-    );
+    if (authError || !authData.user) {
+      return res.status(400).json({ 
+        error: 'Failed to create user',
+        message: authError?.message 
+      });
+    }
+
+    // Create profile (trigger should handle this, but we'll ensure it exists)
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .insert({
+        id: authData.user.id,
+        email,
+        full_name: fullName
+      })
+      .select()
+      .single();
+
+    if (profileError && !profileError.message.includes('duplicate')) {
+      // If profile creation fails and it's not a duplicate, clean up auth user
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      return res.status(500).json({ 
+        error: 'Failed to create profile',
+        message: profileError.message 
+      });
+    }
+
+    // Get the profile (either newly created or existing from trigger)
+    const { data: finalProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .eq('id', authData.user.id)
+      .single();
+
+    // Sign in to get session token
+    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (sessionError || !sessionData.session) {
+      return res.status(500).json({ 
+        error: 'Failed to create session',
+        message: sessionError?.message 
+      });
+    }
 
     res.json({
       user: {
-        id: profile.id,
-        email: profile.email,
-        fullName: profile.fullName
+        id: finalProfile?.id || authData.user.id,
+        email: finalProfile?.email || email,
+        fullName: finalProfile?.full_name || fullName
       },
-      token
+      token: sessionData.session.access_token
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors });
-    }
-    
-    // Check for database connection errors
-    const isDbError = error.message?.includes('Can\'t reach database server') || 
-                      error.message?.includes('database server');
-    
-    if (isDbError) {
-      return res.status(503).json({ 
-        error: 'Database connection failed',
-        message: 'PostgreSQL database is not running. Please start it with: sudo systemctl start postgresql',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
     }
     
     console.error('Register error:', error);
@@ -97,56 +114,49 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
 
-    // Find profile and user
-    const profile = await prisma.profile.findUnique({
-      where: { email },
-      include: {
-        user: true,
-        userRoles: true
-      }
+    // Sign in with Supabase Auth
+    const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
+      email,
+      password
     });
 
-    if (!profile || !profile.user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    if (authError || !authData.user || !authData.session) {
+      return res.status(401).json({ 
+        error: 'Invalid credentials',
+        message: authError?.message 
+      });
     }
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, profile.user.password);
-    if (!isValidPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
+    // Get profile and roles
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select(`
+        id,
+        email,
+        full_name,
+        user_roles (role)
+      `)
+      .eq('id', authData.user.id)
+      .single();
 
-    // Create JWT token
-    const token = jwt.sign(
-      { userId: profile.id },
-      process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-    );
+    if (profileError || !profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
 
     res.json({
       user: {
         id: profile.id,
         email: profile.email,
-        fullName: profile.fullName,
-        roles: profile.userRoles.map(ur => ur.role)
+        fullName: profile.full_name,
+        roles: Array.isArray(profile.user_roles) 
+          ? profile.user_roles.map((ur: any) => ur.role)
+          : []
       },
-      token
+      token: authData.session.access_token
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors });
-    }
-    
-    // Check for database connection errors
-    const isDbError = error.message?.includes('Can\'t reach database server') || 
-                      error.message?.includes('database server');
-    
-    if (isDbError) {
-      return res.status(503).json({ 
-        error: 'Database connection failed',
-        message: 'PostgreSQL database is not running. Please start it with: sudo systemctl start postgresql',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
     }
     
     console.error('Login error:', error);
@@ -165,25 +175,37 @@ router.get('/me', async (req, res) => {
       return res.status(401).json({ error: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
-    
-    const user = await prisma.profile.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        userRoles: true
-      }
-    });
+    // Verify token with Supabase
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Get profile and roles
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select(`
+        id,
+        email,
+        full_name,
+        user_roles (role)
+      `)
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return res.status(404).json({ error: 'Profile not found' });
     }
 
     res.json({
       user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        roles: user.userRoles.map(ur => ur.role)
+        id: profile.id,
+        email: profile.email,
+        fullName: profile.full_name,
+        roles: Array.isArray(profile.user_roles) 
+          ? profile.user_roles.map((ur: any) => ur.role)
+          : []
       }
     });
   } catch (error: any) {

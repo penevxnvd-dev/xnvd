@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CityCard } from './CityCard';
-import { api } from '@/lib/api';
+import { supabaseApi } from '@/lib/supabaseApi';
 import { KPIMetrics } from '@/utils/kpiCalculations';
 
 interface CityCardWithKPIProps {
@@ -25,7 +25,7 @@ export const CityCardWithKPI = ({ city, onClick }: CityCardWithKPIProps) => {
   useEffect(() => {
     const fetchKPI = async () => {
       try {
-        const kpi = await api.getCityKPI(city.id);
+        const kpi = await supabaseApi.getCityKPI(city.id);
         setMetrics(kpi);
       } catch (error) {
         console.error('Error fetching city KPI:', error);
