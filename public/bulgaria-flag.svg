@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80" viewBox="0 0 120 80">
+  <!-- White stripe -->
+  <rect y="0" width="120" height="26.67" fill="#FFFFFF"/>
+  <!-- Green stripe -->
+  <rect y="26.67" width="120" height="26.67" fill="#009639"/>
+  <!-- Red stripe -->
+  <rect y="53.34" width="120" height="26.66" fill="#D62612"/>
+</svg>
+

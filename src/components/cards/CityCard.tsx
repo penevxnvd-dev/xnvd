@@ -4,6 +4,18 @@ import { KPIMetrics, formatSuccessRate } from '@/utils/kpiCalculations';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 
+// Function to get flag image path based on city name
+const getCityFlag = (cityName: string): string | null => {
+  const normalizedName = cityName.toLowerCase().trim();
+  if (normalizedName.includes('бург') || normalizedName.includes('burgas')) {
+    return '/burgas-flag.jpg';
+  }
+  if (normalizedName.includes('плов') || normalizedName.includes('plovdiv')) {
+    return '/plovdiv-flag.png';
+  }
+  return null;
+};
+
 interface CityCardProps {
   city: {
     id: string;
@@ -17,6 +29,8 @@ interface CityCardProps {
 export const CityCard = ({ city, metrics, onClick }: CityCardProps) => {
   const successRate = metrics.successRate;
   const maxValue = Math.max(metrics.realtors, metrics.deals, metrics.diagnoses, 1);
+  const flagPath = getCityFlag(city.name);
+  const isPlovdiv = city.name.toLowerCase().includes('плов') || city.name.toLowerCase().includes('plovdiv');
   
   return (
     <Card 
@@ -32,9 +46,15 @@ export const CityCard = ({ city, metrics, onClick }: CityCardProps) => {
       <CardHeader className="pb-3.5 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="p-2 rounded-md bg-accent/5 border border-accent/20">
+            {flagPath ? (
+              <img 
+                src={flagPath} 
+                alt={`${city.name} flag`}
+                className={isPlovdiv ? "h-8 w-11 sm:h-9 sm:w-14 object-contain" : "h-10 w-14 sm:h-12 sm:w-16 object-contain"}
+              />
+            ) : (
               <MapPin className="h-4.5 w-4.5 text-accent" />
-            </div>
+            )}
             <div className="flex-1 min-w-0">
               <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-gray-900 dark:text-gray-50 break-words">
                 {city.name}

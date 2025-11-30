@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Users, TrendingUp, DollarSign } from 'lucide-react';
 import { TeamLeader } from '@/types';
 import { calculateLeaderMetrics, formatCurrency } from '@/utils/calculations';
+import { formatNameWithEmoji } from '@/utils/nameEmojis';
 
 interface TeamLeaderCardProps {
   leader: TeamLeader;
@@ -29,7 +30,7 @@ export const TeamLeaderCard = ({ leader, onClick }: TeamLeaderCardProps) => {
             </AvatarFallback>
           </Avatar>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-foreground">{leader.name}</h3>
+            <h3 className="text-lg font-semibold text-foreground">{formatNameWithEmoji(leader.name)}</h3>
             <p className="text-sm text-muted-foreground mb-2">{leader.position}</p>
             <div className="flex items-center gap-2 text-accent">
               <Users className="h-4 w-4" />

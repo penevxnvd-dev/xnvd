@@ -17,6 +17,7 @@ import { Calendar as CalendarIcon, Users, Award, BookOpen, UserPlus, Clock, Edit
 import { TrainingGroup } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { useState, useRef, useMemo, useEffect } from 'react';
+import { formatNameWithEmoji } from '@/utils/nameEmojis';
 import { toast } from '@/hooks/use-toast';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { format, addDays, nextMonday, nextDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, startOfWeek, endOfWeek, addMonths, subMonths, parse, differenceInDays, isPast, isFuture } from 'date-fns';
@@ -464,7 +465,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
             <GripVertical className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-foreground truncate">{trainee.name}</p>
+            <p className="font-medium text-foreground truncate">{formatNameWithEmoji(trainee.name)}</p>
             <p className="text-xs text-muted-foreground truncate">{trainee.position}</p>
           </div>
         </div>
@@ -633,7 +634,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                           }
                         }}>
                           <Users className="h-4 w-4 mr-2" />
-                          {t.name} - {t.phone}
+                          {formatNameWithEmoji(t.name)} - {t.phone}
                         </CommandItem>
                       ))}
                   </CommandGroup>
@@ -1185,7 +1186,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                       <p className="text-sm text-muted-foreground mb-2">{g.trainees.length} курсисти</p>
                       <div className="space-y-1">
                         {g.trainees.map(t => (
-                          <div key={t.id} className="text-sm">{t.name} - {t.position}</div>
+                          <div key={t.id} className="text-sm">{formatNameWithEmoji(t.name)} - {t.position}</div>
                         ))}
                       </div>
                     </Card>
@@ -1444,7 +1445,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                             <SelectContent>
                               {availableLeaders.map((leader) => (
                                 <SelectItem key={leader.id} value={leader.fullName}>
-                                  {leader.fullName}
+                                  {formatNameWithEmoji(leader.fullName)}
                                   {leader.email && ` (${leader.email})`}
                                 </SelectItem>
                               ))}
@@ -1899,7 +1900,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
-                              <p className="font-semibold">{trainee.name}</p>
+                              <p className="font-semibold">{formatNameWithEmoji(trainee.name)}</p>
                               <p className="text-sm text-muted-foreground">{trainee.position}</p>
                               {trainee.phone && (
                                 <p className="text-xs text-muted-foreground mt-1">

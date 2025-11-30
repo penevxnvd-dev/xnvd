@@ -32,7 +32,7 @@ const TrainingCalendarPage = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/dashboard')}
                 className="flex items-center gap-2"
               >
                 <ChevronLeft className="h-4 w-4" />

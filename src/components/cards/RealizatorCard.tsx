@@ -3,6 +3,7 @@ import { FileText, Target, CheckCircle2, XCircle, Award, TrendingUp } from 'luci
 import { KPIMetrics, formatSuccessRate } from '@/utils/kpiCalculations';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
 
 interface RealizatorCardProps {
   realtor: {
@@ -46,6 +47,9 @@ export const RealizatorCard = ({ realtor, metrics, onClick }: RealizatorCardProp
   const level = levelMap[realtor.level] || 'Чирак';
   const qualitiesCount = [realtor.confidence, realtor.salesResilience, realtor.successMindset].filter(Boolean).length;
   
+  // Extract "11:11" from the name and format it
+  const { displayName, shouldShowElevenEleven } = formatNameWithoutElevenEleven(realtor.name);
+  
   return (
     <Card 
       className={cn(
@@ -61,21 +65,28 @@ export const RealizatorCard = ({ realtor, metrics, onClick }: RealizatorCardProp
       onClick={onClick}
     >
       <CardHeader className="pb-3.5 border-b border-gray-100 dark:border-gray-800">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 flex-wrap">
             <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-gray-900 dark:text-gray-50 break-words flex-1 min-w-0">
-              {realtor.name}
+              {displayName}
             </CardTitle>
             <Badge className={cn("text-[9px] sm:text-[10px] md:text-xs border font-medium flex-shrink-0", getLevelColor(realtor.level))}>
               {level === 'Елит' && <Award className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />}
               {level}
             </Badge>
           </div>
-          <div className="flex items-baseline gap-1.5 flex-shrink-0">
-            <TrendingUp className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span className="text-base font-semibold text-emerald-600 dark:text-emerald-400">
-              {formatSuccessRate(metrics.successRate)}
-            </span>
+          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+            {shouldShowElevenEleven && (
+              <span className="text-[10px] sm:text-xs md:text-sm font-medium text-gray-600 dark:text-gray-400">
+                11:11
+              </span>
+            )}
+            <div className="flex items-baseline gap-1.5">
+              <TrendingUp className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-base font-semibold text-emerald-600 dark:text-emerald-400">
+                {formatSuccessRate(metrics.successRate)}
+              </span>
+            </div>
           </div>
         </div>
       </CardHeader>

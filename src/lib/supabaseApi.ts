@@ -356,7 +356,14 @@ class SupabaseApiClient {
   async getTeamsByOffice(officeId: string) {
     const { data, error } = await supabase
       .from('teams')
-      .select('*')
+      .select(`
+        *,
+        leader:profiles!teams_leader_id_fkey (
+          id,
+          full_name,
+          email
+        )
+      `)
       .eq('office_id', officeId)
       .order('name', { ascending: true });
 

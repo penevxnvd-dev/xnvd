@@ -21,7 +21,7 @@ const Auth = () => {
     // Check if user is already logged in
     supabaseApi.getCurrentUser()
       .then(() => {
-        navigate("/");
+        navigate("/dashboard");
       })
       .catch(() => {
         // Not logged in, stay on auth page
@@ -39,14 +39,14 @@ const Auth = () => {
           title: "Успешно влизане",
           description: "Добре дошли!",
         });
-        navigate("/");
+        navigate("/dashboard");
       } else {
         await supabaseApi.register(email, password, fullName || email);
         toast({
           title: "Успешна регистрация",
           description: "Акаунтът е създаден успешно!",
         });
-        navigate("/");
+        navigate("/dashboard");
       }
     } catch (error: any) {
       toast({

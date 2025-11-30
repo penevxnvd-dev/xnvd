@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { toast } from 'sonner';
+import { formatNameWithEmoji } from '@/utils/nameEmojis';
 
 interface AddPersonToTeamDialogProps {
   open: boolean;
@@ -231,7 +232,7 @@ export const AddPersonToTeamDialog = ({
                   <SelectContent>
                     {availableProfiles.map((profile) => (
                       <SelectItem key={profile.id} value={profile.id}>
-                        {profile.fullName} ({profile.email})
+                        {formatNameWithEmoji(profile.fullName)} ({profile.email})
                         {profile.isRealtor && ' - Реализатор'}
                       </SelectItem>
                     ))}

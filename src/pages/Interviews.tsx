@@ -97,7 +97,7 @@ const Interviews = () => {
               <img src={logo} alt="HRCO Logo" className="h-16 w-16 object-contain" />
               <h1 className="text-3xl font-bold text-foreground">Календар за интервюта</h1>
             </div>
-            <Button onClick={() => navigate('/')} variant="outline" size="sm">
+            <Button onClick={() => navigate('/dashboard')} variant="outline" size="sm">
               <Home className="h-4 w-4 mr-2" />
               Начало
             </Button>

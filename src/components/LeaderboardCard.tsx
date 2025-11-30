@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Agent } from '@/types';
 import { Trophy, Award, Medal } from 'lucide-react';
 import { formatCurrency } from '@/utils/calculations';
+import { formatNameWithEmoji } from '@/utils/nameEmojis';
 
 interface LeaderboardCardProps {
   agents: Agent[];
@@ -50,7 +51,7 @@ export const LeaderboardCard = ({ agents, title, sortBy, limit = 5 }: Leaderboar
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-foreground truncate">{agent.name}</p>
+                <p className="font-medium text-foreground truncate">{formatNameWithEmoji(agent.name)}</p>
                 <p className="text-xs text-muted-foreground">{agent.department}</p>
               </div>
               <div className="text-right">

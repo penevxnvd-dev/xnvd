@@ -1,4 +1,5 @@
 import { Office, TeamLeader, Agent, Deal } from '@/types';
+import { formatNameWithEmoji, formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
 
 // Map level number to AgentLevel string
 const levelMap: Record<number, 'Чирак' | 'Реализатор' | 'Елит'> = {
@@ -75,7 +76,7 @@ function transformAgent(dbRealtor: any): Agent {
 
   return {
     id: dbRealtor.id,
-    name: dbRealtor.user.fullName,
+    name: formatNameWithoutElevenEleven(dbRealtor.user.fullName).displayName,
     position: 'Реализатор',
     avatar,
     level,
@@ -102,7 +103,7 @@ function transformTeamLeader(dbTeam: any): TeamLeader | null {
 
   return {
     id: dbTeam.id,
-    name: leader.fullName,
+    name: formatNameWithoutElevenEleven(leader.fullName).displayName,
     position: leader.realtor ? 'Регионален мениджър' : 'Ръководител',
     avatar,
     teamMembers

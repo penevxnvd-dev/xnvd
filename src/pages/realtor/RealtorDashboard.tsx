@@ -24,6 +24,7 @@ import { TopologySidebar } from '@/components/TopologySidebar';
 import { transformOffices } from '@/utils/dataTransform';
 import { Office, Agent } from '@/types';
 import { toast } from 'sonner';
+import { formatNameWithEmoji, formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
 
 interface RealtorData {
   id: string;
@@ -322,9 +323,14 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
               </Button>
               <img src={logo} alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 object-contain flex-shrink-0" />
               <div className="min-w-0 flex-1">
-                <h1 className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-foreground break-words">
-                  {realtorData.user.fullName}
-                </h1>
+                {(() => {
+                  const { displayName } = formatNameWithoutElevenEleven(realtorData.user.fullName);
+                  return (
+                    <h1 className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-foreground break-words">
+                      {displayName}
+                    </h1>
+                  );
+                })()}
                 <p className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground">Ниво {realtorData.level}</p>
               </div>
             </div>
@@ -347,7 +353,12 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
                           {realtorData.user.fullName.split(' ').map(n => n[0]).join('')}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="break-words max-w-[100px] sm:max-w-[150px] md:max-w-none">{realtorData.user.fullName}</span>
+                      {(() => {
+                        const { displayName } = formatNameWithoutElevenEleven(realtorData.user.fullName);
+                        return (
+                          <span className="break-words max-w-[100px] sm:max-w-[150px] md:max-w-none">{displayName}</span>
+                        );
+                      })()}
                       <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                     </div>
                   </Button>
@@ -355,7 +366,12 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium">{realtorData.user.fullName}</p>
+                      {(() => {
+                        const { displayName } = formatNameWithoutElevenEleven(realtorData.user.fullName);
+                        return (
+                          <p className="text-sm font-medium">{displayName}</p>
+                        );
+                      })()}
                       <p className="text-xs text-muted-foreground">{realtorData.user.email}</p>
                     </div>
                   </DropdownMenuLabel>

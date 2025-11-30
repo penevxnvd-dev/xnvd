@@ -52,7 +52,7 @@ const Analytics = () => {
               <h1 className="text-3xl font-bold text-foreground">Аналитика</h1>
               <p className="text-muted-foreground mt-1">Детайлен преглед на представянето</p>
             </div>
-            <Button onClick={() => navigate('/')} variant="outline" size="sm">
+            <Button onClick={() => navigate('/dashboard')} variant="outline" size="sm">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Назад към офисите
             </Button>

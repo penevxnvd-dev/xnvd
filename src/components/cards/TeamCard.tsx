@@ -4,6 +4,7 @@ import { KPIMetrics, formatSuccessRate } from '@/utils/kpiCalculations';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import { formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
 
 interface TeamCardProps {
   team: {
@@ -33,22 +34,26 @@ export const TeamCard = ({ team, metrics, onClick }: TeamCardProps) => {
       <CardHeader className="pb-3.5 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="p-2 rounded-md bg-warning/5 border border-warning/20">
-              <Users className="h-4.5 w-4.5 text-warning" />
+            <div className="p-1 rounded-md bg-black dark:bg-gray-900 border border-gray-800 dark:border-gray-700 overflow-hidden">
+              <img 
+                src="/Screenshot from 2025-11-30 17-19-58.png" 
+                alt="Team icon" 
+                className="h-7 w-7 sm:h-8 sm:w-8 object-contain scale-125"
+              />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-gray-900 dark:text-gray-50 break-words flex-1 min-w-0">
-                  {team.name}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-gray-900 dark:text-gray-50 break-words">
+                  {formatNameWithoutElevenEleven(team.name).displayName}
                 </CardTitle>
-                <div className="flex items-center gap-1.5 px-1.5 sm:px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 flex-shrink-0">
+                <div className="flex items-center gap-1 px-1 sm:px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 flex-shrink-0">
                   <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-blue-600 dark:text-blue-400" />
-                  <span className="text-[9px] sm:text-[10px] md:text-xs font-semibold text-blue-700 dark:text-blue-300">{metrics.realtors}</span>
+                  <span className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-blue-700 dark:text-blue-300">{metrics.realtors}</span>
                 </div>
               </div>
               {team.leaderName && (
                 <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-500 dark:text-gray-400 mt-0.5 break-words">
-                  Ръководител: {team.leaderName}
+                  Ръководител: {formatNameWithoutElevenEleven(team.leaderName).displayName}
                 </p>
               )}
             </div>

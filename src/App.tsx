@@ -25,8 +25,9 @@ const App = () => (
         }}
       >
         <Routes>
+          <Route path="/" element={<Auth />} />
           <Route path="/auth" element={<Auth />} />
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/interviews" element={<Interviews />} />
           <Route path="/training" element={<TrainingPage />} />

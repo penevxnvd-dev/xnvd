@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Office, TeamLeader, Agent } from '@/types';
 import { supabaseApi } from '@/lib/supabaseApi';
+import { formatNameWithEmoji, formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
 
 interface TopologySidebarProps {
   offices: Office[];
@@ -71,12 +72,12 @@ export const TopologySidebar = ({
           const officeTeams: Array<{id: string; name: string; leaderName: string; members: Agent[]}> = [];
           
           (dbOffice.teams || []).forEach((team: any) => {
-            const leaderName = team.leader?.full_name || 'Без лидер';
+            const leaderName = formatNameWithoutElevenEleven(team.leader?.full_name || 'Без лидер').displayName;
             const members = (team.realtors || []).map((realtor: any) => {
               const profile = realtor.profile;
               return {
                 id: realtor.id || profile?.id || `realtor-${Date.now()}`,
-                name: profile?.full_name || 'Неизвестен',
+                name: formatNameWithEmoji(profile?.full_name || 'Неизвестен'),
                 phone: '',
                 position: '',
                 email: profile?.email || '',

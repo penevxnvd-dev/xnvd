@@ -177,11 +177,11 @@ const TrainingPage = () => {
               </div>
             </div>
             <div className="flex gap-1.5 sm:gap-2 flex-wrap">
-              <Button onClick={() => navigate('/')} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
+              <Button onClick={() => navigate('/dashboard')} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
                 <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                 <span>Назад</span>
               </Button>
-              <Button onClick={() => navigate('/')} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
+              <Button onClick={() => navigate('/dashboard')} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
                 Начало
               </Button>
               <Button onClick={handleLogout} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">

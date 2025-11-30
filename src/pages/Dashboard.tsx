@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { LogOut, AlertCircle } from 'lucide-react';
 import { supabaseApi } from '@/lib/supabaseApi';
 import logo from '@/assets/logo.jpeg';
+import { useEffect } from 'react';
 
 const Dashboard = () => {
   const { role, loading, userId } = useUserRole();
@@ -15,8 +16,14 @@ const Dashboard = () => {
 
   const handleLogout = async () => {
     await supabaseApi.logout();
-    navigate('/auth');
+    navigate('/');
   };
+
+  useEffect(() => {
+    if (!loading && !role) {
+      navigate('/');
+    }
+  }, [loading, role, navigate]);
 
   if (loading) {
     return (

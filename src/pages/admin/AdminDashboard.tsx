@@ -1,5 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical } from 'lucide-react';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -53,6 +73,7 @@ import { trainingStructure, calculateTrainingProgress, TrainingSection } from '@
 import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
 import { Progress } from '@/components/ui/progress';
 import { BookOpen } from 'lucide-react';
+import { formatNameWithEmoji, formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
 
 type ViewLevel = 'countries' | 'cities' | 'offices' | 'teams' | 'realtors' | 'realtor-detail';
 
@@ -100,6 +121,41 @@ interface AdminDashboardProps {
   userId: string;
 }
 
+// Sortable Card Wrapper Component
+const SortableCard = ({ id, children, className }: { id: string; children: React.ReactNode; className?: string }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn("relative group", className)}
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="absolute top-2 left-2 z-20 cursor-grab active:cursor-grabbing touch-none opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm rounded p-1"
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+      </div>
+      {children}
+    </div>
+  );
+};
+
 const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const navigate = useNavigate();
   const [currentView, setCurrentView] = useState<ViewLevel>('countries');
@@ -134,6 +190,14 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const [addPersonDialogOpen, setAddPersonDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [parentOptions, setParentOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     fetchCountries();
@@ -170,7 +234,8 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     setLoading(true);
     try {
       const data = await supabaseApi.getCountries();
-      setCountries(data);
+      const ordered = applyPositions(data, 'countries');
+      setCountries(ordered);
     } catch (error) {
       console.error('Error fetching countries:', error);
     } finally {
@@ -182,11 +247,13 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     setLoading(true);
     try {
       const data = await supabaseApi.getCitiesByCountry(countryId);
-      setCities(data.map((city: any) => ({
+      const mapped = data.map((city: any) => ({
         id: city.id,
         name: city.name,
         country_id: city.countryId
-      })));
+      }));
+      const ordered = applyPositions(mapped, 'cities', countryId);
+      setCities(ordered);
     } catch (error) {
       console.error('Error fetching cities:', error);
     } finally {
@@ -198,12 +265,14 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     setLoading(true);
     try {
       const data = await supabaseApi.getOfficesByCity(cityId);
-      setOffices(data.map((office: any) => ({
+      const mapped = data.map((office: any) => ({
         id: office.id,
         name: office.name,
         city_id: office.cityId,
         address: office.address
-      })));
+      }));
+      const ordered = applyPositions(mapped, 'offices', cityId);
+      setOffices(ordered);
     } catch (error) {
       console.error('Error fetching offices:', error);
     } finally {
@@ -215,12 +284,15 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     setLoading(true);
     try {
       const data = await supabaseApi.getTeamsByOffice(officeId);
-      setTeams(data.map((team: any) => ({
+      const mapped = data.map((team: any) => ({
         id: team.id,
         name: team.name,
         office_id: team.officeId,
-        leader_id: team.leaderId
-      })));
+        leader_id: team.leaderId,
+        leaderName: team.leader?.full_name ? formatNameWithoutElevenEleven(team.leader.full_name).displayName : undefined
+      }));
+      const ordered = applyPositions(mapped, 'teams', officeId);
+      setTeams(ordered);
     } catch (error) {
       console.error('Error fetching teams:', error);
     } finally {
@@ -232,7 +304,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     setLoading(true);
     try {
       const data = await supabaseApi.getRealtorsByTeam(teamId);
-      setRealtors(data.map((realtor: any) => ({
+      const mapped = data.map((realtor: any) => ({
         id: realtor.id,
         userId: realtor.userId,
         teamId: realtor.teamId,
@@ -241,7 +313,9 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
           fullName: realtor.user?.fullName || realtor.profile?.fullName || 'Неизвестен',
           email: realtor.user?.email || realtor.profile?.email || ''
         }
-      })));
+      }));
+      const ordered = applyPositions(mapped, 'realtors', teamId);
+      setRealtors(ordered);
       
       // Изчисляване на KPI за екипа
       try {
@@ -256,6 +330,129 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
       console.error('Error fetching realtors:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  // Helper functions to save/load positions from localStorage
+  const getStorageKey = (view: ViewLevel, contextId?: string) => {
+    if (view === 'cities') {
+      const countryId = contextId || selectedCountry?.id;
+      return countryId ? `card-positions-cities-${countryId}` : `card-positions-cities`;
+    } else if (view === 'offices') {
+      const cityId = contextId || selectedCity?.id;
+      return cityId ? `card-positions-offices-${cityId}` : `card-positions-offices`;
+    } else if (view === 'teams') {
+      const officeId = contextId || selectedOffice?.id;
+      return officeId ? `card-positions-teams-${officeId}` : `card-positions-teams`;
+    } else if (view === 'realtors') {
+      const teamId = contextId || selectedTeam?.id;
+      return teamId ? `card-positions-realtors-${teamId}` : `card-positions-realtors`;
+    }
+    return `card-positions-${view}`;
+  };
+
+  const savePositions = (view: ViewLevel, itemIds: string[], contextId?: string) => {
+    const key = getStorageKey(view, contextId);
+    try {
+      localStorage.setItem(key, JSON.stringify(itemIds));
+    } catch (error) {
+      console.error('Error saving positions to localStorage:', error);
+    }
+  };
+
+  const loadPositions = (view: ViewLevel, contextId?: string): string[] | null => {
+    const key = getStorageKey(view, contextId);
+    try {
+      const stored = localStorage.getItem(key);
+      return stored ? JSON.parse(stored) : null;
+    } catch (error) {
+      console.error('Error loading positions from localStorage:', error);
+      return null;
+    }
+  };
+
+  const applyPositions = <T extends { id: string }>(items: T[], view: ViewLevel, contextId?: string): T[] => {
+    const savedPositions = loadPositions(view, contextId);
+    if (!savedPositions || savedPositions.length === 0) {
+      return items;
+    }
+
+    // Create a map for quick lookup
+    const itemsMap = new Map(items.map(item => [item.id, item]));
+    
+    // Reorder based on saved positions, keeping items not in saved list at the end
+    const ordered: T[] = [];
+    const usedIds = new Set<string>();
+    
+    savedPositions.forEach(id => {
+      if (itemsMap.has(id)) {
+        ordered.push(itemsMap.get(id)!);
+        usedIds.add(id);
+      }
+    });
+    
+    // Add any items that weren't in the saved positions
+    items.forEach(item => {
+      if (!usedIds.has(item.id)) {
+        ordered.push(item);
+      }
+    });
+    
+    return ordered;
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    if (currentView === 'countries') {
+      setCountries((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        const reordered = arrayMove(items, oldIndex, newIndex);
+        savePositions('countries', reordered.map(item => item.id));
+        return reordered;
+      });
+    } else if (currentView === 'cities') {
+      setCities((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        const reordered = arrayMove(items, oldIndex, newIndex);
+        savePositions('cities', reordered.map(item => item.id), selectedCountry?.id);
+        return reordered;
+      });
+    } else if (currentView === 'offices') {
+      setOffices((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        const reordered = arrayMove(items, oldIndex, newIndex);
+        savePositions('offices', reordered.map(item => item.id), selectedCity?.id);
+        return reordered;
+      });
+    } else if (currentView === 'teams') {
+      setTeams((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        const reordered = arrayMove(items, oldIndex, newIndex);
+        savePositions('teams', reordered.map(item => item.id), selectedOffice?.id);
+        return reordered;
+      });
+    } else if (currentView === 'realtors') {
+      setRealtors((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        const reordered = arrayMove(items, oldIndex, newIndex);
+        savePositions('realtors', reordered.map(item => item.id), selectedTeam?.id);
+        return reordered;
+      });
     }
   };
 
@@ -647,14 +844,30 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
         {loading ? (
           <div className="text-center text-muted-foreground">Зареждане...</div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-            {currentView === 'countries' && countries.map((country) => (
-              <div key={country.id} className="relative group">
-                <CountryCardWithKPI
-                  country={country}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={
+                currentView === 'countries' ? countries.map(c => c.id) :
+                currentView === 'cities' ? cities.map(c => c.id) :
+                currentView === 'offices' ? offices.map(o => o.id) :
+                currentView === 'teams' ? teams.map(t => t.id) :
+                currentView === 'realtors' ? realtors.map(r => r.id) : []
+              }
+              strategy={rectSortingStrategy}
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+                {currentView === 'countries' && countries.map((country) => (
+                  <SortableCard key={country.id} id={country.id}>
+                    <CountryCardWithKPI
+                      country={country}
                       onClick={() => handleCountryClick(country)}
-                />
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+                    />
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -678,11 +891,11 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
-                  </div>
+                  </SortableCard>
             ))}
 
             {currentView === 'cities' && cities.map((city) => (
-              <div key={city.id} className="relative group">
+              <SortableCard key={city.id} id={city.id}>
                 <CityCardWithKPI
                   city={{ ...city, countryName: selectedCountry?.name }}
                       onClick={() => handleCityClick(city)}
@@ -711,11 +924,11 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
-                  </div>
+                  </SortableCard>
             ))}
 
             {currentView === 'offices' && offices.map((office) => (
-              <div key={office.id} className="relative group">
+              <SortableCard key={office.id} id={office.id}>
                 <OfficeCardWithKPI
                   office={office}
                       onClick={() => handleOfficeClick(office)}
@@ -744,11 +957,11 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
-                  </div>
+                  </SortableCard>
             ))}
 
             {currentView === 'teams' && teams.map((team) => (
-              <div key={team.id} className="relative group">
+              <SortableCard key={team.id} id={team.id}>
                 <TeamCardWithKPI
                   team={team}
                       onClick={() => handleTeamClick(team)}
@@ -777,13 +990,13 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
-                  </div>
+                  </SortableCard>
             ))}
 
             {currentView === 'realtors' && realtors.map((realtor) => (
               realtor.user && (
-                <RealizatorCardWithKPI
-                  key={realtor.id}
+                <SortableCard key={realtor.id} id={realtor.id}>
+                  <RealizatorCardWithKPI
                   realtor={{
                     id: realtor.id,
                     name: realtor.user.fullName,
@@ -873,9 +1086,19 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                     }
                   }}
                 />
+                </SortableCard>
               )
             ))}
-          </div>
+              </div>
+            </SortableContext>
+            <DragOverlay>
+              {activeId ? (
+                <div className="opacity-50">
+                  {/* Render a placeholder card here if needed */}
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         )}
 
         {/* Realtor Detail View */}
@@ -884,26 +1107,47 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
             {/* Overall Training Progress - At the very top with realtor info */}
             <Card>
               <CardHeader className="p-3 sm:p-6">
-                <div className="flex items-center justify-between flex-wrap gap-2 mb-3 sm:mb-4">
+                <div className="flex items-start justify-between flex-wrap gap-2 mb-3 sm:mb-4">
                   <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 flex-wrap">
-                    <h2 className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-gray-900 dark:text-gray-50 break-words flex-1 min-w-0">
-                      {selectedRealtor.user.fullName}
-                    </h2>
-                    <Badge className={cn(
-                      "text-[9px] sm:text-[10px] md:text-xs border font-medium flex-shrink-0",
-                      selectedRealtor.level === 1 ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800' :
-                      (selectedRealtor.level === 2 || selectedRealtor.level === 3) ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800' :
-                      'bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800'
-                    )}>
-                      {(selectedRealtor.level === 4 || selectedRealtor.level === 5) && <Award className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />}
-                      {selectedRealtor.level === 1 ? 'Чирак' : (selectedRealtor.level === 2 || selectedRealtor.level === 3) ? 'Реализатор' : 'Елит'}
-                    </Badge>
+                    {(() => {
+                      const { displayName } = formatNameWithoutElevenEleven(selectedRealtor.user.fullName);
+                      return (
+                        <>
+                          <h2 className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-gray-900 dark:text-gray-50 break-words flex-1 min-w-0">
+                            {displayName}
+                          </h2>
+                          <Badge className={cn(
+                            "text-[9px] sm:text-[10px] md:text-xs border font-medium flex-shrink-0",
+                            selectedRealtor.level === 1 ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800' :
+                            (selectedRealtor.level === 2 || selectedRealtor.level === 3) ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800' :
+                            'bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800'
+                          )}>
+                            {(selectedRealtor.level === 4 || selectedRealtor.level === 5) && <Award className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />}
+                            {selectedRealtor.level === 1 ? 'Чирак' : (selectedRealtor.level === 2 || selectedRealtor.level === 3) ? 'Реализатор' : 'Елит'}
+                          </Badge>
+                        </>
+                      );
+                    })()}
                   </div>
-                  <div className="flex items-baseline gap-1.5 flex-shrink-0">
-                    <TrendingUp className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                    <span className="text-base font-semibold text-emerald-600 dark:text-emerald-400">
-                      {formatSuccessRate(selectedRealtorKPI.successRate)}
-                    </span>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    {(() => {
+                      const { shouldShowElevenEleven } = formatNameWithoutElevenEleven(selectedRealtor.user.fullName);
+                      return (
+                        <>
+                          {shouldShowElevenEleven && (
+                            <span className="text-[10px] sm:text-xs md:text-sm font-medium text-gray-600 dark:text-gray-400">
+                              11:11
+                            </span>
+                          )}
+                          <div className="flex items-baseline gap-1.5">
+                            <TrendingUp className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span className="text-base font-semibold text-emerald-600 dark:text-emerald-400">
+                              {formatSuccessRate(selectedRealtorKPI.successRate)}
+                            </span>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
                 

@@ -257,7 +257,7 @@ export const UserManagementDialog = ({
                       className="flex items-center justify-between p-3 border rounded-md hover:bg-accent/50"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{user.fullName}</p>
+                        <p className="font-medium truncate">{formatNameWithEmoji(user.fullName)}</p>
                         <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           Роля: {user.role === 'admin' ? 'Администратор' : user.role === 'realtor' ? 'Реализатор' : 'Няма роля'}
@@ -362,7 +362,7 @@ export const UserManagementDialog = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Потвърждение за изтриване</AlertDialogTitle>
             <AlertDialogDescription>
-              Сигурни ли сте, че искате да изтриете акаунта на "{selectedUser?.fullName}"? 
+              Сигурни ли сте, че искате да изтриете акаунта на "{selectedUser ? formatNameWithEmoji(selectedUser.fullName) : ''}"? 
               Това действие не може да бъде отменено.
             </AlertDialogDescription>
           </AlertDialogHeader>

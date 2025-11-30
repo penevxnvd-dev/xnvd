@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Agent } from '@/types';
+import { formatNameWithEmoji } from '@/utils/nameEmojis';
 
 interface AgentCardProps {
   agent: Agent;
@@ -44,7 +45,7 @@ export const AgentCard = ({ agent, onClick }: AgentCardProps) => {
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-2">
             <div>
-              <h3 className="text-lg font-semibold text-foreground">{agent.name}</h3>
+              <h3 className="text-lg font-semibold text-foreground">{formatNameWithEmoji(agent.name)}</h3>
               <p className="text-sm text-muted-foreground">{agent.position}</p>
             </div>
             <Badge className={getLevelColor(agent.level)}>{agent.level}</Badge>

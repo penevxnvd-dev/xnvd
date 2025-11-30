@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
+import { formatNameWithEmoji } from '@/utils/nameEmojis';
 import { Settings } from 'lucide-react';
 import { OfficeCard } from '@/components/OfficeCard';
 import { TeamLeaderCard } from '@/components/TeamLeaderCard';
@@ -181,7 +182,7 @@ const Index = () => {
                             {userInfo?.fullName?.split(' ').map(n => n[0]).join('') || 'U'}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="hidden sm:inline">{userInfo?.fullName || 'Акаунт'}</span>
+                        <span className="hidden sm:inline">{userInfo?.fullName ? formatNameWithEmoji(userInfo.fullName) : 'Акаунт'}</span>
                         <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
                       </div>
                     </Button>
@@ -189,7 +190,7 @@ const Index = () => {
                   <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuLabel>
                       <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium">{userInfo?.fullName || 'Потребител'}</p>
+                        <p className="text-sm font-medium">{userInfo?.fullName ? formatNameWithEmoji(userInfo.fullName) : 'Потребител'}</p>
                         <p className="text-xs text-muted-foreground">{userInfo?.email || ''}</p>
                       </div>
                     </DropdownMenuLabel>

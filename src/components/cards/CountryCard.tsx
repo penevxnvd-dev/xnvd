@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Map, Users, FileText, Target, TrendingUp } from 'lucide-react';
+import { Users, FileText, Target, TrendingUp } from 'lucide-react';
 import { KPIMetrics, formatSuccessRate } from '@/utils/kpiCalculations';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -32,9 +32,7 @@ export const CountryCard = ({ country, metrics, onClick }: CountryCardProps) => 
       <CardHeader className="pb-3.5 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="p-2 rounded-md bg-primary/5 border border-primary/20">
-              <Map className="h-4.5 w-4.5 text-primary" />
-            </div>
+            <span className="text-2xl sm:text-3xl">🇧🇬</span>
             <div className="flex-1 min-w-0">
               <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-gray-900 dark:text-gray-50 break-words">
                 {country.name}
