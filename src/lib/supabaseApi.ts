@@ -589,7 +589,7 @@ class SupabaseApiClient {
         data: {
           full_name: fullName,
         },
-        email_redirect_to: window.location.origin,
+        emailRedirectTo: window.location.origin,
       },
     });
 
@@ -947,40 +947,9 @@ class SupabaseApiClient {
     return progress;
   }
 
-  // KPI endpoints - using RPC functions with fallback to direct calculation
+  // KPI endpoints - direct calculation (RPC functions removed for simplicity)
   async getRealtorKPI(realtorId: string) {
-    const { data, error } = await supabase.rpc('get_realtor_kpi', {
-      p_realtor_id: realtorId,
-    });
-
-    // If RPC function doesn't exist (404) or other RPC errors, fallback to direct calculation
-    if (error) {
-      const errorObj = error as any;
-      const isNotFound = error.code === 'P0001' || 
-                        error.code === '42883' || 
-                        error.code === '42P01' ||
-                        error.message?.includes('does not exist') ||
-                        error.message?.includes('function') ||
-                        error.message?.includes('not found') ||
-                        errorObj.status === 404 ||
-                        errorObj.statusCode === 404 ||
-                        errorObj.code === '404' ||
-                        String(errorObj).includes('404');
-      
-      if (isNotFound) {
-        console.warn('RPC function not found, calculating KPI directly');
-        return this.calculateRealtorKPIDirectly(realtorId);
-      }
-      // For any other error, also try fallback as last resort
-      console.warn('RPC error, falling back to direct calculation:', error);
-      try {
-        return await this.calculateRealtorKPIDirectly(realtorId);
-      } catch (fallbackError) {
-        throw error; // Throw original error if fallback also fails
-      }
-    }
-    
-    return data;
+    return this.calculateRealtorKPIDirectly(realtorId);
   }
 
   private async calculateRealtorKPIDirectly(realtorId: string) {
@@ -1020,36 +989,7 @@ class SupabaseApiClient {
   }
 
   async getTeamKPI(teamId: string) {
-    const { data, error } = await supabase.rpc('get_team_kpi', {
-      p_team_id: teamId,
-    });
-
-    if (error) {
-      const errorObj = error as any;
-      const isNotFound = error.code === 'P0001' || 
-                        error.code === '42883' || 
-                        error.code === '42P01' ||
-                        error.message?.includes('does not exist') ||
-                        error.message?.includes('function') ||
-                        error.message?.includes('not found') ||
-                        errorObj.status === 404 ||
-                        errorObj.statusCode === 404 ||
-                        errorObj.code === '404' ||
-                        String(errorObj).includes('404');
-      
-      if (isNotFound) {
-        console.warn('RPC function not found, calculating KPI directly');
-        return this.calculateTeamKPIDirectly(teamId);
-      }
-      console.warn('RPC error, falling back to direct calculation:', error);
-      try {
-        return await this.calculateTeamKPIDirectly(teamId);
-      } catch (fallbackError) {
-        throw error;
-      }
-    }
-    
-    return data;
+    return this.calculateTeamKPIDirectly(teamId);
   }
 
   private async calculateTeamKPIDirectly(teamId: string) {
@@ -1097,27 +1037,7 @@ class SupabaseApiClient {
   }
 
   async getOfficeKPI(officeId: string) {
-    const { data, error } = await supabase.rpc('get_office_kpi', {
-      p_office_id: officeId,
-    });
-
-    if (error) {
-      const isNotFound = error.code === 'P0001' || 
-                        error.code === '42883' || 
-                        error.message?.includes('does not exist') ||
-                        error.message?.includes('function') ||
-                        error.code === '42P01' ||
-                        (error as any).status === 404 ||
-                        (error as any).statusCode === 404;
-      
-      if (isNotFound) {
-        console.warn('RPC function not found, calculating KPI directly');
-        return this.calculateOfficeKPIDirectly(officeId);
-      }
-      throw error;
-    }
-    
-    return data;
+    return this.calculateOfficeKPIDirectly(officeId);
   }
 
   private async calculateOfficeKPIDirectly(officeId: string) {
@@ -1155,27 +1075,7 @@ class SupabaseApiClient {
   }
 
   async getCityKPI(cityId: string) {
-    const { data, error } = await supabase.rpc('get_city_kpi', {
-      p_city_id: cityId,
-    });
-
-    if (error) {
-      const isNotFound = error.code === 'P0001' || 
-                        error.code === '42883' || 
-                        error.message?.includes('does not exist') ||
-                        error.message?.includes('function') ||
-                        error.code === '42P01' ||
-                        (error as any).status === 404 ||
-                        (error as any).statusCode === 404;
-      
-      if (isNotFound) {
-        console.warn('RPC function not found, calculating KPI directly');
-        return this.calculateCityKPIDirectly(cityId);
-      }
-      throw error;
-    }
-    
-    return data;
+    return this.calculateCityKPIDirectly(cityId);
   }
 
   private async calculateCityKPIDirectly(cityId: string) {
@@ -1210,27 +1110,7 @@ class SupabaseApiClient {
   }
 
   async getCountryKPI(countryId: string) {
-    const { data, error } = await supabase.rpc('get_country_kpi', {
-      p_country_id: countryId,
-    });
-
-    if (error) {
-      const isNotFound = error.code === 'P0001' || 
-                        error.code === '42883' || 
-                        error.message?.includes('does not exist') ||
-                        error.message?.includes('function') ||
-                        error.code === '42P01' ||
-                        (error as any).status === 404 ||
-                        (error as any).statusCode === 404;
-      
-      if (isNotFound) {
-        console.warn('RPC function not found, calculating KPI directly');
-        return this.calculateCountryKPIDirectly(countryId);
-      }
-      throw error;
-    }
-    
-    return data;
+    return this.calculateCountryKPIDirectly(countryId);
   }
 
   private async calculateCountryKPIDirectly(countryId: string) {

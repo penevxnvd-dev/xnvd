@@ -8,7 +8,7 @@ export interface TrainingGroup {
   leaderId: string;
   trainees: Agent[];
   currentDay: number; // 1-3
-  status: 'активна' | 'завършена';
+  status: 'активна' | 'завършена' | 'предстояща';
 }
 
 export interface TrainingSchedule {

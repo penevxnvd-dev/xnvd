@@ -34,12 +34,8 @@ export const TeamCard = ({ team, metrics, onClick }: TeamCardProps) => {
       <CardHeader className="pb-3.5 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="p-1 rounded-md bg-black dark:bg-gray-900 border border-gray-800 dark:border-gray-700 overflow-hidden">
-              <img 
-                src="/Screenshot from 2025-11-30 17-19-58.png" 
-                alt="Team icon" 
-                className="h-7 w-7 sm:h-8 sm:w-8 object-contain scale-125"
-              />
+            <div className="p-1.5 rounded-md bg-primary/10 dark:bg-primary/20">
+              <Users className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">

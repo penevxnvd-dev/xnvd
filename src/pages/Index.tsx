@@ -24,7 +24,7 @@ import { TopologySidebar } from '@/components/TopologySidebar';
 import { mockTrainingGroups } from '@/data/trainingData';
 import { transformOffices } from '@/utils/dataTransform';
 import { Office, TeamLeader, Agent, TrainingGroup } from '@/types';
-import { ChevronLeft, Home, BarChart3, GraduationCap, Calendar, LogOut, Menu } from 'lucide-react';
+import { ChevronLeft, Home, BarChart3, GraduationCap, Calendar, LogOut, Menu, ChevronDown } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
 
 type ViewType = 'offices' | 'leaders' | 'agents' | 'training';

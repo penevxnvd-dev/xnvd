@@ -173,17 +173,17 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
           ...section,
           subsections: section.subsections.map((subsection) => {
             const progressItem = progressData.find(
-              (p: TrainingProgress) => p.section === section.id && p.subsection === subsection.id
+              (p: any) => p.section === section.id && p.subsection === subsection.id
             );
             return {
               ...subsection,
               progress: progressItem
                 ? {
-                    lecture: progressItem.lectureCompleted,
-                    video: progressItem.videoCompleted,
-                    practical: progressItem.practicalCompleted,
-                    handover: progressItem.handoverCompleted,
-                    exam: progressItem.examCompleted,
+                    lecture: progressItem.lecture_completed,
+                    video: progressItem.video_completed,
+                    practical: progressItem.practical_completed,
+                    handover: progressItem.handover_completed,
+                    exam: progressItem.exam_completed,
                   }
                 : subsection.progress,
             };
@@ -562,8 +562,25 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
           onUpdate={async () => {
             // Refetch realtor data
             try {
-              const data = await supabaseApi.getRealtorData(userId);
-              setRealtorData(data);
+              const realtor = await supabaseApi.getCurrentRealtor();
+              if (realtor) {
+                const { user } = await supabaseApi.getCurrentUser();
+                if (user) {
+                  const profile = await supabaseApi.supabase
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', user.id)
+                    .single();
+                  
+                  setRealtorData({
+                    ...realtor,
+                    user: {
+                      fullName: profile.data?.full_name || realtorData.user.fullName,
+                      email: user.email || realtorData.user.email
+                    }
+                  });
+                }
+              }
             } catch (error) {
               console.error('Error refetching realtor data:', error);
             }
