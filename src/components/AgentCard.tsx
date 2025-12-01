@@ -42,11 +42,11 @@ export const AgentCard = ({ agent, onClick }: AgentCardProps) => {
           </AvatarFallback>
         </Avatar>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">{formatNameWithEmoji(agent.name)}</h3>
-              <p className="text-sm text-muted-foreground">{agent.position}</p>
+        <div className="flex-1">
+          <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
+            <div className="flex-1">
+              <h3 className="text-base sm:text-lg font-semibold text-foreground break-words">{formatNameWithEmoji(agent.name)}</h3>
+              <p className="text-sm text-muted-foreground break-words">{agent.position}</p>
             </div>
             <Badge className={getLevelColor(agent.level)}>{agent.level}</Badge>
           </div>

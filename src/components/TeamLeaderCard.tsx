@@ -30,10 +30,10 @@ export const TeamLeaderCard = ({ leader, onClick }: TeamLeaderCardProps) => {
             </AvatarFallback>
           </Avatar>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-foreground">{formatNameWithEmoji(leader.name)}</h3>
-            <p className="text-sm text-muted-foreground mb-2">{leader.position}</p>
+            <h3 className="text-base sm:text-lg font-semibold text-foreground break-words">{formatNameWithEmoji(leader.name)}</h3>
+            <p className="text-sm text-muted-foreground mb-2 break-words">{leader.position}</p>
             <div className="flex items-center gap-2 text-accent">
-              <Users className="h-4 w-4" />
+              <Users className="h-4 w-4 flex-shrink-0" />
               <span className="text-sm font-medium">{leader.teamMembers.length} Членове на екипа</span>
             </div>
           </div>

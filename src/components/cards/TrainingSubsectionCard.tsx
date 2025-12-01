@@ -34,15 +34,15 @@ export const TrainingSubsectionCard = ({
     <Card className="transition-all duration-300 hover:shadow-lg">
       <CardHeader className="p-3 sm:p-6">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base min-w-0 flex-1 break-words">{subsection.title}</CardTitle>
-          <Badge variant={completed ? "default" : "outline"} className={`${completed ? "bg-success" : ""} text-[9px] sm:text-[10px] md:text-xs flex-shrink-0`}>
+          <CardTitle className="text-sm sm:text-base md:text-lg flex-1 break-words">{subsection.title}</CardTitle>
+          <Badge variant={completed ? "default" : "outline"} className={`${completed ? "bg-success" : ""} text-xs sm:text-sm flex-shrink-0`}>
             {completed ? (
               <>
-                <CheckCircle2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-1" />
+                <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
                 <span>Завършено</span>
               </>
             ) : (
-              <Circle className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              <Circle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             )}
           </Badge>
         </div>
@@ -54,11 +54,11 @@ export const TrainingSubsectionCard = ({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-center text-[10px] sm:text-xs">Лекция</TableHead>
-                  <TableHead className="text-center text-[10px] sm:text-xs">Видео</TableHead>
-                  <TableHead className="text-center text-[10px] sm:text-xs">Практическо</TableHead>
-                  <TableHead className="text-center text-[10px] sm:text-xs">Предаване</TableHead>
-                  <TableHead className="text-center text-[10px] sm:text-xs">Изпит</TableHead>
+                  <TableHead className="text-center text-xs sm:text-sm">Лекция</TableHead>
+                  <TableHead className="text-center text-xs sm:text-sm">Видео</TableHead>
+                  <TableHead className="text-center text-xs sm:text-sm">Практическо</TableHead>
+                  <TableHead className="text-center text-xs sm:text-sm">Предаване</TableHead>
+                  <TableHead className="text-center text-xs sm:text-sm">Изпит</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -121,10 +121,10 @@ export const TrainingSubsectionCard = ({
           {/* Horizontal Progress Bar */}
           <div className="pt-2 border-t border-border">
             <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-              <span className="text-[9px] sm:text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wide break-words">
+              <span className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide break-words">
                 Прогрес
               </span>
-              <span className="text-[9px] sm:text-[10px] md:text-xs font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0 ml-2">
+              <span className="text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0 ml-2">
                 {Math.round(progressPercentage)}%
               </span>
             </div>

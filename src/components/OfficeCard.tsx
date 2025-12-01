@@ -22,13 +22,13 @@ export const OfficeCard = ({ office, onClick }: OfficeCardProps) => {
             <Building2 className="h-8 w-8 text-primary" />
           </div>
           <div className="flex-1">
-            <h3 className="text-xl font-semibold text-foreground mb-2">{office.name}</h3>
-            <div className="flex items-center gap-2 text-muted-foreground mb-3">
-              <MapPin className="h-4 w-4" />
+            <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2 break-words">{office.name}</h3>
+            <div className="flex items-center gap-2 text-muted-foreground mb-3 break-words">
+              <MapPin className="h-4 w-4 flex-shrink-0" />
               <span className="text-sm">{office.location}</span>
             </div>
             <div className="flex items-center gap-2 text-accent">
-              <Users className="h-4 w-4" />
+              <Users className="h-4 w-4 flex-shrink-0" />
               <span className="text-sm font-medium">{metrics.totalEmployees} Реализатори</span>
             </div>
           </div>
