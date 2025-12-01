@@ -1,10 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, FileText, Target, TrendingUp } from 'lucide-react';
+import { Users, FileText, Target, TrendingUp, Award } from 'lucide-react';
 import { KPIMetrics, formatSuccessRate } from '@/utils/kpiCalculations';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
+import { Achievement } from '@/utils/achievements';
 
 interface TeamCardProps {
   team: {
@@ -13,10 +14,11 @@ interface TeamCardProps {
     leaderName?: string;
   };
   metrics: KPIMetrics;
+  achievements?: Achievement[];
   onClick?: () => void;
 }
 
-export const TeamCard = ({ team, metrics, onClick }: TeamCardProps) => {
+export const TeamCard = ({ team, metrics, achievements = [], onClick }: TeamCardProps) => {
   const successRate = metrics.successRate;
   const maxValue = Math.max(metrics.deals, metrics.diagnoses, 1);
   

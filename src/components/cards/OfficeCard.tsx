@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Users, FileText, Target, TrendingUp } from 'lucide-react';
+import { Building2, Users, FileText, Target, TrendingUp, Award } from 'lucide-react';
 import { KPIMetrics, formatSuccessRate } from '@/utils/kpiCalculations';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import { Achievement } from '@/utils/achievements';
 
 interface OfficeCardProps {
   office: {
@@ -12,10 +13,11 @@ interface OfficeCardProps {
     address?: string | null;
   };
   metrics: KPIMetrics;
+  achievements?: Achievement[];
   onClick?: () => void;
 }
 
-export const OfficeCard = ({ office, metrics, onClick }: OfficeCardProps) => {
+export const OfficeCard = ({ office, metrics, achievements = [], onClick }: OfficeCardProps) => {
   const successRate = metrics.successRate;
   const maxValue = Math.max(metrics.deals, metrics.diagnoses, 1);
   

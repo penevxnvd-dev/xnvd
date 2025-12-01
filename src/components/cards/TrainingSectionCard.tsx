@@ -1,11 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, BookOpen } from 'lucide-react';
+import { ChevronDown, BookOpen, CheckCircle2 } from 'lucide-react';
 import { TrainingSection } from '@/data/trainingStructure';
 import { TrainingSubsectionCard } from './TrainingSubsectionCard';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
 
 interface TrainingSectionCardProps {
   section: TrainingSection;
@@ -35,28 +36,54 @@ export const TrainingSectionCard = ({
     sub.progress.exam
   ).length;
   const sectionProgress = totalSubsections > 0 ? (completedSubsections / totalSubsections) * 100 : 0;
+  const isSectionCompleted = completedSubsections === totalSubsections && totalSubsections > 0;
 
   return (
-    <Card className="transition-all duration-300 hover:shadow-lg">
+    <Card className={cn(
+      "transition-all duration-300 hover:shadow-lg",
+      isSectionCompleted && "border-2 border-success bg-success/5"
+    )}>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CardHeader className="p-3 sm:p-6">
           <CollapsibleTrigger className="w-full">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2 sm:gap-3 flex-1">
-                <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10 flex-shrink-0">
-                  <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                <div className={cn(
+                  "p-1.5 sm:p-2 rounded-lg flex-shrink-0",
+                  isSectionCompleted ? "bg-success/20" : "bg-primary/10"
+                )}>
+                  {isSectionCompleted ? (
+                    <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-success" />
+                  ) : (
+                    <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                  )}
                 </div>
                 <div className="text-left flex-1">
-                  <CardTitle className="text-sm sm:text-base md:text-lg break-words">{section.title}</CardTitle>
+                  <CardTitle className={cn(
+                    "text-sm sm:text-base md:text-lg break-words",
+                    isSectionCompleted && "text-success font-bold"
+                  )}>
+                    {section.title}
+                    {isSectionCompleted && (
+                      <span className="ml-2 text-success">✓</span>
+                    )}
+                  </CardTitle>
                   <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 break-words">
                     {completedSubsections} от {totalSubsections} подточки завършени
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
-                <Badge variant="secondary" className="text-xs sm:text-sm">
-                  {Math.round(sectionProgress)}%
-                </Badge>
+                {isSectionCompleted ? (
+                  <Badge className="bg-success text-white text-xs sm:text-sm">
+                    <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
+                    Завършен
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="text-xs sm:text-sm">
+                    {Math.round(sectionProgress)}%
+                  </Badge>
+                )}
                 <ChevronDown className={`h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
               </div>
             </div>

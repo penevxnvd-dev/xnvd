@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { TeamCard } from './TeamCard';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { KPIMetrics } from '@/utils/kpiCalculations';
+import { Achievement } from '@/utils/achievements';
 
 interface TeamCardWithKPIProps {
   team: {
@@ -9,10 +10,11 @@ interface TeamCardWithKPIProps {
     name: string;
     leaderName?: string;
   };
+  achievements?: Achievement[];
   onClick?: () => void;
 }
 
-export const TeamCardWithKPI = ({ team, onClick }: TeamCardWithKPIProps) => {
+export const TeamCardWithKPI = ({ team, achievements = [], onClick }: TeamCardWithKPIProps) => {
   const [metrics, setMetrics] = useState<KPIMetrics>({
     realtors: 0,
     deals: 0,
@@ -34,6 +36,6 @@ export const TeamCardWithKPI = ({ team, onClick }: TeamCardWithKPIProps) => {
     fetchKPI();
   }, [team.id]);
 
-  return <TeamCard team={team} metrics={metrics} onClick={onClick} />;
+  return <TeamCard team={team} metrics={metrics} achievements={achievements} onClick={onClick} />;
 };
 

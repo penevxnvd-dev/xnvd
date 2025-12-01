@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { RealizatorCard } from './RealizatorCard';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { KPIMetrics } from '@/utils/kpiCalculations';
+import { Achievement } from '@/utils/achievements';
 
 interface RealizatorCardWithKPIProps {
   realtor: {
@@ -14,10 +15,11 @@ interface RealizatorCardWithKPIProps {
     successMindset?: boolean;
     avatar?: string;
   };
+  achievements?: Achievement[];
   onClick?: () => void;
 }
 
-export const RealizatorCardWithKPI = ({ realtor, onClick }: RealizatorCardWithKPIProps) => {
+export const RealizatorCardWithKPI = ({ realtor, achievements = [], onClick }: RealizatorCardWithKPIProps) => {
   const [metrics, setMetrics] = useState<KPIMetrics>({
     realtors: 1,
     deals: 0,
@@ -39,6 +41,6 @@ export const RealizatorCardWithKPI = ({ realtor, onClick }: RealizatorCardWithKP
     fetchKPI();
   }, [realtor.id]);
 
-  return <RealizatorCard realtor={realtor} metrics={metrics} onClick={onClick} />;
+  return <RealizatorCard realtor={realtor} metrics={metrics} achievements={achievements} onClick={onClick} />;
 };
 

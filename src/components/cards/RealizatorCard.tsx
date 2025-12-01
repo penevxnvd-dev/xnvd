@@ -4,6 +4,7 @@ import { KPIMetrics, formatSuccessRate } from '@/utils/kpiCalculations';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
+import { Achievement } from '@/utils/achievements';
 
 interface RealizatorCardProps {
   realtor: {
@@ -17,6 +18,7 @@ interface RealizatorCardProps {
     avatar?: string;
   };
   metrics: KPIMetrics;
+  achievements?: Achievement[];
   onClick?: () => void;
 }
 
@@ -43,7 +45,7 @@ const getLevelColor = (level: number) => {
   }
 };
 
-export const RealizatorCard = ({ realtor, metrics, onClick }: RealizatorCardProps) => {
+export const RealizatorCard = ({ realtor, metrics, achievements = [], onClick }: RealizatorCardProps) => {
   const level = levelMap[realtor.level] || 'Чирак';
   const qualitiesCount = [realtor.confidence, realtor.salesResilience, realtor.successMindset].filter(Boolean).length;
   
