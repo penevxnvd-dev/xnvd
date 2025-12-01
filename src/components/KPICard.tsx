@@ -17,23 +17,23 @@ export const KPICard = ({ metrics, title }: KPICardProps) => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Реализатори</CardTitle>
+            <CardTitle className="text-sm sm:text-base font-medium">Реализатори</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.realtors}</div>
-            <p className="text-xs text-muted-foreground">Общ брой</p>
+            <div className="text-xl sm:text-2xl font-bold">{metrics.realtors}</div>
+            <p className="text-xs sm:text-sm text-muted-foreground">Общ брой</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Сделки</CardTitle>
+            <CardTitle className="text-sm sm:text-base font-medium">Сделки</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.deals}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-xl sm:text-2xl font-bold">{metrics.deals}</div>
+            <p className="text-xs sm:text-sm text-muted-foreground break-words">
               За месеца • {formatDealValue(metrics.totalDealValue)}
             </p>
           </CardContent>
@@ -41,23 +41,23 @@ export const KPICard = ({ metrics, title }: KPICardProps) => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Диагнози</CardTitle>
+            <CardTitle className="text-sm sm:text-base font-medium">Диагнози</CardTitle>
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.diagnoses}</div>
-            <p className="text-xs text-muted-foreground">Активни запитвания</p>
+            <div className="text-xl sm:text-2xl font-bold">{metrics.diagnoses}</div>
+            <p className="text-xs sm:text-sm text-muted-foreground">Активни запитвания</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Успеваемост</CardTitle>
+            <CardTitle className="text-sm sm:text-base font-medium">Успеваемост</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatSuccessRate(metrics.successRate)}</div>
-            <p className="text-xs text-muted-foreground">Сделки / Диагнози</p>
+            <div className="text-xl sm:text-2xl font-bold">{formatSuccessRate(metrics.successRate)}</div>
+            <p className="text-xs sm:text-sm text-muted-foreground">Сделки / Диагнози</p>
           </CardContent>
         </Card>
       </div>

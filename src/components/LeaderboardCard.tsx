@@ -50,9 +50,9 @@ export const LeaderboardCard = ({ agents, title, sortBy, limit = 5 }: Leaderboar
                   {agent.name.split(' ').map(n => n[0]).join('')}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-foreground truncate">{formatNameWithEmoji(agent.name)}</p>
-                <p className="text-xs text-muted-foreground">{agent.department}</p>
+              <div className="flex-1">
+                <p className="font-medium text-foreground break-words">{formatNameWithEmoji(agent.name)}</p>
+                <p className="text-xs text-muted-foreground break-words">{agent.department}</p>
               </div>
               <div className="text-right">
                 {sortBy === 'profit' ? (
