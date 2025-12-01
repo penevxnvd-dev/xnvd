@@ -68,17 +68,17 @@ const TrainingPage = () => {
           ...section,
           subsections: section.subsections.map((subsection) => {
             const progressItem = progressData.find(
-              (p: TrainingProgress) => p.section === section.id && p.subsection === subsection.id
+              (p: any) => p.section === section.id && p.subsection === subsection.id
             );
             return {
               ...subsection,
               progress: progressItem
                 ? {
-                    lecture: progressItem.lectureCompleted,
-                    video: progressItem.videoCompleted,
-                    practical: progressItem.practicalCompleted,
-                    handover: progressItem.handoverCompleted,
-                    exam: progressItem.examCompleted,
+                    lecture: progressItem.lecture_completed,
+                    video: progressItem.video_completed,
+                    practical: progressItem.practical_completed,
+                    handover: progressItem.handover_completed,
+                    exam: progressItem.exam_completed,
                   }
                 : subsection.progress,
             };

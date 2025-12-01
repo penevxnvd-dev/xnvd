@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { formatNameWithEmoji } from '@/utils/nameEmojis';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { toast } from 'sonner';
@@ -158,7 +159,7 @@ export const UserManagementDialog = ({
         .from('user_roles')
         .insert({
           user_id: newUserId,
-          role: newUser.role,
+          role: newUser.role as 'admin' | 'realtor',
         });
 
       if (roleError && !roleError.message.includes('duplicate')) {

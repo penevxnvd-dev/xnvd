@@ -48,7 +48,7 @@ import { TeamCardWithKPI } from '@/components/cards/TeamCardWithKPI';
 import { RealizatorCardWithKPI } from '@/components/cards/RealizatorCardWithKPI';
 import { TopologySidebar } from '@/components/TopologySidebar';
 import { transformOffices } from '@/utils/dataTransform';
-import { Office, TeamLeader, Agent } from '@/types';
+import { Office as UIOffice, TeamLeader, Agent } from '@/types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -176,7 +176,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const [selectedRealtorDiagnoses, setSelectedRealtorDiagnoses] = useState<any[]>([]);
   const [selectedRealtorTrainingData, setSelectedRealtorTrainingData] = useState<TrainingSection[]>(trainingStructure);
   const [selectedRealtorTrainingProgress, setSelectedRealtorTrainingProgress] = useState(0);
-  const [topologyOffices, setTopologyOffices] = useState<Office[]>([]);
+  const [topologyOffices, setTopologyOffices] = useState<UIOffice[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [userManagementOpen, setUserManagementOpen] = useState(false);
@@ -671,7 +671,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     }
   };
 
-  const handleTopologyOfficeClick = async (office: Office) => {
+  const handleTopologyOfficeClick = async (office: UIOffice) => {
     // Find the city and country for this office
     const dbOffices = await supabaseApi.getAllOfficesFull();
     const dbOffice = dbOffices.find((o: any) => o.id === office.id);
@@ -699,9 +699,9 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
       await handleTopologyOfficeClick(office);
       // Find and select the team
       const teams = await supabaseApi.getTeamsByOffice(office.id);
-      const team = teams.find((t: any) => t.leaderId === leader.id);
+      const team = teams.find((t: any) => t.leader_id === leader.id);
       if (team) {
-        setSelectedTeam({ id: team.id, name: team.name, office_id: office.id, leader_id: team.leaderId || null });
+        setSelectedTeam({ id: team.id, name: team.name, office_id: office.id, leader_id: team.leader_id || null });
         fetchRealtors(team.id);
         setCurrentView('realtors');
       }
@@ -721,7 +721,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
         const realtors = await supabaseApi.getRealtorsByTeam(team.id);
         const realtor = realtors.find((r: any) => r.profile?.id === agent.id);
         if (realtor) {
-          setSelectedTeam({ id: team.id, name: team.name, office_id: office.id, leader_id: team.leaderId || null });
+          setSelectedTeam({ id: team.id, name: team.name, office_id: office.id, leader_id: team.leader_id || null });
           fetchRealtors(team.id);
           setCurrentView('realtors');
           break;

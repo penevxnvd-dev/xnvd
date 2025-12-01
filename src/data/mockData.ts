@@ -81,7 +81,7 @@ export const mockOffices: Office[] = [
             name: 'Руска Тодорова',
             position: 'Реализатор',
             avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ruska',
-            level: 'Джуниър',
+            level: 'Чирак',
             trainingStage: 2,
             dateOfHiring: '2023-10-10',
             email: 'ruska@agency.com',

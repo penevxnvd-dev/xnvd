@@ -226,7 +226,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
         title: "Курсист записан успешно!",
         description: `${newTrainee.name} е добавен/а към групата за ${dateLabel}.`,
       });
-      setNewTrainee({ name: '', phone: '', position: '', selectedDate: '' });
+      setNewTrainee({ name: '', phone: '', position: '', selectedDate: '', email: '' });
     }
   };
 
@@ -1553,8 +1553,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                     </h4>
                     <div className="space-y-3">
                       {activeForDate.map((group) => (
-                        <DroppableGroup key={group.id} group={group}>
-                          <Card className="p-4 hover:shadow-lg transition-shadow">
+                        <Card key={group.id} className="p-4 hover:shadow-lg transition-shadow">
                             <div className="space-y-3">
                             <div className="flex items-center justify-between gap-2">
                               <Button
@@ -1625,7 +1624,6 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                             </div>
                           </div>
                         </Card>
-                        </DroppableGroup>
                       ))}
                     </div>
                   </div>
