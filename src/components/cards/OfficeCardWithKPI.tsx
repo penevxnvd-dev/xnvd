@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { OfficeCard } from './OfficeCard';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { KPIMetrics } from '@/utils/kpiCalculations';
+import { Achievement } from '@/utils/achievements';
 
 interface OfficeCardWithKPIProps {
   office: {
@@ -9,10 +10,11 @@ interface OfficeCardWithKPIProps {
     name: string;
     address?: string | null;
   };
+  achievements?: Achievement[];
   onClick?: () => void;
 }
 
-export const OfficeCardWithKPI = ({ office, onClick }: OfficeCardWithKPIProps) => {
+export const OfficeCardWithKPI = ({ office, achievements = [], onClick }: OfficeCardWithKPIProps) => {
   const [metrics, setMetrics] = useState<KPIMetrics>({
     realtors: 0,
     deals: 0,
@@ -34,6 +36,6 @@ export const OfficeCardWithKPI = ({ office, onClick }: OfficeCardWithKPIProps) =
     fetchKPI();
   }, [office.id]);
 
-  return <OfficeCard office={office} metrics={metrics} onClick={onClick} />;
+  return <OfficeCard office={office} metrics={metrics} achievements={achievements} onClick={onClick} />;
 };
 

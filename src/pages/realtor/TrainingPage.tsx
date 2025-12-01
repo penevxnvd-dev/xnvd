@@ -108,12 +108,28 @@ const TrainingPage = () => {
           ...section,
           subsections: section.subsections.map((subsection) => {
             if (subsection.id === subsectionId) {
+              const newProgress = {
+                ...subsection.progress,
+                [field]: checked,
+              };
+              
+              // Ако изпитът е минат, автоматично маркираме всички останали стъпки като завършени
+              if (field === 'exam' && checked) {
+                return {
+                  ...subsection,
+                  progress: {
+                    lecture: true,
+                    video: true,
+                    practical: true,
+                    handover: true,
+                    exam: true,
+                  },
+                };
+              }
+              
               return {
                 ...subsection,
-                progress: {
-                  ...subsection.progress,
-                  [field]: checked,
-                },
+                progress: newProgress,
               };
             }
             return subsection;
@@ -143,7 +159,12 @@ const TrainingPage = () => {
           examCompleted: subsection.progress.exam,
         });
 
-        toast.success('Прогресът е обновен');
+        // Ако изпитът е минат, показваме съобщение
+        if (field === 'exam' && checked) {
+          toast.success('Изпитът е минат! Подточката е завършена.');
+        } else {
+          toast.success('Прогресът е обновен');
+        }
       }
     } catch (error: any) {
       toast.error('Грешка при запазване на прогреса');
@@ -170,7 +191,12 @@ const TrainingPage = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <img src={logo} alt="Logo" className="h-12 w-12 object-contain" />
+              <button 
+                onClick={() => navigate('/dashboard')} 
+                className="hover:opacity-80 transition-opacity cursor-pointer"
+              >
+                <img src={logo} alt="Logo" className="h-12 w-12 object-contain" />
+              </button>
               <div>
                 <h1 className="text-lg font-semibold text-foreground">Обучение</h1>
                 <p className="text-xs text-muted-foreground">Проследяване на обучителен прогрес</p>
@@ -181,8 +207,9 @@ const TrainingPage = () => {
                 <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                 <span>Назад</span>
               </Button>
-              <Button onClick={() => navigate('/dashboard')} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
-                Начало
+              <Button onClick={() => navigate('/training-progress')} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
+                <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                <span>Отбелязване</span>
               </Button>
               <Button onClick={handleLogout} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
                 <LogOut className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />

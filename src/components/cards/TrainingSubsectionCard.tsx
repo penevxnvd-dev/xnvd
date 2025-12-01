@@ -5,6 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, Circle } from 'lucide-react';
 import { TrainingSubsection } from '@/data/trainingStructure';
+import { cn } from '@/lib/utils';
 
 interface TrainingSubsectionCardProps {
   subsection: TrainingSubsection;
@@ -31,11 +32,25 @@ export const TrainingSubsectionCard = ({
   const progressPercentage = (completedSteps / totalSteps) * 100;
 
   return (
-    <Card className="transition-all duration-300 hover:shadow-lg">
+    <Card className={cn(
+      "transition-all duration-300 hover:shadow-lg",
+      completed && "border-2 border-success bg-success/5"
+    )}>
       <CardHeader className="p-3 sm:p-6">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <CardTitle className="text-sm sm:text-base md:text-lg flex-1 break-words">{subsection.title}</CardTitle>
-          <Badge variant={completed ? "default" : "outline"} className={`${completed ? "bg-success" : ""} text-xs sm:text-sm flex-shrink-0`}>
+          <CardTitle className={cn(
+            "text-sm sm:text-base md:text-lg flex-1 break-words",
+            completed && "text-success font-semibold"
+          )}>
+            {subsection.title}
+            {completed && (
+              <span className="ml-2 text-success">✓</span>
+            )}
+          </CardTitle>
+          <Badge variant={completed ? "default" : "outline"} className={cn(
+            completed && "bg-success text-white",
+            "text-xs sm:text-sm flex-shrink-0"
+          )}>
             {completed ? (
               <>
                 <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />

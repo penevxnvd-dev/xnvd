@@ -230,6 +230,16 @@ class SupabaseApiClient {
     return data || [];
   }
 
+  async getAllOffices() {
+    const { data, error } = await supabase
+      .from('offices')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  }
+
   async getAllOfficesFull() {
     const { data: offices, error: officesError } = await supabase
       .from('offices')

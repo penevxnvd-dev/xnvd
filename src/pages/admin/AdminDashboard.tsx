@@ -306,11 +306,11 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
       const data = await supabaseApi.getRealtorsByTeam(teamId);
       const mapped = data.map((realtor: any) => ({
         id: realtor.id,
-        userId: realtor.userId,
-        teamId: realtor.teamId,
+        userId: realtor.user_id,
+        teamId: realtor.team_id,
         level: realtor.level,
         user: {
-          fullName: realtor.user?.fullName || realtor.profile?.fullName || 'Неизвестен',
+          fullName: realtor.user?.fullName || realtor.profile?.full_name || 'Неизвестен',
           email: realtor.user?.email || realtor.profile?.email || ''
         }
       }));
@@ -326,6 +326,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
         console.error('Error fetching team KPI:', error);
         setShowKPI(false);
       }
+
     } catch (error) {
       console.error('Error fetching realtors:', error);
     } finally {
@@ -568,10 +569,10 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     if (currentView === 'realtor-detail' && selectedRealtor) {
       parts.push(selectedRealtor.user.fullName);
     } else {
-      if (selectedCountry) parts.push(selectedCountry.name);
-      if (selectedCity) parts.push(selectedCity.name);
-      if (selectedOffice) parts.push(selectedOffice.name);
-      if (selectedTeam) parts.push(selectedTeam.name);
+    if (selectedCountry) parts.push(selectedCountry.name);
+    if (selectedCity) parts.push(selectedCity.name);
+    if (selectedOffice) parts.push(selectedOffice.name);
+    if (selectedTeam) parts.push(selectedTeam.name);
     }
     return parts.join(' / ');
   };
@@ -758,7 +759,12 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
               >
                 <Menu className="h-5 w-5" />
               </Button>
-              <img src={logo} alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 object-contain flex-shrink-0" />
+              <button 
+                onClick={handleHome} 
+                className="hover:opacity-80 transition-opacity cursor-pointer flex-shrink-0"
+              >
+                <img src={logo} alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 object-contain" />
+              </button>
               <div className="min-w-0">
                 <h1 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground truncate">Админ Панел</h1>
                 <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{getBreadcrumb()}</p>
@@ -769,12 +775,12 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                 <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 <span className="hidden sm:inline">Календар</span>
               </Button>
+              <Button onClick={() => navigate('/training-progress')} variant="outline" size="sm" className="text-xs sm:text-sm">
+                <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Обучение</span>
+              </Button>
               {currentView !== 'countries' && (
                 <>
-                  <Button onClick={handleHome} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
-                    <Home className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    <span>Начало</span>
-                  </Button>
                   <Button onClick={handleBack} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
                     <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                     <span>Назад</span>
@@ -830,8 +836,8 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Изход
+                <LogOut className="h-4 w-4 mr-2" />
+                Изход
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -844,7 +850,8 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
         {loading ? (
           <div className="text-center text-muted-foreground">Зареждане...</div>
         ) : (
-          <DndContext
+          <>
+            <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragStart={handleDragStart}
@@ -861,13 +868,13 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
               strategy={rectSortingStrategy}
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-                {currentView === 'countries' && countries.map((country) => (
+            {currentView === 'countries' && countries.map((country) => (
                   <SortableCard key={country.id} id={country.id}>
-                    <CountryCardWithKPI
-                      country={country}
+                <CountryCardWithKPI
+                  country={country}
                       onClick={() => handleCountryClick(country)}
-                    />
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+                />
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -931,40 +938,40 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
               <SortableCard key={office.id} id={office.id}>
                 <OfficeCardWithKPI
                   office={office}
-                      onClick={() => handleOfficeClick(office)}
+                  onClick={() => handleOfficeClick(office)}
                 />
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
-                      <Button
-                        variant="ghost"
-                        size="sm"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="h-8 w-8 p-0 bg-background/80 backdrop-blur-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEdit(office);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEdit(office);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="h-8 w-8 p-0 bg-background/80 backdrop-blur-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(office);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </SortableCard>
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(office);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              </SortableCard>
             ))}
 
             {currentView === 'teams' && teams.map((team) => (
               <SortableCard key={team.id} id={team.id}>
                 <TeamCardWithKPI
                   team={team}
-                      onClick={() => handleTeamClick(team)}
+                  onClick={() => handleTeamClick(team)}
                 />
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
                       <Button
@@ -996,7 +1003,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
             {currentView === 'realtors' && realtors.map((realtor) => (
               realtor.user && (
                 <SortableCard key={realtor.id} id={realtor.id}>
-                  <RealizatorCardWithKPI
+                <RealizatorCardWithKPI
                   realtor={{
                     id: realtor.id,
                     name: realtor.user.fullName,
@@ -1099,6 +1106,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
               ) : null}
             </DragOverlay>
           </DndContext>
+          </>
         )}
 
         {/* Realtor Detail View */}

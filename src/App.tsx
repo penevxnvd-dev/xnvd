@@ -10,6 +10,7 @@ import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import TrainingPage from "./pages/realtor/TrainingPage";
 import TrainingCalendarPage from "./pages/realtor/TrainingCalendarPage";
+import TrainingProgressPage from "./pages/realtor/TrainingProgressPage";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
           <Route path="/interviews" element={<Interviews />} />
           <Route path="/training" element={<TrainingPage />} />
           <Route path="/training-calendar" element={<TrainingCalendarPage />} />
+          <Route path="/training-progress" element={<TrainingProgressPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
