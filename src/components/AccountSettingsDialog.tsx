@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -114,6 +115,9 @@ export const AccountSettingsDialog = ({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Настройки на акаунта</DialogTitle>
+          <DialogDescription>
+            Управлявайте информацията за вашия профил и променете паролата си.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           {/* Profile Information */}

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -503,6 +503,9 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Редактиране на курсист</DialogTitle>
+            <DialogDescription>
+              Редактирайте информацията за курсиста.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -557,6 +560,10 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Добавяне на курсист към група</DialogTitle>
+            <DialogDescription>
+              Добавете нов курсист към група за обучение.
+            </DialogDescription>
+          </DialogHeader>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -1260,6 +1267,9 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
             <DialogTitle>
               Групи за {selectedDate && format(selectedDate, 'dd.MM.yyyy')}
             </DialogTitle>
+            <DialogDescription>
+              Преглед на всички групи за избраната дата.
+            </DialogDescription>
           </DialogHeader>
           {selectedDate && (() => {
             const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -1700,6 +1710,9 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
               <UserPlus className="h-4 w-4" />
               Добави курсист в група
             </DialogTitle>
+            <DialogDescription>
+              Добавете нов курсист към избраната група.
+            </DialogDescription>
           </DialogHeader>
           {selectedGroupForAddTrainee && (
             <div className="space-y-4 mt-4">
@@ -1852,6 +1865,9 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                   </>
                 )}
               </DialogTitle>
+              <DialogDescription>
+                Преглед на детайли за групата и записаните курсисти.
+              </DialogDescription>
             </DialogHeader>
             {selectedGroupForDetails && (
               <div className="space-y-4 mt-4">

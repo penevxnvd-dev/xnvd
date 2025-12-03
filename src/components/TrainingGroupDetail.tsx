@@ -3,6 +3,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { TrainingGroup } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -68,6 +69,9 @@ export const TrainingGroupDetail = ({ group, open, onOpenChange }: TrainingGroup
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="sr-only">Детайли за група</DialogTitle>
+          <DialogDescription className="sr-only">
+            Подробна информация за групата за обучение, включително курсисти, прогрес и съдържание.
+          </DialogDescription>
           <div className="space-y-4 pt-2">
             <div className="flex items-center justify-between">
               <Badge variant={group.status === 'активна' ? 'default' : 'secondary'}>
