@@ -1,5 +1,5 @@
 import express from 'express';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { prisma } from '../lib/prisma.js';
 import { authenticate, requireRealtor, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();

@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, AlertCircle } from 'lucide-react';
-import { supabaseApi } from '@/lib/supabaseApi';
+import { api } from '@/lib/api';
 import logo from '@/assets/logo.jpeg';
 import { useEffect } from 'react';
 
@@ -15,13 +15,17 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    await supabaseApi.logout();
-    navigate('/');
+    // Clear all auth data
+    await api.logout();
+    navigate('/auth');
   };
 
   useEffect(() => {
+    // Only redirect if explicitly no role after loading (not on initial load)
     if (!loading && !role) {
-      navigate('/');
+      // Clear any stored tokens
+      localStorage.removeItem('token');
+      navigate('/auth');
     }
   }, [loading, role, navigate]);
 

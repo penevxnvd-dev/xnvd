@@ -1,5 +1,5 @@
 import express from 'express';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { prisma } from '../lib/prisma.js';
 import { authenticate, requireRealtor, requireAdmin, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -7,13 +7,12 @@ const router = express.Router();
 // Get deals for current realtor
 router.get('/me', authenticate, requireRealtor, async (req: AuthRequest, res) => {
   try {
-    const { data: realtor, error: realtorError } = await supabaseAdmin
-      .from('realtors')
-      .select('id')
-      .eq('user_id', req.userId!)
-      .single();
+    const realtor = await prisma.realtor.findUnique({
+      where: { userId: req.userId! },
+      select: { id: true }
+    });
 
-    if (realtorError || !realtor) {
+    if (!realtor) {
       return res.status(404).json({ error: 'Realtor not found' });
     }
 
@@ -21,15 +20,26 @@ router.get('/me', authenticate, requireRealtor, async (req: AuthRequest, res) =>
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    const { data: deals, error } = await supabaseAdmin
-      .from('deals')
-      .select('*')
-      .eq('realtor_id', realtor.id)
-      .gte('deal_date', startOfMonth.toISOString().split('T')[0])
-      .order('deal_date', { ascending: false });
+    const deals = await prisma.deal.findMany({
+      where: {
+        realtorId: realtor.id,
+        dealDate: {
+          gte: startOfMonth
+        }
+      },
+      orderBy: { dealDate: 'desc' }
+    });
 
-    if (error) throw error;
-    res.json(deals || []);
+    res.json(deals.map(deal => ({
+      id: deal.id,
+      realtor_id: deal.realtorId,
+      client_name: deal.clientName,
+      deal_value: deal.dealValue,
+      commission: deal.commission,
+      deal_date: deal.dealDate.toISOString().split('T')[0],
+      is_key: deal.isKey,
+      is_exclusive: deal.isExclusive
+    })));
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

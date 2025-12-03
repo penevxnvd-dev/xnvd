@@ -9,8 +9,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { supabaseApi } from '@/lib/supabaseApi';
+import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { LogOut } from 'lucide-react';
 
 interface AccountSettingsDialogProps {
   open: boolean;
@@ -20,6 +21,7 @@ interface AccountSettingsDialogProps {
     email: string;
   };
   onUpdate: () => void;
+  onLogout?: () => void;
 }
 
 export const AccountSettingsDialog = ({
@@ -27,6 +29,7 @@ export const AccountSettingsDialog = ({
   onOpenChange,
   userInfo,
   onUpdate,
+  onLogout,
 }: AccountSettingsDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -57,15 +60,8 @@ export const AccountSettingsDialog = ({
 
     setLoading(true);
     try {
-      // Update profile in Supabase
-      const currentUser = await supabaseApi.getCurrentUser();
-      const { error } = await supabaseApi.supabase
-        .from('profiles')
-        .update({ full_name: formData.fullName })
-        .eq('id', currentUser.user.id);
-
-      if (error) throw error;
-
+      // Update profile via API
+      await api.updateProfile(formData.fullName);
       toast.success('Профилът е обновен успешно');
       onUpdate();
       onOpenChange(false);
@@ -96,11 +92,7 @@ export const AccountSettingsDialog = ({
     setLoading(true);
     try {
       // Update password using Supabase Auth
-      const { error } = await supabaseApi.supabase.auth.updateUser({
-        password: formData.newPassword,
-      });
-
-      if (error) throw error;
+      await api.updatePassword(formData.currentPassword, formData.newPassword);
 
       toast.success('Паролата е променена успешно');
       setFormData({
@@ -196,6 +188,24 @@ export const AccountSettingsDialog = ({
               {loading ? 'Промяна...' : 'Промени парола'}
             </Button>
           </div>
+
+          {/* Logout Section */}
+          {onLogout && (
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-semibold mb-3 text-destructive">Изход</h3>
+              <Button
+                onClick={() => {
+                  onOpenChange(false);
+                  onLogout();
+                }}
+                variant="destructive"
+                className="w-full"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Изход от акаунта
+              </Button>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

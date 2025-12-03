@@ -69,10 +69,38 @@ export const TrainingSubsectionCard = ({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-center text-xs sm:text-sm">Лекция</TableHead>
-                  <TableHead className="text-center text-xs sm:text-sm">Видео</TableHead>
-                  <TableHead className="text-center text-xs sm:text-sm">Практическо</TableHead>
-                  <TableHead className="text-center text-xs sm:text-sm">Предаване</TableHead>
+                  <TableHead className="text-center text-xs sm:text-sm">
+                    Лекция
+                    {subsection.counts?.lecture && (
+                      <span className="block text-[10px] text-muted-foreground mt-0.5">
+                        ({subsection.counts.lecture})
+                      </span>
+                    )}
+                  </TableHead>
+                  <TableHead className="text-center text-xs sm:text-sm">
+                    Видео демонстрация
+                    {subsection.counts?.video && (
+                      <span className="block text-[10px] text-muted-foreground mt-0.5">
+                        ({subsection.counts.video})
+                      </span>
+                    )}
+                  </TableHead>
+                  <TableHead className="text-center text-xs sm:text-sm">
+                    {subsection.practicalType === 'roleplay' ? 'Ролева игра' : 'Практика с треньор'}
+                    {subsection.counts?.practical !== undefined && (
+                      <span className="block text-[10px] text-muted-foreground mt-0.5">
+                        ({subsection.counts.practical || 0})
+                      </span>
+                    )}
+                  </TableHead>
+                  <TableHead className="text-center text-xs sm:text-sm">
+                    Преподаване на друг
+                    {subsection.counts?.handover && (
+                      <span className="block text-[10px] text-muted-foreground mt-0.5">
+                        ({subsection.counts.handover})
+                      </span>
+                    )}
+                  </TableHead>
                   <TableHead className="text-center text-xs sm:text-sm">Изпит</TableHead>
                 </TableRow>
               </TableHeader>

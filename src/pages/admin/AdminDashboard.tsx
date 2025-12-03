@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
-import { supabaseApi } from '@/lib/supabaseApi';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -207,10 +207,10 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
 
   const fetchUserInfo = async () => {
     try {
-      const { user } = await supabaseApi.getCurrentUser();
+      const { user } = await api.getCurrentUser();
       if (user) {
         setUserInfo({
-          fullName: user.fullName,
+          fullName: user.fullName || user.full_name,
           email: user.email,
           role: 'Администратор'
         });
@@ -222,7 +222,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
 
   const fetchTopologyData = async () => {
     try {
-      const dbOffices = await supabaseApi.getAllOfficesFull();
+      const dbOffices = await api.getAllOfficesFull();
       const transformedOffices = transformOffices(dbOffices);
       setTopologyOffices(transformedOffices);
     } catch (error) {
@@ -233,7 +233,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const fetchCountries = async () => {
     setLoading(true);
     try {
-      const data = await supabaseApi.getCountries();
+      const data = await api.getCountries();
       const ordered = applyPositions(data, 'countries');
       setCountries(ordered);
     } catch (error) {
@@ -246,7 +246,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const fetchCities = async (countryId: string) => {
     setLoading(true);
     try {
-      const data = await supabaseApi.getCitiesByCountry(countryId);
+      const data = await api.getCitiesByCountry(countryId);
       const mapped = data.map((city: any) => ({
         id: city.id,
         name: city.name,
@@ -264,7 +264,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const fetchOffices = async (cityId: string) => {
     setLoading(true);
     try {
-      const data = await supabaseApi.getOfficesByCity(cityId);
+      const data = await api.getOfficesByCity(cityId);
       const mapped = data.map((office: any) => ({
         id: office.id,
         name: office.name,
@@ -283,7 +283,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const fetchTeams = async (officeId: string) => {
     setLoading(true);
     try {
-      const data = await supabaseApi.getTeamsByOffice(officeId);
+      const data = await api.getTeamsByOffice(officeId);
       const mapped = data.map((team: any) => ({
         id: team.id,
         name: team.name,
@@ -303,7 +303,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const fetchRealtors = async (teamId: string) => {
     setLoading(true);
     try {
-      const data = await supabaseApi.getRealtorsByTeam(teamId);
+      const data = await api.getRealtorsByTeam(teamId);
       const mapped = data.map((realtor: any) => ({
         id: realtor.id,
         userId: realtor.user_id,
@@ -319,7 +319,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
       
       // Изчисляване на KPI за екипа
       try {
-        const kpi = await supabaseApi.getTeamKPI(teamId);
+        const kpi = await api.getTeamKPI(teamId);
         setKpiMetrics(kpi);
         setShowKPI(true);
       } catch (error) {
@@ -459,7 +459,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
 
   const fetchCountryKPI = async (countryId: string) => {
     try {
-      const kpi = await supabaseApi.getCountryKPI(countryId);
+      const kpi = await api.getCountryKPI(countryId);
       setKpiMetrics(kpi);
       setShowKPI(true);
     } catch (error) {
@@ -477,7 +477,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
 
   const fetchCityKPI = async (cityId: string) => {
     try {
-      const kpi = await supabaseApi.getCityKPI(cityId);
+      const kpi = await api.getCityKPI(cityId);
       setKpiMetrics(kpi);
       setShowKPI(true);
     } catch (error) {
@@ -495,7 +495,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
 
   const fetchOfficeKPI = async (officeId: string) => {
     try {
-      const kpi = await supabaseApi.getOfficeKPI(officeId);
+      const kpi = await api.getOfficeKPI(officeId);
       setKpiMetrics(kpi);
       setShowKPI(true);
     } catch (error) {
@@ -560,7 +560,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   };
 
   const handleLogout = async () => {
-    await supabaseApi.logout();
+    await api.logout();
     navigate('/auth');
   };
 
@@ -621,13 +621,13 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
 
     try {
       if (currentView === 'countries') {
-        await supabaseApi.deleteCountry(selectedItem.id);
+        await api.deleteCountry(selectedItem.id);
       } else if (currentView === 'cities') {
-        await supabaseApi.deleteCity(selectedItem.id);
+        await api.deleteCity(selectedItem.id);
       } else if (currentView === 'offices') {
-        await supabaseApi.deleteOffice(selectedItem.id);
+        await api.deleteOffice(selectedItem.id);
       } else if (currentView === 'teams') {
-        await supabaseApi.deleteTeam(selectedItem.id);
+        await api.deleteTeam(selectedItem.id);
       }
 
       toast.success('Успешно изтрито');
@@ -674,7 +674,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
 
   const handleTopologyOfficeClick = async (office: UIOffice) => {
     // Find the city and country for this office
-    const dbOffices = await supabaseApi.getAllOfficesFull();
+    const dbOffices = await api.getAllOfficesFull();
     const dbOffice = dbOffices.find((o: any) => o.id === office.id);
     if (dbOffice?.city) {
       const city = dbOffice.city;
@@ -699,7 +699,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     if (office) {
       await handleTopologyOfficeClick(office);
       // Find and select the team
-      const teams = await supabaseApi.getTeamsByOffice(office.id);
+      const teams = await api.getTeamsByOffice(office.id);
       const team = teams.find((t: any) => t.leader_id === leader.id);
       if (team) {
         setSelectedTeam({ id: team.id, name: team.name, office_id: office.id, leader_id: team.leader_id || null });
@@ -717,9 +717,9 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     if (office) {
       handleTopologyOfficeClick(office);
       // Find and select the team and realtor
-      const teams = await supabaseApi.getTeamsByOffice(office.id);
+      const teams = await api.getTeamsByOffice(office.id);
       for (const team of teams) {
-        const realtors = await supabaseApi.getRealtorsByTeam(team.id);
+        const realtors = await api.getRealtorsByTeam(team.id);
         const realtor = realtors.find((r: any) => r.profile?.id === agent.id);
         if (realtor) {
           setSelectedTeam({ id: team.id, name: team.name, office_id: office.id, leader_id: team.leader_id || null });
@@ -743,6 +743,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
         selectedLeaderId={selectedTeam?.leader_id || undefined}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
+        mode="admin"
       />
 
       {/* Main Content Area */}
@@ -1016,49 +1017,31 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                   onClick={async () => {
                     // Fetch full realtor data with all fields
                     try {
-                      const { data: fullRealtor } = await supabaseApi.supabase
-                        .from('realtors')
-                        .select('*, profile:profiles!realtors_user_id_fkey(*)')
-                        .eq('id', realtor.id)
-                        .single();
+                      // Get realtor details - using API
+                      // TODO: Add API endpoint for full realtor details with all fields
+                      setSelectedRealtor({
+                        ...realtor,
+                        confidence: false,
+                        salesResilience: false,
+                        successMindset: false,
+                      });
                       
-                      if (fullRealtor) {
-                        setSelectedRealtor({
-                          ...realtor,
-                          confidence: fullRealtor.confidence || false,
-                          salesResilience: fullRealtor.sales_resilience || false,
-                          successMindset: fullRealtor.success_mindset || false,
-                        });
-                      } else {
-                        setSelectedRealtor(realtor);
-                      }
-                      
-                      const kpi = await supabaseApi.getRealtorKPI(realtor.id);
+                      const kpi = await api.getRealtorKPI(realtor.id);
                       setSelectedRealtorKPI(kpi);
                       
                       // Fetch deals and diagnoses
-                      const { data: deals } = await supabaseApi.supabase
-                        .from('deals')
-                        .select('*')
-                        .eq('realtor_id', realtor.id)
-                        .order('deal_date', { ascending: false });
+                      // TODO: Add API endpoints for realtor deals and diagnoses
+                      const deals: any[] = [];
+                      const diagnoses: any[] = [];
                       
-                      const { data: diagnoses } = await supabaseApi.supabase
-                        .from('diagnoses')
-                        .select('*')
-                        .eq('realtor_id', realtor.id)
-                        .order('diagnosis_date', { ascending: false });
-                      
-                      setSelectedRealtorDeals(deals || []);
-                      setSelectedRealtorDiagnoses(diagnoses || []);
+                      setSelectedRealtorDeals(deals);
+                      setSelectedRealtorDiagnoses(diagnoses);
                       
                       // Fetch training progress
-                      const { data: trainingProgress } = await supabaseApi.supabase
-                        .from('training_progress')
-                        .select('*')
-                        .eq('realtor_id', realtor.id);
+                      // TODO: Add API endpoint for training progress
+                      const trainingProgress: any[] = [];
                       
-                      if (trainingProgress) {
+                      if (trainingProgress && trainingProgress.length > 0) {
                         const updatedTrainingData = trainingStructure.map((section) => ({
                           ...section,
                           subsections: section.subsections.map((subsection) => {

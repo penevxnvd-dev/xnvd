@@ -12,7 +12,7 @@ class SupabaseApiClient {
     return supabase;
   }
 
-  // Auth methods
+  // Auth methods - using Supabase Auth
   async login(email: string, password: string) {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -20,32 +20,27 @@ class SupabaseApiClient {
     });
 
     if (error) throw error;
+    
+    // Get user profile
+    if (data.user) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
 
-    // Get user profile and roles
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select(`
-        id,
-        email,
-        full_name,
-        user_roles (role)
-      `)
-      .eq('id', data.user.id)
-      .single();
+      if (profileError) throw profileError;
 
-    if (profileError) throw profileError;
+      return {
+        user: {
+          ...data.user,
+          ...profile,
+        },
+        session: data.session,
+      };
+    }
 
-    return {
-      user: {
-        id: profile.id,
-        email: profile.email,
-        fullName: profile.full_name,
-        roles: Array.isArray(profile.user_roles)
-          ? profile.user_roles.map((ur: any) => ur.role)
-          : [],
-      },
-      session: data.session,
-    };
+    return { user: data.user, session: data.session };
   }
 
   async register(email: string, password: string, fullName: string) {
@@ -60,36 +55,41 @@ class SupabaseApiClient {
     });
 
     if (error) throw error;
-    if (!data.user) throw new Error('Failed to create user');
 
-    // Profile is created automatically by trigger, but we need to wait a bit
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Profile should be created automatically by trigger, but verify
+    if (data.user) {
+      // Wait a bit for trigger to create profile
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Get user profile
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select(`
-        id,
-        email,
-        full_name,
-        user_roles (role)
-      `)
-      .eq('id', data.user.id)
-      .single();
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
 
-    if (profileError) throw profileError;
+      if (profileError && profileError.code !== 'PGRST116') {
+        // If profile doesn't exist, create it manually
+        const { error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            id: data.user.id,
+            full_name: fullName,
+            email: email,
+          });
 
-    return {
-      user: {
-        id: profile.id,
-        email: profile.email,
-        fullName: profile.full_name,
-        roles: Array.isArray(profile.user_roles)
-          ? profile.user_roles.map((ur: any) => ur.role)
-          : [],
-      },
-      session: data.session,
-    };
+        if (createError) throw createError;
+      }
+
+      return {
+        user: {
+          ...data.user,
+          ...(profile || { full_name: fullName, email }),
+        },
+        session: data.session,
+      };
+    }
+
+    return { user: data.user, session: data.session };
   }
 
   async getCurrentUser() {
@@ -99,14 +99,10 @@ class SupabaseApiClient {
       throw new Error('Not authenticated');
     }
 
+    // Get user profile
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select(`
-        id,
-        email,
-        full_name,
-        user_roles (role)
-      `)
+      .select('*')
       .eq('id', user.id)
       .single();
 
@@ -114,18 +110,30 @@ class SupabaseApiClient {
 
     return {
       user: {
-        id: profile.id,
-        email: profile.email,
-        fullName: profile.full_name,
-        roles: Array.isArray(profile.user_roles)
-          ? profile.user_roles.map((ur: any) => ur.role)
-          : [],
+        ...user,
+        ...profile,
       },
     };
   }
 
   async logout() {
+    // Sign out from Supabase
     const { error } = await supabase.auth.signOut();
+    
+    // Clear all localStorage items related to auth
+    localStorage.removeItem('token');
+    
+    // Clear Supabase auth token if exists
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (supabaseUrl) {
+        const storageKey = 'sb-' + supabaseUrl.split('//')[1]?.split('.')[0] + '-auth-token';
+        localStorage.removeItem(storageKey);
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+    
     if (error) throw error;
   }
 
@@ -680,12 +688,40 @@ class SupabaseApiClient {
       throw new Error('Not authenticated');
     }
 
-    // Try with foreign key relation first
-    let { data: realtor, error } = await supabase
+    // Use the get_realtor_id function if available, otherwise query directly
+    try {
+      const { data: realtorId, error: functionError } = await supabase
+        .rpc('get_realtor_id', { _user_id: user.id });
+
+      if (!functionError && realtorId) {
+        // Get full realtor data with profile
+        const { data: realtor, error: realtorError } = await supabase
+          .from('realtors')
+          .select(`
+            *,
+            profile:profiles!realtors_user_id_fkey (
+              id,
+              full_name,
+              email
+            )
+          `)
+          .eq('id', realtorId)
+          .single();
+
+        if (realtorError) throw realtorError;
+        return realtor;
+      }
+    } catch (e) {
+      // Function might not exist, fall back to direct query
+    }
+
+    // Fallback: query directly
+    const { data: realtor, error: realtorError } = await supabase
       .from('realtors')
       .select(`
         *,
         profile:profiles!realtors_user_id_fkey (
+          id,
           full_name,
           email
         )
@@ -693,46 +729,14 @@ class SupabaseApiClient {
       .eq('user_id', user.id)
       .single();
 
-    // If that fails (406 error), try without the relation
-    if (error && (error.code === 'PGRST116' || error.message?.includes('406'))) {
-      const { data: realtorData, error: realtorError } = await supabase
-        .from('realtors')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (realtorError) throw realtorError;
-      
-      // Fetch profile separately
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name, email')
-        .eq('id', user.id)
-        .single();
-
-      return {
-        ...realtorData,
-        salesResilience: realtorData.sales_resilience || false,
-        successMindset: realtorData.success_mindset || false,
-        user: {
-          fullName: profile?.full_name || '',
-          email: profile?.email || '',
-        },
-      };
+    if (realtorError) {
+      if (realtorError.code === 'PGRST116') {
+        throw new Error('Realtor not found');
+      }
+      throw realtorError;
     }
 
-    if (error) throw error;
-    if (!realtor) throw new Error('Realtor not found');
-
-    return {
-      ...realtor,
-      salesResilience: realtor.sales_resilience || false,
-      successMindset: realtor.success_mindset || false,
-      user: {
-        fullName: realtor.profile?.full_name || '',
-        email: realtor.profile?.email || '',
-      },
-    };
+    return realtor;
   }
 
   // Deals
@@ -754,15 +758,10 @@ class SupabaseApiClient {
       throw new Error('Realtor not found');
     }
 
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
     const { data: deals, error } = await supabase
       .from('deals')
       .select('*')
       .eq('realtor_id', realtor.id)
-      .gte('deal_date', startOfMonth.toISOString().split('T')[0])
       .order('deal_date', { ascending: false });
 
     if (error) throw error;
@@ -827,15 +826,10 @@ class SupabaseApiClient {
       throw new Error('Realtor not found');
     }
 
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
     const { data: diagnoses, error } = await supabase
       .from('diagnoses')
       .select('*')
       .eq('realtor_id', realtor.id)
-      .gte('diagnosis_date', startOfMonth.toISOString().split('T')[0])
       .order('diagnosis_date', { ascending: false });
 
     if (error) throw error;
@@ -903,7 +897,9 @@ class SupabaseApiClient {
     const { data: progress, error } = await supabase
       .from('training_progress')
       .select('*')
-      .eq('realtor_id', realtor.id);
+      .eq('realtor_id', realtor.id)
+      .order('section', { ascending: true })
+      .order('subsection', { ascending: true });
 
     if (error) throw error;
     return progress || [];

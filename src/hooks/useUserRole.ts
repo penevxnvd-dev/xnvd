@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabaseApi } from '@/lib/supabaseApi';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 
 export type UserRole = 'admin' | 'realtor' | null;
 
@@ -12,15 +11,17 @@ export const useUserRole = () => {
   useEffect(() => {
     const fetchUserRole = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        // Check if token exists first
+        const token = localStorage.getItem('token');
+        if (!token) {
           setRole(null);
           setUserId(null);
           setLoading(false);
           return;
         }
 
-        const { user: userData } = await supabaseApi.getCurrentUser();
+        // Fetch user data using API client
+        const { user: userData } = await api.getCurrentUser();
         if (!userData) {
           setRole(null);
           setUserId(null);
@@ -38,6 +39,8 @@ export const useUserRole = () => {
         }
       } catch (error) {
         console.error('Error fetching user role:', error);
+        // Clear invalid token
+        localStorage.removeItem('token');
         setRole(null);
         setUserId(null);
       } finally {
@@ -46,21 +49,6 @@ export const useUserRole = () => {
     };
 
     fetchUserRole();
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        fetchUserRole();
-      } else {
-        setRole(null);
-        setUserId(null);
-        setLoading(false);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
   }, []);
 
   return { role, loading, userId };

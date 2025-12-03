@@ -1,5 +1,5 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.js';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth.js';
 import {
   calculateTeamKPI,
@@ -10,7 +10,6 @@ import {
 } from '../utils/kpiCalculations.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Helper function to fetch realtor data with deals and diagnoses
 async function fetchRealtorData(realtorIds: string[]): Promise<RealtorData[]> {

@@ -1,6 +1,10 @@
 import express from 'express';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { prisma } from '../lib/prisma.js';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { z } from 'zod';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'xnvd-secret-key-2024';
 
 const router = express.Router();
 
@@ -21,80 +25,51 @@ router.post('/register', async (req, res) => {
     const { email, password, fullName } = registerSchema.parse(req.body);
 
     // Check if user exists
-    const { data: existingProfile } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .eq('email', email)
-      .single();
+    const existingProfile = await prisma.profile.findUnique({
+      where: { email }
+    });
 
     if (existingProfile) {
       return res.status(400).json({ error: 'User already exists' });
     }
 
-    // Create user with Supabase Auth
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create profile first
+    const profile = await prisma.profile.create({
+      data: {
       email,
-      password,
-      email_confirm: true, // Auto-confirm email
-      user_metadata: {
-        full_name: fullName
+        fullName: fullName
       }
     });
 
-    if (authError || !authData.user) {
-      return res.status(400).json({ 
-        error: 'Failed to create user',
-        message: authError?.message 
-      });
-    }
-
-    // Create profile (trigger should handle this, but we'll ensure it exists)
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .insert({
-        id: authData.user.id,
+    // Create user with hashed password
+    const user = await prisma.user.create({
+      data: {
         email,
-        full_name: fullName
-      })
-      .select()
-      .single();
-
-    if (profileError && !profileError.message.includes('duplicate')) {
-      // If profile creation fails and it's not a duplicate, clean up auth user
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-      return res.status(500).json({ 
-        error: 'Failed to create profile',
-        message: profileError.message 
-      });
-    }
-
-    // Get the profile (either newly created or existing from trigger)
-    const { data: finalProfile } = await supabaseAdmin
-      .from('profiles')
-      .select('*')
-      .eq('id', authData.user.id)
-      .single();
-
-    // Sign in to get session token
-    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.signInWithPassword({
-      email,
-      password
+        password: hashedPassword,
+        profileId: profile.id
+      }
     });
 
-    if (sessionError || !sessionData.session) {
-      return res.status(500).json({ 
-        error: 'Failed to create session',
-        message: sessionError?.message 
-      });
-    }
+    // Generate JWT token
+    const token = jwt.sign(
+      { 
+        userId: profile.id,
+        email: profile.email 
+      },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
     res.json({
       user: {
-        id: finalProfile?.id || authData.user.id,
-        email: finalProfile?.email || email,
-        fullName: finalProfile?.full_name || fullName
+        id: profile.id,
+        email: profile.email,
+        fullName: profile.fullName
       },
-      token: sessionData.session.access_token
+      token
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
@@ -114,45 +89,47 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
 
-    // Sign in with Supabase Auth
-    const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
-      email,
-      password
+    // Find user in database
+    const profile = await prisma.profile.findUnique({
+      where: { email },
+      include: {
+        user: true,
+        userRoles: true
+      }
     });
 
-    if (authError || !authData.user || !authData.session) {
+    if (!profile || !profile.user) {
       return res.status(401).json({ 
-        error: 'Invalid credentials',
-        message: authError?.message 
+        error: 'Invalid credentials'
       });
     }
 
-    // Get profile and roles
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select(`
-        id,
-        email,
-        full_name,
-        user_roles (role)
-      `)
-      .eq('id', authData.user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return res.status(404).json({ error: 'Profile not found' });
+    // Verify password
+    const passwordValid = await bcrypt.compare(password, profile.user.password);
+    if (!passwordValid) {
+      return res.status(401).json({ 
+        error: 'Invalid credentials'
+      });
     }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { 
+        userId: profile.id,
+        email: profile.email 
+      },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
     res.json({
       user: {
         id: profile.id,
         email: profile.email,
-        fullName: profile.full_name,
-        roles: Array.isArray(profile.user_roles) 
-          ? profile.user_roles.map((ur: any) => ur.role)
-          : []
+        fullName: profile.fullName,
+        roles: profile.userRoles.map(ur => ur.role)
       },
-      token: authData.session.access_token
+      token
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
@@ -175,26 +152,22 @@ router.get('/me', async (req, res) => {
       return res.status(401).json({ error: 'No token provided' });
     }
 
-    // Verify token with Supabase
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    // Verify JWT token
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
 
-    if (authError || !user) {
+    if (!decoded || !decoded.userId) {
       return res.status(401).json({ error: 'Invalid token' });
     }
 
-    // Get profile and roles
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select(`
-        id,
-        email,
-        full_name,
-        user_roles (role)
-      `)
-      .eq('id', user.id)
-      .single();
+    // Get profile and roles from database
+    const profile = await prisma.profile.findUnique({
+      where: { id: decoded.userId },
+      include: {
+        userRoles: true
+      }
+    });
 
-    if (profileError || !profile) {
+    if (!profile) {
       return res.status(404).json({ error: 'Profile not found' });
     }
 
@@ -202,14 +175,121 @@ router.get('/me', async (req, res) => {
       user: {
         id: profile.id,
         email: profile.email,
-        fullName: profile.full_name,
-        roles: Array.isArray(profile.user_roles) 
-          ? profile.user_roles.map((ur: any) => ur.role)
-          : []
+        fullName: profile.fullName,
+        roles: profile.userRoles.map(ur => ur.role)
       }
     });
   } catch (error: any) {
     res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+// Update profile
+router.put('/profile', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    // Verify JWT token
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
+    if (!decoded || !decoded.userId) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const { fullName } = req.body;
+    if (!fullName || typeof fullName !== 'string' || fullName.trim().length === 0) {
+      return res.status(400).json({ error: 'Full name is required' });
+    }
+
+    // Update profile
+    const profile = await prisma.profile.update({
+      where: { id: decoded.userId },
+      data: { fullName: fullName.trim() },
+      include: {
+        userRoles: true
+      }
+    });
+
+    res.json({
+      user: {
+        id: profile.id,
+        email: profile.email,
+        fullName: profile.fullName,
+        roles: profile.userRoles.map(ur => ur.role)
+      }
+    });
+  } catch (error: any) {
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    console.error('Update profile error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Update password
+router.put('/password', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    // Verify JWT token
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
+    if (!decoded || !decoded.userId) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    // Get user
+    const profile = await prisma.profile.findUnique({
+      where: { id: decoded.userId },
+      include: { user: true }
+    });
+
+    if (!profile || !profile.user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Verify current password
+    const passwordValid = await bcrypt.compare(currentPassword, profile.user.password);
+    if (!passwordValid) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await prisma.user.update({
+      where: { profileId: profile.id },
+      data: { password: hashedPassword }
+    });
+
+    res.json({ success: true });
+  } catch (error: any) {
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    console.error('Update password error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

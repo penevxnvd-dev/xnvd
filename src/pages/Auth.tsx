@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabaseApi } from "@/lib/supabaseApi";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,16 +17,17 @@ const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Check if user is already logged in
-    supabaseApi.getCurrentUser()
-      .then(() => {
-        navigate("/dashboard");
-      })
-      .catch(() => {
-        // Not logged in, stay on auth page
-      });
-  }, [navigate]);
+  // Removed automatic login check - user must manually log in
+  // useEffect(() => {
+  //   // Check if user is already logged in
+  //   supabaseApi.getCurrentUser()
+  //     .then(() => {
+  //       navigate("/dashboard");
+  //     })
+  //     .catch(() => {
+  //       // Not logged in, stay on auth page
+  //     });
+  // }, [navigate]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,14 +35,14 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        await supabaseApi.login(email, password);
+        await api.login(email, password);
         toast({
           title: "Успешно влизане",
           description: "Добре дошли!",
         });
         navigate("/dashboard");
       } else {
-        await supabaseApi.register(email, password, fullName || email);
+        await api.register(email, password, fullName || email);
         toast({
           title: "Успешна регистрация",
           description: "Акаунтът е създаден успешно!",
@@ -114,28 +115,41 @@ const Auth = () => {
               {loading ? "Зареждане..." : isLogin ? "Влез" : "Регистрирай се"}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm">
-            {isLogin ? (
-              <>
-                Нямате акаунт?{" "}
-                <button
-                  onClick={() => setIsLogin(false)}
-                  className="text-primary hover:underline"
-                >
-                  Регистрирайте се
-                </button>
-              </>
-            ) : (
-              <>
-                Имате акаунт?{" "}
-                <button
-                  onClick={() => setIsLogin(true)}
-                  className="text-primary hover:underline"
-                >
-                  Влезте
-                </button>
-              </>
-            )}
+          <div className="mt-4 space-y-2">
+            <div className="text-center text-sm">
+              {isLogin ? (
+                <>
+                  Нямате акаунт?{" "}
+                  <button
+                    onClick={() => setIsLogin(false)}
+                    className="text-primary hover:underline"
+                  >
+                    Регистрирайте се
+                  </button>
+                </>
+              ) : (
+                <>
+                  Имате акаунт?{" "}
+                  <button
+                    onClick={() => setIsLogin(true)}
+                    className="text-primary hover:underline"
+                  >
+                    Влезте
+                  </button>
+                </>
+              )}
+            </div>
+            <div className="text-center">
+              <button
+                onClick={() => {
+                  localStorage.clear();
+                  window.location.reload();
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+              >
+                Изчисти всички данни
+              </button>
+            </div>
           </div>
         </CardContent>
       </Card>

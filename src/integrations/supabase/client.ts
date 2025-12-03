@@ -5,13 +5,44 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+// Verify we're using REMOTE Supabase (not local)
+if (SUPABASE_URL && SUPABASE_URL.includes('localhost')) {
+  console.warn('⚠️ Warning: Supabase URL points to localhost. Make sure to use remote Supabase URL.');
+} else if (SUPABASE_URL) {
+  console.log('✅ Supabase client configured with remote URL:', SUPABASE_URL);
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
+// Singleton pattern to prevent multiple instances
+let supabaseInstance: ReturnType<typeof createClient<Database>> | null = null;
+
+export const supabase = (() => {
+  if (!supabaseInstance && SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY) {
+    // Ensure we're using remote Supabase, not local
+    if (SUPABASE_URL.includes('localhost') || SUPABASE_URL.includes('127.0.0.1')) {
+      throw new Error('Cannot use local Supabase. Please set VITE_SUPABASE_URL to remote Supabase URL.');
+    }
+    
+    supabaseInstance = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      auth: {
+        storage: {
+          getItem: () => null, // Disable storage - always return null
+          setItem: () => {}, // Disable storage - do nothing
+          removeItem: () => {}, // Disable storage - do nothing
+        },
+        persistSession: false, // Disable automatic session persistence
+        autoRefreshToken: false, // Disable automatic token refresh
+        detectSessionInUrl: false, // Disable automatic session detection
+      },
+      // Global options to prevent multiple instances warning
+      global: {
+        headers: {
+          'x-client-info': 'xnvd-app',
+        },
+      },
+    });
   }
-});
+  return supabaseInstance;
+})();

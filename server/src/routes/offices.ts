@@ -1,5 +1,5 @@
 import express from 'express';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { prisma } from '../lib/prisma.js';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -8,16 +8,79 @@ const router = express.Router();
 router.get('/city/:cityId', authenticate, async (req, res) => {
   try {
     const { cityId } = req.params;
-    const { data: offices, error } = await supabaseAdmin
-      .from('offices')
-      .select('*')
-      .eq('city_id', cityId)
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-    res.json(offices || []);
+    const offices = await prisma.office.findMany({
+      where: { cityId },
+      orderBy: { name: 'asc' }
+    });
+    res.json(offices);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all offices with full structure - MUST be before /:id/full to avoid route conflict
+router.get('/all/full', authenticate, async (req, res) => {
+  try {
+    // Get all offices with city and country from Prisma
+    const offices = await prisma.office.findMany({
+      include: {
+        city: {
+          include: {
+            country: true
+          }
+        },
+        teams: {
+          include: {
+            leader: {
+              include: {
+                realtor: true
+              }
+            },
+            realtors: {
+              include: {
+                user: true,
+                deals: true,
+                diagnoses: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+
+    // Transform to match frontend expectations
+    const transformed = offices.map(office => ({
+      ...office,
+      city_id: office.cityId,
+      city: {
+        ...office.city,
+        country_id: office.city.countryId,
+        country: office.city.country
+      },
+      teams: office.teams.map(team => ({
+        ...team,
+        office_id: team.officeId,
+        leader_id: team.leaderId,
+        leader: team.leader ? {
+          ...team.leader,
+          realtor: team.leader.realtor
+        } : null,
+        realtors: team.realtors.map(realtor => ({
+          ...realtor,
+          user_id: realtor.userId,
+          team_id: realtor.teamId,
+          profile: realtor.user,
+          deals: realtor.deals,
+          diagnoses: realtor.diagnoses
+        }))
+      }))
+    }));
+
+    res.json(transformed);
+  } catch (error: any) {
+    console.error('Error in /all/full:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
 
@@ -26,103 +89,66 @@ router.get('/:id/full', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Get office with city and country
-    const { data: office, error: officeError } = await supabaseAdmin
-      .from('offices')
-      .select(`
-        *,
-        city:cities (
-          *,
-          country:countries (*)
-        )
-      `)
-      .eq('id', id)
-      .single();
+    const office = await prisma.office.findUnique({
+      where: { id },
+      include: {
+        city: {
+          include: {
+            country: true
+          }
+        },
+        teams: {
+          include: {
+            leader: {
+              include: {
+                realtor: true
+              }
+            },
+            realtors: {
+              include: {
+                user: true,
+                deals: true,
+                diagnoses: true
+              }
+            }
+          }
+        }
+      }
+    });
 
-    if (officeError || !office) {
+    if (!office) {
       return res.status(404).json({ error: 'Office not found' });
     }
 
-    // Get teams with leaders and realtors
-    const { data: teams, error: teamsError } = await supabaseAdmin
-      .from('teams')
-      .select(`
-        *,
-        leader:profiles!teams_leader_id_fkey (
-          *,
-          realtor:realtors (*)
-        ),
-        realtors:realtors (
-          *,
-          profile:profiles!realtors_user_id_fkey (*),
-          deals:deals (*),
-          diagnoses:diagnoses (*)
-        )
-      `)
-      .eq('office_id', id);
-
-    if (teamsError) throw teamsError;
-
-    res.json({
+    // Transform to match frontend expectations
+    const transformed = {
       ...office,
-      teams: teams || []
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
+      city_id: office.cityId,
+      city: {
+        ...office.city,
+        country_id: office.city.countryId,
+        country: office.city.country
+      },
+      teams: office.teams.map(team => ({
+        ...team,
+        office_id: team.officeId,
+        leader_id: team.leaderId,
+        leader: team.leader ? {
+          ...team.leader,
+          realtor: team.leader.realtor
+        } : null,
+        realtors: team.realtors.map(realtor => ({
+          ...realtor,
+          user_id: realtor.userId,
+          team_id: realtor.teamId,
+          profile: realtor.user,
+          deals: realtor.deals,
+          diagnoses: realtor.diagnoses
+        }))
+      }))
+    };
 
-// Get all offices with full structure
-router.get('/all/full', authenticate, async (req, res) => {
-  try {
-    const { data: offices, error: officesError } = await supabaseAdmin
-      .from('offices')
-      .select(`
-        *,
-        city:cities (
-          *,
-          country:countries (*)
-        )
-      `)
-      .order('name', { ascending: true });
-
-    if (officesError) throw officesError;
-
-    // Get teams for all offices
-    const { data: allTeams, error: teamsError } = await supabaseAdmin
-      .from('teams')
-      .select(`
-        *,
-        leader:profiles!teams_leader_id_fkey (
-          *,
-          realtor:realtors (*)
-        ),
-        realtors:realtors (
-          *,
-          profile:profiles!realtors_user_id_fkey (*),
-          deals:deals (*),
-          diagnoses:diagnoses (*)
-        )
-      `);
-
-    if (teamsError) throw teamsError;
-
-    // Group teams by office_id
-    const teamsByOffice = (allTeams || []).reduce((acc: any, team: any) => {
-      if (!acc[team.office_id]) {
-        acc[team.office_id] = [];
-      }
-      acc[team.office_id].push(team);
-      return acc;
-    }, {});
-
-    // Attach teams to offices
-    const officesWithTeams = (offices || []).map((office: any) => ({
-      ...office,
-      teams: teamsByOffice[office.id] || []
-    }));
-
-    res.json(officesWithTeams);
+    res.json(transformed);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -132,13 +158,9 @@ router.get('/all/full', authenticate, async (req, res) => {
 router.post('/', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { name, cityId, address } = req.body;
-    const { data: office, error } = await supabaseAdmin
-      .from('offices')
-      .insert({ name, city_id: cityId, address })
-      .select()
-      .single();
-
-    if (error) throw error;
+    const office = await prisma.office.create({
+      data: { name, cityId, address }
+    });
     res.json(office);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -150,14 +172,10 @@ router.put('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => 
   try {
     const { id } = req.params;
     const { name, address } = req.body;
-    const { data: office, error } = await supabaseAdmin
-      .from('offices')
-      .update({ name, address })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
+    const office = await prisma.office.update({
+      where: { id },
+      data: { name, address }
+    });
     res.json(office);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -168,12 +186,9 @@ router.put('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => 
 router.delete('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { error } = await supabaseAdmin
-      .from('offices')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
+    await prisma.office.delete({
+      where: { id }
+    });
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -181,4 +196,3 @@ router.delete('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) 
 });
 
 export default router;
-

@@ -12,7 +12,8 @@
     "prisma:migrate": "dotenv -e .env -- prisma migrate dev",
     "prisma:studio": "dotenv -e .env -- prisma studio",
     "prisma:deploy": "dotenv -e .env -- prisma migrate deploy",
-    "create-admin": "node scripts/create-admin.js"
+    "create-admin": "node scripts/create-admin.js",
+    "sync:supabase-to-prisma": "dotenv -e .env -- tsx scripts/sync-supabase-to-prisma.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.19.0",

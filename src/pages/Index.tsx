@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate as useRouterNavigate } from 'react-router-dom';
-import { supabaseApi } from '@/lib/supabaseApi';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -36,19 +36,19 @@ const Index = () => {
   
   useEffect(() => {
     // Check authentication
-    supabaseApi.getCurrentUser()
+    api.getCurrentUser()
       .then(async (userData) => {
         // Set user info
         if (userData.user) {
           setUserInfo({
-            fullName: userData.user.fullName,
+            fullName: userData.user.fullName || userData.user.full_name,
             email: userData.user.email,
             role: userData.user.roles?.[0] === 'admin' ? 'Администратор' : 'Реализатор'
           });
         }
         // Fetch offices with full structure
         try {
-          const dbOffices = await supabaseApi.getAllOfficesFull();
+          const dbOffices = await api.getAllOfficesFull();
           const transformedOffices = transformOffices(dbOffices);
           setOffices(transformedOffices);
         } catch (error) {
@@ -106,7 +106,7 @@ const Index = () => {
   };
 
   const handleLogout = async () => {
-    await supabaseApi.logout();
+    await api.logout();
     navigate('/auth');
   };
 

@@ -1,5 +1,5 @@
 import express from 'express';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { prisma } from '../lib/prisma.js';
 import { authenticate, requireRealtor, requireAdmin, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -7,13 +7,12 @@ const router = express.Router();
 // Get diagnoses for current realtor
 router.get('/me', authenticate, requireRealtor, async (req: AuthRequest, res) => {
   try {
-    const { data: realtor, error: realtorError } = await supabaseAdmin
-      .from('realtors')
-      .select('id')
-      .eq('user_id', req.userId!)
-      .single();
+    const realtor = await prisma.realtor.findUnique({
+      where: { userId: req.userId! },
+      select: { id: true }
+    });
 
-    if (realtorError || !realtor) {
+    if (!realtor) {
       return res.status(404).json({ error: 'Realtor not found' });
     }
 
@@ -21,15 +20,25 @@ router.get('/me', authenticate, requireRealtor, async (req: AuthRequest, res) =>
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    const { data: diagnoses, error } = await supabaseAdmin
-      .from('diagnoses')
-      .select('*')
-      .eq('realtor_id', realtor.id)
-      .gte('diagnosis_date', startOfMonth.toISOString().split('T')[0])
-      .order('diagnosis_date', { ascending: false });
+    const diagnoses = await prisma.diagnosis.findMany({
+      where: {
+        realtorId: realtor.id,
+        diagnosisDate: {
+          gte: startOfMonth
+        }
+      },
+      orderBy: { diagnosisDate: 'desc' }
+    });
 
-    if (error) throw error;
-    res.json(diagnoses || []);
+    res.json(diagnoses.map(d => ({
+      id: d.id,
+      realtor_id: d.realtorId,
+      client_name: d.clientName,
+      diagnosis_date: d.diagnosisDate.toISOString().split('T')[0],
+      status: d.status,
+      notes: d.notes,
+      created_at: d.createdAt.toISOString()
+    })));
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -38,31 +47,35 @@ router.get('/me', authenticate, requireRealtor, async (req: AuthRequest, res) =>
 // Create diagnosis
 router.post('/', authenticate, requireRealtor, async (req: AuthRequest, res) => {
   try {
-    const { data: realtor, error: realtorError } = await supabaseAdmin
-      .from('realtors')
-      .select('id')
-      .eq('user_id', req.userId!)
-      .single();
+    const realtor = await prisma.realtor.findUnique({
+      where: { userId: req.userId! },
+      select: { id: true }
+    });
 
-    if (realtorError || !realtor) {
+    if (!realtor) {
       return res.status(404).json({ error: 'Realtor not found' });
     }
 
     const { clientName, status, notes, diagnosisDate } = req.body;
-    const { data: diagnosis, error } = await supabaseAdmin
-      .from('diagnoses')
-      .insert({
-        realtor_id: realtor.id,
-        client_name: clientName,
+    const diagnosis = await prisma.diagnosis.create({
+      data: {
+        realtorId: realtor.id,
+        clientName,
         status: status || 'active',
-        notes,
-        diagnosis_date: diagnosisDate ? diagnosisDate : new Date().toISOString().split('T')[0]
-      })
-      .select()
-      .single();
+        notes: notes || null,
+        diagnosisDate: diagnosisDate ? new Date(diagnosisDate) : new Date()
+      }
+    });
 
-    if (error) throw error;
-    res.json(diagnosis);
+    res.json({
+      id: diagnosis.id,
+      realtor_id: diagnosis.realtorId,
+      client_name: diagnosis.clientName,
+      diagnosis_date: diagnosis.diagnosisDate.toISOString().split('T')[0],
+      status: diagnosis.status,
+      notes: diagnosis.notes,
+      created_at: diagnosis.createdAt.toISOString()
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

@@ -1,5 +1,5 @@
 import express from 'express';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { prisma } from '../lib/prisma.js';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -8,14 +8,62 @@ const router = express.Router();
 router.get('/office/:officeId', authenticate, async (req, res) => {
   try {
     const { officeId } = req.params;
-    const { data: teams, error } = await supabaseAdmin
-      .from('teams')
-      .select('*')
-      .eq('office_id', officeId)
-      .order('name', { ascending: true });
+    const teams = await prisma.team.findMany({
+      where: { officeId },
+      orderBy: { name: 'asc' }
+    });
+    res.json(teams);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
-    if (error) throw error;
-    res.json(teams || []);
+// Get team with full data (leader and realtors)
+router.get('/:id/full', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const team = await prisma.team.findUnique({
+      where: { id },
+      include: {
+        leader: {
+          include: {
+            realtor: true
+          }
+        },
+        realtors: {
+          include: {
+            user: true,
+            deals: true,
+            diagnoses: true
+          }
+        }
+      }
+    });
+
+    if (!team) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+
+    // Transform to match frontend expectations
+    const transformed = {
+      ...team,
+      office_id: team.officeId,
+      leader_id: team.leaderId,
+      leader: team.leader ? {
+        ...team.leader,
+        realtor: team.leader.realtor
+      } : null,
+      realtors: team.realtors.map(realtor => ({
+        ...realtor,
+        user_id: realtor.userId,
+        team_id: realtor.teamId,
+        profile: realtor.user,
+        deals: realtor.deals,
+        diagnoses: realtor.diagnoses
+      }))
+    };
+
+    res.json(transformed);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -25,13 +73,9 @@ router.get('/office/:officeId', authenticate, async (req, res) => {
 router.post('/', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { name, officeId, leaderId } = req.body;
-    const { data: team, error } = await supabaseAdmin
-      .from('teams')
-      .insert({ name, office_id: officeId, leader_id: leaderId })
-      .select()
-      .single();
-
-    if (error) throw error;
+    const team = await prisma.team.create({
+      data: { name, officeId, leaderId }
+    });
     res.json(team);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -43,14 +87,10 @@ router.put('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => 
   try {
     const { id } = req.params;
     const { name, leaderId } = req.body;
-    const { data: team, error } = await supabaseAdmin
-      .from('teams')
-      .update({ name, leader_id: leaderId })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
+    const team = await prisma.team.update({
+      where: { id },
+      data: { name, leaderId }
+    });
     res.json(team);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -61,12 +101,9 @@ router.put('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => 
 router.delete('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { error } = await supabaseAdmin
-      .from('teams')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
+    await prisma.team.delete({
+      where: { id }
+    });
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -74,4 +111,3 @@ router.delete('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) 
 });
 
 export default router;
-
