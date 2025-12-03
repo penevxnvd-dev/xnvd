@@ -31,17 +31,41 @@ export const useUserRole = () => {
 
         if (rolesError) {
           console.error('Error fetching user roles:', rolesError);
-          setRole(null);
-          setLoading(false);
-          return;
+          // Don't return early - check realtors table as fallback
         }
 
         if (roles && roles.length > 0) {
           // Priority: admin > realtor
           const hasAdmin = roles.some(r => r.role === 'admin');
-          setRole(hasAdmin ? 'admin' : 'realtor');
+          const determinedRole = hasAdmin ? 'admin' : 'realtor';
+          console.log(`[useUserRole] Found role in user_roles: ${determinedRole}`);
+          setRole(determinedRole);
         } else {
-          setRole(null);
+          // If no role in user_roles, check if user is a realtor
+          console.log('[useUserRole] No role in user_roles, checking realtors table...');
+          const { data: realtor, error: realtorError } = await supabase
+            .from('realtors')
+            .select('id')
+            .eq('user_id', user.id)
+            .single();
+
+          if (realtorError) {
+            if (realtorError.code === 'PGRST116') {
+              // No realtor found - this is expected if user is not a realtor
+              console.log('[useUserRole] User is not a realtor');
+            } else {
+              console.error('[useUserRole] Error checking realtor status:', realtorError);
+            }
+          }
+
+          if (realtor) {
+            // User is a realtor but doesn't have role in user_roles
+            console.log('[useUserRole] User is a realtor (found in realtors table)');
+            setRole('realtor');
+          } else {
+            console.log('[useUserRole] User has no role assigned');
+            setRole(null);
+          }
         }
       } catch (error) {
         console.error('Error fetching user role:', error);
