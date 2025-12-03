@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate as useRouterNavigate } from 'react-router-dom';
-import { api } from '@/lib/api';
+import { api, supabaseApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -40,10 +40,18 @@ const Index = () => {
       .then(async (userData) => {
         // Set user info
         if (userData.user) {
+          // Fetch user roles
+          const { data: roles } = await supabaseApi.supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', userData.user.id);
+          
+          const isAdmin = roles?.some(r => r.role === 'admin');
+          
           setUserInfo({
-            fullName: userData.user.fullName || userData.user.full_name,
+            fullName: userData.user.full_name || userData.user.email,
             email: userData.user.email,
-            role: userData.user.roles?.[0] === 'admin' ? 'Администратор' : 'Реализатор'
+            role: isAdmin ? 'Администратор' : 'Реализатор'
           });
         }
         // Fetch offices with full structure

@@ -1212,7 +1212,7 @@ class SupabaseApiClient {
     const targetMonth = month ?? now.getMonth() + 1;
     const targetYear = year ?? now.getFullYear();
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('realtor_goals')
       .select('*')
       .eq('realtor_id', realtor.id)
@@ -1221,7 +1221,12 @@ class SupabaseApiClient {
       .maybeSingle();
 
     if (error) throw error;
-    return data;
+    return data ? {
+      dealsGoal: data.deals_goal,
+      keysGoal: data.keys_goal,
+      exclusivesGoal: data.exclusives_goal,
+      ...data
+    } : null;
   }
 
   async setMyGoals(month: number, year: number, dealsGoal: number, keysGoal: number, exclusivesGoal: number) {
@@ -1241,7 +1246,7 @@ class SupabaseApiClient {
       throw new Error('Realtor not found');
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('realtor_goals')
       .upsert({
         realtor_id: realtor.id,
@@ -1278,14 +1283,24 @@ class SupabaseApiClient {
       return [];
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('buyer_schedule')
       .select('*')
       .eq('realtor_id', realtor.id)
       .order('schedule_date', { ascending: true });
 
     if (error) throw error;
-    return data || [];
+    return (data || []).map((item: any) => ({
+      ...item,
+      scheduleDate: item.schedule_date,
+      timeSlot: item.time_slot,
+      buyer1Name: item.buyer1_name,
+      buyer1Phone: item.buyer1_phone,
+      buyer1Notes: item.buyer1_notes,
+      buyer2Name: item.buyer2_name,
+      buyer2Phone: item.buyer2_phone,
+      buyer2Notes: item.buyer2_notes,
+    }));
   }
 
   async createScheduleEntry(entryData: {
@@ -1328,7 +1343,7 @@ class SupabaseApiClient {
     };
 
     if (entryData.id) {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('buyer_schedule')
         .update(insertData)
         .eq('id', entryData.id)
@@ -1339,7 +1354,7 @@ class SupabaseApiClient {
       return data;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('buyer_schedule')
       .insert(insertData)
       .select()
@@ -1350,7 +1365,7 @@ class SupabaseApiClient {
   }
 
   async deleteScheduleEntry(id: string) {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('buyer_schedule')
       .delete()
       .eq('id', id);
@@ -1367,14 +1382,19 @@ class SupabaseApiClient {
       throw new Error('Not authenticated');
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('messages')
       .select('*')
       .or(`and(sender_id.eq.${user.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${user.id})`)
       .order('created_at', { ascending: true });
 
     if (error) throw error;
-    return data || [];
+    return (data || []).map((msg: any) => ({
+      ...msg,
+      senderId: msg.sender_id,
+      receiverId: msg.receiver_id,
+      createdAt: msg.created_at,
+    }));
   }
 
   async sendMessage(receiverId: string, content: string) {
@@ -1384,7 +1404,7 @@ class SupabaseApiClient {
       throw new Error('Not authenticated');
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('messages')
       .insert({
         sender_id: user.id,
@@ -1395,7 +1415,12 @@ class SupabaseApiClient {
       .single();
 
     if (error) throw error;
-    return data;
+    return {
+      ...data,
+      senderId: data.sender_id,
+      receiverId: data.receiver_id,
+      createdAt: data.created_at,
+    };
   }
 
   async markMessagesAsRead(userId: string) {
@@ -1405,7 +1430,7 @@ class SupabaseApiClient {
       throw new Error('Not authenticated');
     }
 
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('messages')
       .update({ read: true })
       .eq('sender_id', userId)
