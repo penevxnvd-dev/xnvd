@@ -557,6 +557,9 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Добавяне на курсист към група</DialogTitle>
+            <DialogDescription>
+              Добавете нов курсист към група за обучение.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
