@@ -4,7 +4,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -143,9 +142,6 @@ export const AddPersonToTeamDialog = ({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Добави човек в екип "{teamName}"</DialogTitle>
-          <DialogDescription>
-            Изберете съществуващ профил или създайте нов акаунт и го добавете към екипа.
-          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">

@@ -19,20 +19,12 @@ if (SUPABASE_URL && SUPABASE_URL.includes('localhost')) {
 let supabaseInstance: ReturnType<typeof createClient<Database>> | null = null;
 
 export const supabase = (() => {
-  if (!supabaseInstance) {
-    if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-      console.error('❌ Supabase environment variables are missing!');
-      console.error('VITE_SUPABASE_URL:', SUPABASE_URL ? '✅ Set' : '❌ Missing');
-      console.error('VITE_SUPABASE_PUBLISHABLE_KEY:', SUPABASE_PUBLISHABLE_KEY ? '✅ Set' : '❌ Missing');
-      throw new Error('Supabase environment variables are not configured. Please check your .env file.');
-    }
-    
+  if (!supabaseInstance && SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY) {
     // Ensure we're using remote Supabase, not local
     if (SUPABASE_URL.includes('localhost') || SUPABASE_URL.includes('127.0.0.1')) {
       throw new Error('Cannot use local Supabase. Please set VITE_SUPABASE_URL to remote Supabase URL.');
     }
     
-    console.log('🔧 Initializing Supabase client with URL:', SUPABASE_URL);
     supabaseInstance = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
       auth: {
         storage: {
@@ -51,7 +43,6 @@ export const supabase = (() => {
         },
       },
     });
-    console.log('✅ Supabase client initialized successfully');
   }
   return supabaseInstance;
 })();

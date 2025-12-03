@@ -4,7 +4,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -228,9 +227,6 @@ export const UserManagementDialog = ({
                 <span className="hidden sm:inline">Нов акаунт</span>
               </Button>
             </DialogTitle>
-            <DialogDescription>
-              Прегледайте и управлявайте всички потребителски акаунти в системата.
-            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {/* Search */}
@@ -295,9 +291,6 @@ export const UserManagementDialog = ({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Създай нов акаунт</DialogTitle>
-            <DialogDescription>
-              Създайте нов потребителски акаунт с име, имейл, парола и роля.
-            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">

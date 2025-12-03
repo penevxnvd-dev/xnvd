@@ -3,7 +3,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -93,9 +92,6 @@ export const AgentDetailDialog = ({ agent, open, onOpenChange }: AgentDetailDial
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="sr-only">Данни за агент</DialogTitle>
-          <DialogDescription className="sr-only">
-            Подробна информация за агента, включително статистика, сделки и постижения.
-          </DialogDescription>
           <div className="flex items-start gap-4 pt-2">
             <Avatar className="h-20 w-20 border-2 border-primary/20">
               <AvatarImage src={agent.avatar} alt={agent.name} />

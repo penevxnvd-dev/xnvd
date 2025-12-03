@@ -96,7 +96,6 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
       fetchTopologyData();
       fetchCurrentTeam();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [realtorData?.id, realtorData?.user?.email, realtorData?.team_id]);
 
   const fetchTopologyData = async () => {
@@ -116,7 +115,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
               break;
             }
           }
-          if (agent) break;
+          if (selectedAgentId) break;
         }
       }
     } catch (error) {
