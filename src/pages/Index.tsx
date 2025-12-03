@@ -35,9 +35,15 @@ const Index = () => {
   const [offices, setOffices] = useState<Office[]>([]);
   
   useEffect(() => {
+    let isMounted = true;
+    
     // Check authentication
-    api.getCurrentUser()
-      .then(async (userData) => {
+    const checkAuth = async () => {
+      try {
+        const userData = await api.getCurrentUser();
+        
+        if (!isMounted) return;
+        
         // Set user info
         if (userData.user) {
           // Fetch user roles
@@ -48,27 +54,46 @@ const Index = () => {
           
           const isAdmin = roles?.some(r => r.role === 'admin');
           
-          setUserInfo({
-            fullName: userData.user.full_name || userData.user.email,
-            email: userData.user.email,
-            role: isAdmin ? 'Администратор' : 'Реализатор'
-          });
+          if (isMounted) {
+            setUserInfo({
+              fullName: userData.user.full_name || userData.user.email,
+              email: userData.user.email,
+              role: isAdmin ? 'Администратор' : 'Реализатор'
+            });
+          }
         }
+        
         // Fetch offices with full structure
         try {
           const dbOffices = await api.getAllOfficesFull();
-          const transformedOffices = transformOffices(dbOffices);
-          setOffices(transformedOffices);
+          if (isMounted) {
+            const transformedOffices = transformOffices(dbOffices);
+            setOffices(transformedOffices);
+          }
         } catch (error) {
           console.error('Error fetching offices:', error);
           // Fallback to empty array
-          setOffices([]);
+          if (isMounted) {
+            setOffices([]);
+          }
         }
-        setLoading(false);
-      })
-      .catch(() => {
-        navigate('/auth');
-      });
+        
+        if (isMounted) {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Authentication error:', error);
+        if (isMounted) {
+          navigate('/auth');
+        }
+      }
+    };
+    
+    checkAuth();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [navigate]);
   const [currentView, setCurrentView] = useState<ViewType>('offices');
   const [selectedOffice, setSelectedOffice] = useState<Office | null>(null);

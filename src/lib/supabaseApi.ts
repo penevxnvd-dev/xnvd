@@ -548,6 +548,21 @@ class SupabaseApiClient {
         .single();
 
       if (updateError) throw updateError;
+      
+      // Ensure realtor role exists in user_roles
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .upsert({
+          user_id: userId,
+          role: 'realtor',
+        }, {
+          onConflict: 'user_id,role'
+        });
+      
+      if (roleError && !roleError.message.includes('duplicate')) {
+        console.warn('Warning: Could not ensure realtor role:', roleError);
+      }
+      
       return updatedRealtor;
     } else {
       // Create new realtor
@@ -568,6 +583,21 @@ class SupabaseApiClient {
         .single();
 
       if (createError) throw createError;
+      
+      // Ensure realtor role exists in user_roles
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .upsert({
+          user_id: userId,
+          role: 'realtor',
+        }, {
+          onConflict: 'user_id,role'
+        });
+      
+      if (roleError && !roleError.message.includes('duplicate')) {
+        console.warn('Warning: Could not ensure realtor role:', roleError);
+      }
+      
       return newRealtor;
     }
   }
@@ -657,6 +687,20 @@ class SupabaseApiClient {
 
     if (realtorError) {
       throw new Error(`Грешка при добавяне към екип: ${realtorError.message}`);
+    }
+
+    // Ensure realtor role exists in user_roles
+    const { error: roleError } = await supabase
+      .from('user_roles')
+      .upsert({
+        user_id: authData.user.id,
+        role: 'realtor',
+      }, {
+        onConflict: 'user_id,role'
+      });
+    
+    if (roleError && !roleError.message.includes('duplicate')) {
+      console.warn('Warning: Could not ensure realtor role:', roleError);
     }
 
     return authData.user.id;

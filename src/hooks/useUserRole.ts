@@ -31,9 +31,6 @@ export const useUserRole = () => {
 
         if (rolesError) {
           console.error('Error fetching user roles:', rolesError);
-          setRole(null);
-          setLoading(false);
-          return;
         }
 
         if (roles && roles.length > 0) {
@@ -41,7 +38,23 @@ export const useUserRole = () => {
           const hasAdmin = roles.some(r => r.role === 'admin');
           setRole(hasAdmin ? 'admin' : 'realtor');
         } else {
-          setRole(null);
+          // If no role in user_roles, check if user is a realtor
+          const { data: realtor, error: realtorError } = await supabase
+            .from('realtors')
+            .select('id')
+            .eq('user_id', user.id)
+            .single();
+
+          if (realtorError && realtorError.code !== 'PGRST116') {
+            console.error('Error checking realtor status:', realtorError);
+          }
+
+          if (realtor) {
+            // User is a realtor but doesn't have role in user_roles
+            setRole('realtor');
+          } else {
+            setRole(null);
+          }
         }
       } catch (error) {
         console.error('Error fetching user role:', error);
