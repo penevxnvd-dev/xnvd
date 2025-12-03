@@ -19,7 +19,16 @@ class SupabaseApiClient {
       password,
     });
 
-    if (error) throw error;
+    if (error) {
+      // Provide more user-friendly error messages
+      if (error.message.includes('Invalid login credentials') || error.message.includes('Email not confirmed')) {
+        throw new Error('Невалиден имейл или парола. Моля проверете данните си.');
+      }
+      if (error.message.includes('Email not confirmed')) {
+        throw new Error('Моля потвърдете имейла си преди да влезете.');
+      }
+      throw error;
+    }
     
     // Get user profile
     if (data.user) {
