@@ -92,7 +92,7 @@ export const TopologySidebar = ({
           return;
         }
 
-        const teamId = realtor.teamId || realtor.team_id;
+        const teamId = realtor.team_id;
         console.log('✅ Current realtor found. TeamId:', teamId);
         
         // Step 2: Get all offices with teams from Prisma (via API)
@@ -518,7 +518,7 @@ export const TopologySidebar = ({
                         "px-2 py-1.5 mb-2 rounded-md bg-accent/50 cursor-pointer transition-colors",
                         onChatClick && "hover:bg-accent"
                       )}
-                      onClick={() => onChatClick && onChatClick(currentTeam.leader!.userId || currentTeam.leader!.id, currentTeam.leader!.name)}
+                      onClick={() => onChatClick && onChatClick(currentTeam.leader!.id, currentTeam.leader!.name)}
                     >
                       <div className="flex items-center gap-2">
                         <Crown className="h-3 w-3 text-yellow-600 flex-shrink-0" />

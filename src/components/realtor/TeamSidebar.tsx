@@ -45,7 +45,7 @@ export const TeamSidebar = ({ realtorId, userId, isOpen, onToggle }: TeamSidebar
       // Get current realtor with team info
       const realtor = await supabaseApi.getCurrentRealtor();
       
-      if (!realtor || !realtor.teamId) {
+      if (!realtor || !realtor.team_id) {
         setLoading(false);
         return;
       }
@@ -55,7 +55,7 @@ export const TeamSidebar = ({ realtorId, userId, isOpen, onToggle }: TeamSidebar
       
       for (const office of offices) {
         for (const team of office.teams || []) {
-          if (team.id === realtor.teamId) {
+          if (team.id === realtor.team_id) {
             // Found the team
             if (team.leader) {
               setLeader({

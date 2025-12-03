@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '@/lib/api';
+import { supabaseApi } from '@/lib/supabaseApi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
@@ -28,6 +28,7 @@ interface RealtorData {
   confidence: boolean;
   salesResilience: boolean;
   successMindset: boolean;
+  team_id?: string | null;
   user: {
     fullName: string;
     email: string;
@@ -95,13 +96,13 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
       fetchTopologyData();
       fetchCurrentTeam();
     }
-  }, [realtorData?.id, realtorData?.user?.email, realtorData?.teamId]);
+  }, [realtorData?.id, realtorData?.user?.email, realtorData?.team_id]);
 
   const fetchTopologyData = async () => {
     try {
-      console.log('📥 Fetching topology data from Prisma (via API)...');
-      const dbOffices = await api.getAllOfficesFull();
-      console.log(`✅ Loaded ${dbOffices.length} offices from Prisma`);
+      console.log('📥 Fetching topology data from Supabase...');
+      const dbOffices = await supabaseApi.getAllOfficesFull();
+      console.log(`✅ Loaded ${dbOffices.length} offices from Supabase`);
       const transformedOffices = transformOffices(dbOffices);
       setTopologyOffices(transformedOffices);
       
@@ -124,16 +125,16 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
 
   const fetchCurrentTeam = async () => {
     try {
-      if (!realtorData?.teamId) {
+      if (!realtorData?.team_id) {
         setCurrentTeam(null);
         return;
       }
 
-      const offices = await api.getAllOfficesFull();
+      const offices = await supabaseApi.getAllOfficesFull();
       
       for (const office of offices) {
         for (const team of office.teams || []) {
-          if (team.id === realtorData.teamId) {
+          if (team.id === realtorData.team_id) {
             const leader = team.leader ? {
               id: team.leader.id,
               name: formatNameWithEmoji(team.leader.full_name),
@@ -180,26 +181,27 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
     setLoading(true);
     
     try {
-      console.log('📥 Fetching realtor profile from Prisma (via API)...');
-      const realtorProfile = await api.getCurrentRealtor();
+      console.log('📥 Fetching realtor profile from Supabase...');
+      const realtorProfile = await supabaseApi.getCurrentRealtor();
 
       if (realtorProfile) {
         const realtorDataObj = {
           id: realtorProfile.id,
           level: realtorProfile.level,
           confidence: realtorProfile.confidence || false,
-          salesResilience: realtorProfile.salesResilience || false,
-          successMindset: realtorProfile.successMindset || false,
+          salesResilience: realtorProfile.sales_resilience || false,
+          successMindset: realtorProfile.success_mindset || false,
+          team_id: realtorProfile.team_id,
           user: {
-            fullName: realtorProfile.user.fullName,
-            email: realtorProfile.user.email
+            fullName: realtorProfile.profile?.full_name || '',
+            email: realtorProfile.profile?.email || ''
           }
         };
         setRealtorData(realtorDataObj);
 
         const [dealsData, diagnosesData] = await Promise.all([
-          api.getMyDeals(),
-          api.getMyDiagnoses()
+          supabaseApi.getMyDeals(),
+          supabaseApi.getMyDiagnoses()
         ]);
 
         setDeals(dealsData.map((deal: any) => ({
@@ -230,7 +232,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
     try {
       if (!realtorData?.id) return;
 
-      const progressData = await api.getTrainingProgress();
+      const progressData = await supabaseApi.getTrainingProgress();
 
       if (progressData && progressData.length > 0) {
         const updatedData = trainingStructure.map((section) => ({
@@ -269,10 +271,17 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
     checked: boolean
   ) => {
     try {
-      await api.updateTrainingProgress({
+      const fieldMap: Record<string, string> = {
+        lecture: 'lecture_completed',
+        video: 'video_completed',
+        practical: 'practical_completed',
+        handover: 'handover_completed',
+        exam: 'exam_completed',
+      };
+      await supabaseApi.updateTrainingProgress({
         section: sectionId,
         subsection: subsectionId,
-        [`${field}Completed`]: checked,
+        [fieldMap[field]]: checked,
       });
 
       setTrainingData((prev) => {
@@ -314,7 +323,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
   };
 
   const handleLogout = async () => {
-    api.logout();
+    await supabaseApi.logout();
     navigate('/auth');
   };
 
@@ -690,14 +699,19 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
             onLogout={handleLogout}
             onUpdate={async () => {
               try {
-                const realtor = await api.getCurrentRealtor();
+                const realtor = await supabaseApi.getCurrentRealtor();
                 if (realtor) {
-                  const { user } = await api.getCurrentUser();
+                  const { user } = await supabaseApi.getCurrentUser();
                   if (user) {
                     setRealtorData({
-                      ...realtor,
+                      id: realtor.id,
+                      level: realtor.level,
+                      confidence: realtor.confidence || false,
+                      salesResilience: realtor.sales_resilience || false,
+                      successMindset: realtor.success_mindset || false,
+                      team_id: realtor.team_id,
                       user: {
-                        fullName: user.fullName || realtorData.user.fullName,
+                        fullName: user.full_name || realtorData.user.fullName,
                         email: user.email || realtorData.user.email
                       }
                     });

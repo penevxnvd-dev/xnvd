@@ -908,11 +908,11 @@ class SupabaseApiClient {
   async updateTrainingProgress(data: {
     section: string;
     subsection: string;
-    lectureCompleted: boolean;
-    videoCompleted: boolean;
-    practicalCompleted: boolean;
-    handoverCompleted: boolean;
-    examCompleted: boolean;
+    lecture_completed?: boolean;
+    video_completed?: boolean;
+    practical_completed?: boolean;
+    handover_completed?: boolean;
+    exam_completed?: boolean;
   }) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -931,19 +931,31 @@ class SupabaseApiClient {
       throw new Error('Realtor not found');
     }
 
+    // Get current progress first
+    const { data: existingProgress } = await supabase
+      .from('training_progress')
+      .select('*')
+      .eq('realtor_id', realtor.id)
+      .eq('section', data.section)
+      .eq('subsection', data.subsection)
+      .maybeSingle();
+
+    // Merge with existing progress
+    const progressData = {
+      realtor_id: realtor.id,
+      section: data.section,
+      subsection: data.subsection,
+      lecture_completed: data.lecture_completed ?? existingProgress?.lecture_completed ?? false,
+      video_completed: data.video_completed ?? existingProgress?.video_completed ?? false,
+      practical_completed: data.practical_completed ?? existingProgress?.practical_completed ?? false,
+      handover_completed: data.handover_completed ?? existingProgress?.handover_completed ?? false,
+      exam_completed: data.exam_completed ?? existingProgress?.exam_completed ?? false,
+    };
+
     // Upsert training progress
     const { data: progress, error } = await supabase
       .from('training_progress')
-      .upsert({
-        realtor_id: realtor.id,
-        section: data.section,
-        subsection: data.subsection,
-        lecture_completed: data.lectureCompleted,
-        video_completed: data.videoCompleted,
-        practical_completed: data.practicalCompleted,
-        handover_completed: data.handoverCompleted,
-        exam_completed: data.examCompleted,
-      }, {
+      .upsert(progressData, {
         onConflict: 'realtor_id,section,subsection',
       })
       .select()
@@ -1148,6 +1160,259 @@ class SupabaseApiClient {
       totalDealValue,
       levelDistribution,
     };
+  }
+
+  // Profile methods
+  async updateProfile(fullName: string) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      throw new Error('Not authenticated');
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ full_name: fullName })
+      .eq('id', user.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { user: data };
+  }
+
+  async updatePassword(currentPassword: string, newPassword: string) {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  // Goals
+  async getMyGoals(month?: number, year?: number) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      throw new Error('Not authenticated');
+    }
+
+    const { data: realtor, error: realtorError } = await supabase
+      .from('realtors')
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (realtorError || !realtor) {
+      return null;
+    }
+
+    const now = new Date();
+    const targetMonth = month ?? now.getMonth() + 1;
+    const targetYear = year ?? now.getFullYear();
+
+    const { data, error } = await supabase
+      .from('realtor_goals')
+      .select('*')
+      .eq('realtor_id', realtor.id)
+      .eq('month', targetMonth)
+      .eq('year', targetYear)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async setMyGoals(month: number, year: number, dealsGoal: number, keysGoal: number, exclusivesGoal: number) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      throw new Error('Not authenticated');
+    }
+
+    const { data: realtor, error: realtorError } = await supabase
+      .from('realtors')
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (realtorError || !realtor) {
+      throw new Error('Realtor not found');
+    }
+
+    const { data, error } = await supabase
+      .from('realtor_goals')
+      .upsert({
+        realtor_id: realtor.id,
+        month,
+        year,
+        deals_goal: dealsGoal,
+        keys_goal: keysGoal,
+        exclusives_goal: exclusivesGoal,
+      }, {
+        onConflict: 'realtor_id,month,year',
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  // Schedule
+  async getMySchedule(date?: string) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      throw new Error('Not authenticated');
+    }
+
+    const { data: realtor, error: realtorError } = await supabase
+      .from('realtors')
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (realtorError || !realtor) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from('buyer_schedule')
+      .select('*')
+      .eq('realtor_id', realtor.id)
+      .order('schedule_date', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  async createScheduleEntry(entryData: {
+    scheduleDate: string;
+    timeSlot: string;
+    buyer1Name?: string;
+    buyer1Phone?: string;
+    buyer1Notes?: string;
+    buyer2Name?: string;
+    buyer2Phone?: string;
+    buyer2Notes?: string;
+    id?: string;
+  }) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      throw new Error('Not authenticated');
+    }
+
+    const { data: realtor, error: realtorError } = await supabase
+      .from('realtors')
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (realtorError || !realtor) {
+      throw new Error('Realtor not found');
+    }
+
+    const insertData = {
+      realtor_id: realtor.id,
+      schedule_date: entryData.scheduleDate,
+      time_slot: entryData.timeSlot,
+      buyer1_name: entryData.buyer1Name || null,
+      buyer1_phone: entryData.buyer1Phone || null,
+      buyer1_notes: entryData.buyer1Notes || null,
+      buyer2_name: entryData.buyer2Name || null,
+      buyer2_phone: entryData.buyer2Phone || null,
+      buyer2_notes: entryData.buyer2Notes || null,
+    };
+
+    if (entryData.id) {
+      const { data, error } = await supabase
+        .from('buyer_schedule')
+        .update(insertData)
+        .eq('id', entryData.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    }
+
+    const { data, error } = await supabase
+      .from('buyer_schedule')
+      .insert(insertData)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteScheduleEntry(id: string) {
+    const { error } = await supabase
+      .from('buyer_schedule')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  // Messages
+  async getConversation(userId: string) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      throw new Error('Not authenticated');
+    }
+
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .or(`and(sender_id.eq.${user.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${user.id})`)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  async sendMessage(receiverId: string, content: string) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      throw new Error('Not authenticated');
+    }
+
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({
+        sender_id: user.id,
+        receiver_id: receiverId,
+        content,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async markMessagesAsRead(userId: string) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      throw new Error('Not authenticated');
+    }
+
+    const { error } = await supabase
+      .from('messages')
+      .update({ read: true })
+      .eq('sender_id', userId)
+      .eq('receiver_id', user.id);
+
+    if (error) throw error;
+    return { success: true };
   }
 }
 
