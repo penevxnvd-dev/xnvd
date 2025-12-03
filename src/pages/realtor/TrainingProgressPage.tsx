@@ -142,11 +142,11 @@ const TrainingProgressPage = () => {
         await supabaseApi.updateTrainingProgress({
           section: sectionId,
           subsection: subsectionId,
-          lectureCompleted: subsection.progress.lecture,
-          videoCompleted: subsection.progress.video,
-          practicalCompleted: subsection.progress.practical,
-          handoverCompleted: subsection.progress.handover,
-          examCompleted: subsection.progress.exam,
+          lecture_completed: subsection.progress.lecture,
+          video_completed: subsection.progress.video,
+          practical_completed: subsection.progress.practical,
+          handover_completed: subsection.progress.handover,
+          exam_completed: subsection.progress.exam,
         });
 
         // Ако изпитът е минат, показваме съобщение
