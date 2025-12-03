@@ -4,3 +4,6 @@ import { supabaseApi } from './supabaseApi';
 
 // Re-export supabaseApi as api for backward compatibility
 export const api = supabaseApi;
+
+// Also export supabaseApi directly for cases that need it
+export { supabaseApi };

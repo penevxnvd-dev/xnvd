@@ -210,7 +210,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
       const { user } = await api.getCurrentUser();
       if (user) {
         setUserInfo({
-          fullName: user.fullName || user.full_name,
+          fullName: user.full_name || user.email,
           email: user.email,
           role: 'Администратор'
         });

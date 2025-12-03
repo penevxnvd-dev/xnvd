@@ -14,6 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      buyer_schedule: {
+        Row: {
+          buyer1_name: string | null
+          buyer1_notes: string | null
+          buyer1_phone: string | null
+          buyer2_name: string | null
+          buyer2_notes: string | null
+          buyer2_phone: string | null
+          created_at: string
+          id: string
+          realtor_id: string
+          schedule_date: string
+          time_slot: string
+          updated_at: string
+        }
+        Insert: {
+          buyer1_name?: string | null
+          buyer1_notes?: string | null
+          buyer1_phone?: string | null
+          buyer2_name?: string | null
+          buyer2_notes?: string | null
+          buyer2_phone?: string | null
+          created_at?: string
+          id?: string
+          realtor_id: string
+          schedule_date: string
+          time_slot: string
+          updated_at?: string
+        }
+        Update: {
+          buyer1_name?: string | null
+          buyer1_notes?: string | null
+          buyer1_phone?: string | null
+          buyer2_name?: string | null
+          buyer2_notes?: string | null
+          buyer2_phone?: string | null
+          created_at?: string
+          id?: string
+          realtor_id?: string
+          schedule_date?: string
+          time_slot?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "buyer_schedule_realtor_id_fkey"
+            columns: ["realtor_id"]
+            isOneToOne: false
+            referencedRelation: "realtors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cities: {
         Row: {
           country_id: string
@@ -140,6 +193,48 @@ export type Database = {
           },
         ]
       }
+      messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          read: boolean
+          receiver_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          read?: boolean
+          receiver_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          read?: boolean
+          receiver_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_receiver_id_fkey"
+            columns: ["receiver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       offices: {
         Row: {
           address: string | null
@@ -195,6 +290,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      realtor_goals: {
+        Row: {
+          created_at: string
+          deals_goal: number
+          exclusives_goal: number
+          id: string
+          keys_goal: number
+          month: number
+          realtor_id: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          deals_goal?: number
+          exclusives_goal?: number
+          id?: string
+          keys_goal?: number
+          month: number
+          realtor_id: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          deals_goal?: number
+          exclusives_goal?: number
+          id?: string
+          keys_goal?: number
+          month?: number
+          realtor_id?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "realtor_goals_realtor_id_fkey"
+            columns: ["realtor_id"]
+            isOneToOne: false
+            referencedRelation: "realtors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       realtors: {
         Row: {
