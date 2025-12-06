@@ -1,54 +1,65 @@
-# ✅ App is Running!
+# 🚀 Приложението е стартирано!
 
-## Services Status
+## ✅ Статус
 
-### ✅ Backend Server
-- **Status**: Running
-- **URL**: http://localhost:3001
-- **Health Check**: http://localhost:3001/api/health
-- **Database**: PostgreSQL (localhost:5432/xnvd)
-- **RLS**: Disabled (using Express.js middleware for auth)
+**Frontend Development Server:** Стартиран  
+**URL:** http://localhost:5173
 
-### ✅ Frontend Server  
-- **Status**: Running
-- **URL**: http://localhost:8080
-- **Framework**: Vite + React
+---
 
-## Access the App
+## 📋 Какво да направите сега
 
-🌐 **Open in browser**: http://localhost:8080
+1. **Отворете браузъра** и отидете на:
+   ```
+   http://localhost:5173
+   ```
 
-## Database
+2. **Влезте с някой от акаунтите:**
+   - **Краси Кътев** (Office Manager): `krasi.katev@xnvd.com` / `Krasi123!`
+   - **Лазар Бундев** (Team Leader): `lazar.bundev@xnvd.com` / `Lazar123!`
+   - **Георги Пенев** (Team Leader): `georgi.penev@xnvd.com` / `Georgi123!`
+   - **Камен Георгиев** (Regional Manager): `kamen.georgiev@xnvd.com` / `Kamen123!`
 
-✅ PostgreSQL database is ready
-✅ RLS policies disabled (not needed with Express.js)
-✅ All tables accessible
-✅ INSERT/UPDATE/DELETE operations working
+3. **Тествайте функционалностите:**
+   - ✅ Dashboard според ролята
+   - ✅ Управление на данни
+   - ✅ Training progress
+   - ✅ KPI метрики
 
-## Next Steps
+---
 
-1. Open http://localhost:8080 in your browser
-2. Login with admin credentials (if you have them set up)
-3. Start using the app!
+## 🔧 Команди
 
-## Stop the App
-
-To stop the servers:
+### Стартиране
 ```bash
-# Find and kill the processes
-pkill -f "tsx watch"
-pkill -f "vite"
-
-# Or use the stop script if available
-./stop-app.sh
+npm run dev
 ```
 
-## Restart the App
-
+### Спиране
 ```bash
-./restart-app.sh
-# Or manually:
-cd server && npm run dev &
-cd .. && npm run dev &
+# Намерете процеса
+ps aux | grep vite
+
+# Или спрете на порта
+lsof -ti:5173 | xargs kill -9
 ```
 
+### Build за production
+```bash
+npm run build
+```
+
+---
+
+## 📊 Архитектура
+
+- **Frontend:** React + Vite (порт 5173)
+- **Backend:** Supabase (cloud)
+- **Database:** PostgreSQL (Supabase)
+- **Auth:** Supabase Auth
+
+---
+
+## ✅ Всичко е готово!
+
+Приложението е свързано с Supabase и готово за използване.

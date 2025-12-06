@@ -15,8 +15,15 @@ if (typeof window !== 'undefined') {
       return; // Silently ignore these development-only errors
     }
     // Filter out 403 errors from Lovable iframe registration (development tools)
-    if (message.includes('Failed to load resource') && (message.includes('register-iframe') || message.includes('403'))) {
+    if (message.includes('Failed to load resource') && message.includes('register-iframe')) {
       return; // Silently ignore these development-only errors
+    }
+    // Filter out 403 errors from Supabase RLS (expected when not authenticated)
+    if (message.includes('Failed to load resource') && (message.includes('403') || message.includes('Forbidden'))) {
+      const url = args.find(arg => typeof arg === 'string' && (arg.includes('supabase.co') || arg.includes('supabase.io')));
+      if (url) {
+        return; // Silently ignore Supabase 403 errors - they're handled by the app
+      }
     }
     // Filter out temporary network errors from Supabase Auth (will retry automatically)
     if (message.includes('Failed to fetch') && message.includes('auth.supabase.io')) {

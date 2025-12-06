@@ -1,6 +1,7 @@
 // Supabase-based API client - replaces Express API calls
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
+import { handleSupabaseError } from './errorHandler';
 
 type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
 type TablesInsert<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert'];
@@ -194,7 +195,9 @@ class SupabaseApiClient {
       .select('*')
       .order('name', { ascending: true });
 
-    if (error) throw error;
+    if (error) {
+      throw handleSupabaseError(error);
+    }
     return data || [];
   }
 
