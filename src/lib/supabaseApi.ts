@@ -885,28 +885,37 @@ class SupabaseApiClient {
   }
 
   // Training
-  async getTrainingProgress() {
+  async getTrainingProgress(realtorId?: string) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
       throw new Error('Not authenticated');
     }
 
-    // Get realtor ID
-    const { data: realtor, error: realtorError } = await supabase
-      .from('realtors')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
+    // Get realtor ID - either from parameter (for team leaders/managers) or from current user
+    let targetRealtorId: string;
+    
+    if (realtorId) {
+      // Team leader or office manager viewing another realtor's progress
+      targetRealtorId = realtorId;
+    } else {
+      // Regular realtor viewing their own progress
+      const { data: realtor, error: realtorError } = await supabase
+        .from('realtors')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
 
-    if (realtorError || !realtor) {
-      throw new Error('Realtor not found');
+      if (realtorError || !realtor) {
+        throw new Error('Realtor not found');
+      }
+      targetRealtorId = realtor.id;
     }
 
     const { data: progress, error } = await supabase
       .from('training_progress')
       .select('*')
-      .eq('realtor_id', realtor.id)
+      .eq('realtor_id', targetRealtorId)
       .order('section', { ascending: true })
       .order('subsection', { ascending: true });
 
@@ -922,6 +931,7 @@ class SupabaseApiClient {
     practical_completed?: boolean;
     handover_completed?: boolean;
     exam_completed?: boolean;
+    realtorId?: string; // Optional: for team leaders/office managers to update other realtors
   }) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -929,15 +939,24 @@ class SupabaseApiClient {
       throw new Error('Not authenticated');
     }
 
-    // Get realtor ID
-    const { data: realtor, error: realtorError } = await supabase
-      .from('realtors')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
+    // Get realtor ID - either from parameter (for team leaders/managers) or from current user
+    let realtorId: string;
+    
+    if (data.realtorId) {
+      // Team leader or office manager updating another realtor's progress
+      realtorId = data.realtorId;
+    } else {
+      // Regular realtor updating their own progress
+      const { data: realtor, error: realtorError } = await supabase
+        .from('realtors')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
 
-    if (realtorError || !realtor) {
-      throw new Error('Realtor not found');
+      if (realtorError || !realtor) {
+        throw new Error('Realtor not found');
+      }
+      realtorId = realtor.id;
     }
 
     // Get current progress first
@@ -951,7 +970,7 @@ class SupabaseApiClient {
 
     // Merge with existing progress
     const progressData = {
-      realtor_id: realtor.id,
+      realtor_id: realtorId,
       section: data.section,
       subsection: data.subsection,
       lecture_completed: data.lecture_completed ?? existingProgress?.lecture_completed ?? false,

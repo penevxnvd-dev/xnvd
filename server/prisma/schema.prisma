@@ -11,6 +11,8 @@ datasource db {
 enum AppRole {
   admin
   realtor
+  team_leader
+  office_manager
 }
 
 model Profile {

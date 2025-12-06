@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-export type UserRole = 'admin' | 'realtor' | null;
+export type UserRole = 'admin' | 'realtor' | 'team_leader' | 'office_manager' | null;
 
 export const useUserRole = () => {
   const [role, setRole] = useState<UserRole>(null);
@@ -35,11 +35,21 @@ export const useUserRole = () => {
         }
 
         if (roles && roles.length > 0) {
-          // Priority: admin > realtor
-          const hasAdmin = roles.some(r => r.role === 'admin');
-          const determinedRole = hasAdmin ? 'admin' : 'realtor';
-          console.log(`[useUserRole] Found role in user_roles: ${determinedRole}`);
-          setRole(determinedRole);
+          // Priority: admin > office_manager > team_leader > realtor
+          const rolePriority = ['admin', 'office_manager', 'team_leader', 'realtor'];
+          let determinedRole: UserRole = null;
+          
+          for (const priorityRole of rolePriority) {
+            if (roles.some(r => r.role === priorityRole)) {
+              determinedRole = priorityRole as UserRole;
+              break;
+            }
+          }
+          
+          if (determinedRole) {
+            console.log(`[useUserRole] Found role in user_roles: ${determinedRole}`);
+            setRole(determinedRole);
+          }
         } else {
           // If no role in user_roles, check if user is a realtor
           console.log('[useUserRole] No role in user_roles, checking realtors table...');

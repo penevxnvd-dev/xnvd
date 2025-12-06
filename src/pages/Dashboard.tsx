@@ -1,6 +1,8 @@
 import { useUserRole } from '@/hooks/useUserRole';
 import AdminDashboard from './admin/AdminDashboard';
 import RealtorDashboard from './realtor/RealtorDashboard';
+import TeamLeaderDashboard from './team-leader/TeamLeaderDashboard';
+import OfficeManagerDashboard from './office-manager/OfficeManagerDashboard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -70,6 +72,14 @@ const Dashboard = () => {
 
   if (role === 'realtor') {
     return <RealtorDashboard userId={userId!} />;
+  }
+
+  if (role === 'team_leader') {
+    return <TeamLeaderDashboard userId={userId!} />;
+  }
+
+  if (role === 'office_manager') {
+    return <OfficeManagerDashboard userId={userId!} />;
   }
 
   return null;
