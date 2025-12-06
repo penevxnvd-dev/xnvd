@@ -23,6 +23,56 @@
 
   <body>
     <div id="root"></div>
+    <!-- Early console filter to catch SES errors from browser extensions -->
+    <script>
+      (function() {
+        if (typeof window === 'undefined') return;
+        
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        // Filter SES errors - must be set up before any modules load
+        console.error = function(...args) {
+          const message = String(args[0] || '');
+          const allArgsStr = args.map(arg => {
+            if (arg instanceof Error) {
+              return arg.message + ' ' + (arg.stack || '');
+            }
+            return String(arg);
+          }).join(' ');
+          
+          if (message.includes('SES_UNCAUGHT_EXCEPTION') ||
+              message.includes('SES Removing') ||
+              message.startsWith('SES ') ||
+              allArgsStr.includes('SES_UNCAUGHT_EXCEPTION') ||
+              allArgsStr.includes('lockdown-install.js') ||
+              allArgsStr.includes('Removing unpermitted intrinsics') ||
+              allArgsStr.includes('Removing intrinsics.%') ||
+              allArgsStr.includes('toTemporalInstant') ||
+              allArgsStr.includes('getOrInsert')) {
+            return; // Silently ignore SES errors
+          }
+          originalError.apply(console, args);
+        };
+        
+        console.warn = function(...args) {
+          const message = String(args[0] || '');
+          const allArgsStr = args.map(arg => String(arg)).join(' ');
+          
+          if (message.includes('Removing unpermitted intrinsics') ||
+              message.includes('Removing intrinsics') ||
+              message.includes('SES Removing') ||
+              message.startsWith('SES ') ||
+              allArgsStr.includes('lockdown-install.js') ||
+              allArgsStr.includes('Removing intrinsics') ||
+              allArgsStr.includes('toTemporalInstant') ||
+              allArgsStr.includes('getOrInsert')) {
+            return; // Silently ignore SES warnings
+          }
+          originalWarn.apply(console, args);
+        };
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
