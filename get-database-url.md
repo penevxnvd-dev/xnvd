@@ -2,7 +2,7 @@
 
 ## Стъпка 1: Отворете Database Settings
 
-1. Отидете на: https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/settings/database
+1. Отидете на: https://supabase.com/dashboard/project/qxompdwqdnemsntssjot/settings/database
 2. Влезте в акаунта си в Supabase
 
 ## Стъпка 2: Намерете Connection String
@@ -23,7 +23,7 @@ DATABASE_URL=postgresql://postgres.[project-ref]:[password]@aws-0-[region].poole
 **Или** използвайте директния connection string (без pooling):
 
 ```env
-DATABASE_URL=postgresql://postgres:[password]@db.rbpqagivdpacdvwlwgep.supabase.co:5432/postgres
+DATABASE_URL=postgresql://postgres:[password]@db.qxompdwqdnemsntssjot.supabase.co:5432/postgres
 ```
 
 ## Стъпка 4: Изпълнете миграцията
