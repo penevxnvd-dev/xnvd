@@ -39,6 +39,25 @@ if (typeof window !== 'undefined') {
       // Don't show these errors - they're handled with retry logic
       return;
     }
+    // Filter out SES (Secure EcmaScript) lockdown errors
+    // These are caused by browser extensions (like MetaMask) injecting SES code
+    // They don't affect the app's functionality and are safe to ignore
+    if (message.includes('SES_UNCAUGHT_EXCEPTION') ||
+        message.includes('lockdown-install.js') ||
+        (message.includes('Removing unpermitted intrinsics') && message.includes('lockdown-install.js')) ||
+        (message.includes('toTemporalInstant') && message.includes('lockdown-install.js')) ||
+        (message.includes('getOrInsert') && message.includes('lockdown-install.js'))) {
+      return; // Silently ignore SES security-related errors from browser extensions
+    }
+    // Also check if any argument contains SES-related content
+    const hasSESContent = args.some(arg => {
+      const argStr = String(arg);
+      return argStr.includes('SES_UNCAUGHT_EXCEPTION') ||
+             (argStr.includes('lockdown-install.js') && (argStr.includes('Removing') || argStr.includes('intrinsics')));
+    });
+    if (hasSESContent) {
+      return; // Silently ignore SES errors
+    }
     originalError.apply(console, args);
   };
   
