@@ -12,6 +12,22 @@ You need to add these in Vercel Dashboard:
 
 ## How to Set Them Up
 
+### Option A: Quick Setup (if you have .env file)
+
+If you have a `.env` file with the variables, you can use the automated script:
+
+```bash
+# Make sure you're logged in to Vercel
+vercel login
+
+# Run the script
+./add-env-to-vercel.sh
+```
+
+This will automatically read your `.env` file and add the variables to Vercel.
+
+### Option B: Manual Setup
+
 ### Step 1: Get Your Supabase Credentials
 
 1. Go to your Supabase project: https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep
