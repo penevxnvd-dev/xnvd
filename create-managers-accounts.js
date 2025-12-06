@@ -19,8 +19,12 @@ envContent.split('\n').forEach(line => {
 // Map environment variables - support multiple naming conventions
 const SUPABASE_URL = envVars.VITE_SUPABASE_URL || envVars.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = envVars.SUPABASE_SERVICE_ROLE_KEY || 
-                             envVars.VITE_SUPABASE_SERVICE_ROLE_KEY ||
-                             envVars.VITE_SUPABASE_PUBLISHABLE_KEY; // Fallback to anon key
+                             envVars.VITE_SUPABASE_SERVICE_ROLE_KEY;
+
+// Check if using anon key (which won't work for admin operations)
+const isAnonKey = envVars.VITE_SUPABASE_PUBLISHABLE_KEY && 
+                  !SUPABASE_SERVICE_KEY &&
+                  envVars.VITE_SUPABASE_PUBLISHABLE_KEY.length > 100;
 
 if (!SUPABASE_URL) {
   console.error('❌ Липсва VITE_SUPABASE_URL в .env файла');
@@ -28,9 +32,27 @@ if (!SUPABASE_URL) {
 }
 
 if (!SUPABASE_SERVICE_KEY) {
-  console.error('❌ Липсва SUPABASE_SERVICE_ROLE_KEY в .env файла');
-  console.error('Моля добавете го от: https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/settings/api');
+  console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.error('❌ Липсва SUPABASE_SERVICE_ROLE_KEY');
+  console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+  console.error('За да създадете акаунти, трябва Service Role Key.\n');
+  console.error('📋 Стъпки:');
+  console.error('   1. Отворете: https://supabase.com/dashboard/project/qxompdwqdnemsntssjot/settings/api');
+  console.error('   2. Скролнете до "Project API keys"');
+  console.error('   3. Копирайте "service_role" key (секретен ключ)');
+  console.error('   4. Добавете в .env файла:');
+  console.error('      SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here\n');
+  console.error('⚠️  Важно: Service Role Key е много чувствителен!');
+  console.error('   - Не го споделяйте публично');
+  console.error('   - Не го commit-вайте в Git');
+  console.error('   - Използвайте го само за административни скриптове\n');
+  console.error('📖 Вижте SETUP_SERVICE_ROLE_KEY.md за повече информация\n');
   process.exit(1);
+}
+
+if (isAnonKey) {
+  console.error('\n⚠️  Предупреждение: Използвате anon key вместо service role key!');
+  console.error('   Admin операциите няма да работят. Моля използвайте SUPABASE_SERVICE_ROLE_KEY.\n');
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
