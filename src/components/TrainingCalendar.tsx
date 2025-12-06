@@ -350,7 +350,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
       ...group,
       id: `group-${Date.now()}`,
       startDate: format(addDays(parse(group.startDate, 'yyyy-MM-dd', new Date()), 7), 'yyyy-MM-dd'),
-      status: 'предстояща' as any,
+      status: 'предстояща' as 'активна' | 'завършена' | 'предстояща',
       currentDay: 0,
       trainees: group.trainees.map(t => ({
         ...t,

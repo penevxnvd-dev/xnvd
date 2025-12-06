@@ -129,12 +129,12 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
         name: office.name,
         city_id: office.city_id,
         address: office.address,
-        teams: (office.teams || []).map((t: any) => ({
+        teams: (office.teams || []).map((t: { id: string; name: string; office_id: string; leader_id?: string | null; realtors?: Array<{ id: string; deals?: unknown[]; diagnoses?: unknown[] }> }) => ({
           id: t.id,
           name: t.name,
           office_id: t.office_id,
           leader_id: t.leader_id,
-          realtors: (t.realtors || []).map((r: any) => ({
+          realtors: (t.realtors || []).map((r: { id: string; deals?: unknown[]; diagnoses?: unknown[] }) => ({
             id: r.id,
             deals: r.deals || [],
             diagnoses: r.diagnoses || [],
@@ -148,21 +148,22 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
       const allRealtorData = transformedOffice.teams.flatMap(team =>
         team.realtors.map(r => ({
           id: r.id,
-          deals: r.deals.map((d: any) => ({
-            value: parseFloat(d.deal_value || d.dealValue || '0'),
-            date: d.deal_date || d.dealDate,
+          deals: r.deals.map((d: Record<string, unknown>) => ({
+            value: parseFloat(String(d.deal_value || d.dealValue || '0')),
+            date: String(d.deal_date || d.dealDate),
           })),
-          diagnoses: r.diagnoses.map((d: any) => ({
-            date: d.diagnosis_date || d.diagnosisDate,
+          diagnoses: r.diagnoses.map((d: Record<string, unknown>) => ({
+            date: String(d.diagnosis_date || d.diagnosisDate),
           })),
         }))
       );
 
       const kpi = calculateOfficeKPI(allRealtorData);
       setKpiMetrics(kpi);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       console.error('Error fetching office data:', error);
-      toast.error(error.message || 'Грешка при зареждане на данни');
+      toast.error(message || 'Грешка при зареждане на данни');
     } finally {
       setLoading(false);
     }
@@ -304,12 +305,12 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
                 {officeData.teams.map((team) => {
                   const teamRealtorData = team.realtors.map(r => ({
                     id: r.id,
-                    deals: r.deals.map((d: any) => ({
-                      value: parseFloat(d.deal_value || d.dealValue || '0'),
-                      date: d.deal_date || d.dealDate,
+                    deals: r.deals.map((d: Record<string, unknown>) => ({
+                      value: parseFloat(String(d.deal_value || d.dealValue || '0')),
+                      date: String(d.deal_date || d.dealDate),
                     })),
-                    diagnoses: r.diagnoses.map((d: any) => ({
-                      date: d.diagnosis_date || d.diagnosisDate,
+                    diagnoses: r.diagnoses.map((d: Record<string, unknown>) => ({
+                      date: String(d.diagnosis_date || d.diagnosisDate),
                     })),
                   }));
 

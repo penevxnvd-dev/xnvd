@@ -12,7 +12,7 @@ interface Notification {
 }
 
 class NotificationService {
-  private channel: any = null;
+  private channel: { unsubscribe: () => void } | null = null;
   private listeners: Array<(notification: Notification) => void> = [];
 
   async requestPermission() {

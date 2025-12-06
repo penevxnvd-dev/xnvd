@@ -69,8 +69,8 @@ export const TeamSidebar = ({ realtorId, userId, isOpen, onToggle }: TeamSidebar
 
             // Get team members (excluding leader)
             const members = (team.realtors || [])
-              .filter((r: any) => r.user_id !== team.leader?.id)
-              .map((r: any) => ({
+              .filter((r: { user_id?: string }) => r.user_id !== team.leader?.id)
+              .map((r: { id: string; profile?: { full_name?: string; email?: string }; level?: number }) => ({
                 id: r.id,
                 name: r.profile?.full_name || 'Неизвестен',
                 email: r.profile?.email || '',

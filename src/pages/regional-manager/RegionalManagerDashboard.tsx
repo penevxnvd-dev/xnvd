@@ -182,12 +182,12 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
       office.teams.flatMap(team =>
         team.realtors.map(r => ({
           id: r.id,
-          deals: r.deals.map((d: any) => ({
-            value: parseFloat(d.deal_value || d.dealValue || '0'),
-            date: d.deal_date || d.dealDate,
+          deals: r.deals.map((d: Record<string, unknown>) => ({
+            value: parseFloat(String(d.deal_value || d.dealValue || '0')),
+            date: String(d.deal_date || d.dealDate),
           })),
-          diagnoses: r.diagnoses.map((d: any) => ({
-            date: d.diagnosis_date || d.diagnosisDate,
+          diagnoses: r.diagnoses.map((d: Record<string, unknown>) => ({
+            date: String(d.diagnosis_date || d.diagnosisDate),
           })),
         }))
       )
@@ -299,12 +299,12 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
                     office.teams.flatMap(team =>
                       team.realtors.map(r => ({
                         id: r.id,
-                        deals: r.deals.map((d: any) => ({
-                          value: parseFloat(d.deal_value || d.dealValue || '0'),
-                          date: d.deal_date || d.dealDate,
+                        deals: r.deals.map((d: Record<string, unknown>) => ({
+                          value: parseFloat(String(d.deal_value || d.dealValue || '0')),
+                          date: String(d.deal_date || d.dealDate),
                         })),
-                        diagnoses: r.diagnoses.map((d: any) => ({
-                          date: d.diagnosis_date || d.diagnosisDate,
+                        diagnoses: r.diagnoses.map((d: Record<string, unknown>) => ({
+                          date: String(d.diagnosis_date || d.diagnosisDate),
                         })),
                       }))
                     )

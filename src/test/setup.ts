@@ -27,5 +27,6 @@ global.ResizeObserver = class ResizeObserver {
   observe() {}
   unobserve() {}
   disconnect() {}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as any;
 

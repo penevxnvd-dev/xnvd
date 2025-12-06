@@ -156,7 +156,7 @@ const TrainingProgressPage = () => {
           toast.success('Прогресът е обновен');
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error('Грешка при запазване на прогреса');
       console.error(error);
     }

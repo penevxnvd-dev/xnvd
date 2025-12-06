@@ -156,12 +156,12 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
             } : null;
 
             const members = (team.realtors || [])
-              .filter((r: any) => {
+              .filter((r: { user_id?: string; profile?: { id?: string } }) => {
                 const realtorUserId = r.user_id || r.profile?.id;
                 const leaderId = team.leader?.id;
                 return realtorUserId !== leaderId;
               })
-              .map((r: any) => ({
+              .map((r: { id: string; level?: number; user_id?: string; profile?: { id?: string; full_name?: string } }) => ({
                 id: r.id,
                 name: formatNameWithEmoji(r.profile?.full_name || 'Неизвестен'),
                 level: r.level ? 
@@ -215,7 +215,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
           supabaseApi.getMyDiagnoses()
         ]);
 
-        setDeals(dealsData.map((deal: any) => ({
+        setDeals(dealsData.map((deal: Record<string, unknown>) => ({
           id: deal.id,
           clientName: deal.clientName || deal.client_name,
           dealValue: Number(deal.dealValue || deal.deal_value || 0),
@@ -224,7 +224,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
           isExclusive: deal.isExclusive || deal.is_exclusive || false,
         })));
 
-        setDiagnoses(diagnosesData.map((diagnosis: any) => ({
+        setDiagnoses(diagnosesData.map((diagnosis: Record<string, unknown>) => ({
           id: diagnosis.id,
           clientName: diagnosis.clientName || diagnosis.client_name,
           status: diagnosis.status || 'active',
@@ -250,7 +250,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
           ...section,
           subsections: section.subsections.map((subsection) => {
             const progressItem = progressData.find(
-              (p: any) => p.section === section.id && p.subsection === subsection.id
+              (p: { section: string; subsection: string }) => p.section === section.id && p.subsection === subsection.id
             );
             return {
               ...subsection,
@@ -321,7 +321,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
       });
 
       toast.success('Прогресът е обновен');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
       toast.error('Грешка при обновяване на прогреса');
     }
@@ -628,7 +628,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
                       <div
                         key={member.id}
                         className="group p-4 rounded-xl bg-muted/50 hover:bg-muted border border-border hover:border-primary/50 transition-all duration-300 hover:shadow-md cursor-pointer"
-                        onClick={() => handleOpenChat((member as any).userId || member.id, member.name)}
+                        onClick={() => handleOpenChat((member as { userId?: string; id: string }).userId || member.id, member.name)}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3 flex-1 min-w-0">

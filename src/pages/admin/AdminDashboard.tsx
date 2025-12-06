@@ -175,8 +175,8 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [selectedRealtor, setSelectedRealtor] = useState<Realtor | null>(null);
   const [selectedRealtorKPI, setSelectedRealtorKPI] = useState<KPIMetrics | null>(null);
-  const [selectedRealtorDeals, setSelectedRealtorDeals] = useState<any[]>([]);
-  const [selectedRealtorDiagnoses, setSelectedRealtorDiagnoses] = useState<any[]>([]);
+  const [selectedRealtorDeals, setSelectedRealtorDeals] = useState<Array<Record<string, unknown>>>([]);
+  const [selectedRealtorDiagnoses, setSelectedRealtorDiagnoses] = useState<Array<Record<string, unknown>>>([]);
   const [selectedRealtorTrainingData, setSelectedRealtorTrainingData] = useState<TrainingSection[]>(trainingStructure);
   const [selectedRealtorTrainingProgress, setSelectedRealtorTrainingProgress] = useState(0);
   const [topologyOffices, setTopologyOffices] = useState<UIOffice[]>([]);
@@ -191,7 +191,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [addPersonDialogOpen, setAddPersonDialogOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; [key: string]: unknown } | null>(null);
   const [parentOptions, setParentOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
 

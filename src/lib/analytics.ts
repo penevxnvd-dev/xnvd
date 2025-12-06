@@ -3,6 +3,7 @@
 
 interface AnalyticsEvent {
   name: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   properties?: Record<string, any>;
 }
 
@@ -64,12 +65,16 @@ class Analytics {
     if (!this.initialized) this.init();
 
     // Track in Google Analytics
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (typeof window !== 'undefined' && (window as any).gtag) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).gtag('event', event.name, event.properties);
     }
 
     // Track in Plausible
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (typeof window !== 'undefined' && (window as any).plausible) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).plausible(event.name, { props: event.properties });
     }
 
@@ -79,9 +84,12 @@ class Analytics {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   trackError(error: Error, context?: Record<string, any>) {
     // Send to Sentry if available
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     // if (typeof window !== 'undefined' && (window as any).Sentry) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     //   (window as any).Sentry.captureException(error, { contexts: { custom: context } });
     // }
 

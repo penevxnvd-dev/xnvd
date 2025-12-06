@@ -7,6 +7,7 @@ export function getNameEmoji(name: string): string {
   if (!name) return '';
   
   // Remove any existing emoji and "11:11" from the name before checking
+  // eslint-disable-next-line no-misleading-character-class
   const nameWithoutEmoji = name.replace(/^[🕊️🐙]\s*/u, '').replace(/\s*11:11\s*/g, '').trim();
   
   // Normalize the name for comparison (remove extra spaces, convert to lowercase)
@@ -39,6 +40,7 @@ export function formatNameWithEmoji(name: string): string {
   if (!name) return '';
   
   // Remove any existing emoji from the name before processing
+  // eslint-disable-next-line no-misleading-character-class
   const nameWithoutEmoji = name.replace(/^[🕊️🐙]\s*/u, '').trim();
   const normalizedName = nameWithoutEmoji.toLowerCase().replace(/\s+/g, ' ').trim();
   
@@ -52,6 +54,7 @@ export function formatNameWithEmoji(name: string): string {
   }
   
   // For other names, check if they already have an emoji
+  // eslint-disable-next-line no-misleading-character-class
   if (/^[🕊️🐙]\s/u.test(name.trim())) {
     return name;
   }
@@ -76,7 +79,9 @@ export function formatNameWithoutElevenEleven(name: string): { displayName: stri
   const isKrasiKutev = normalizedName.includes('краси') && normalizedName.includes('кътев');
   
   // Format name with emoji but without "11:11"
+  // eslint-disable-next-line no-misleading-character-class
   const nameWithoutEmoji = nameWithoutElevenEleven.replace(/^[🕊️🐙]\s*/u, '').trim();
+  // eslint-disable-next-line no-misleading-character-class
   const emoji = nameWithoutElevenEleven.match(/^[🕊️🐙]/u)?.[0] || '';
   const displayName = emoji ? `${emoji} ${nameWithoutEmoji}` : nameWithoutEmoji;
   

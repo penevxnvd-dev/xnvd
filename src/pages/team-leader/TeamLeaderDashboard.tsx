@@ -160,7 +160,7 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
   const handleLogout = async () => {
     await api.logout();

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 
 const Form = FormProvider;
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 type FormFieldContextValue<
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
@@ -15,7 +16,8 @@ type FormFieldContextValue<
   name: TName;
 };
 
-const FormFieldContext = React.createContext<FormFieldContextValue>({} as FormFieldContextValue);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-empty-object-type
+const FormFieldContext = React.createContext<FormFieldContextValue>({} as any);
 
 const FormField = <
   TFieldValues extends FieldValues = FieldValues,

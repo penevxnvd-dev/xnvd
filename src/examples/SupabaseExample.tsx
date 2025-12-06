@@ -54,9 +54,10 @@ function TodoPage() {
         } else {
           setTodos([]);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
         console.error('Error fetching todos:', err);
-        setError(err.message || 'Грешка при зареждане на данни');
+        setError(message || 'Грешка при зареждане на данни');
         toast.error('Грешка при зареждане на todos');
       } finally {
         setLoading(false);
@@ -153,7 +154,7 @@ function TodoPageWithApi() {
         if (error) throw error;
         
         setTodos(data || []);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error:', err);
         toast.error('Грешка при зареждане на todos');
       } finally {
