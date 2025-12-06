@@ -2,9 +2,33 @@
 
 ## Инструкции
 
-### 1. Добавете Service Role Key в .env
+### Вариант 1: Чрез SQL скрипт (Препоръчително)
 
-Първо, трябва да добавите `SUPABASE_SERVICE_ROLE_KEY` в `.env` файла:
+#### Стъпка 1: Приложете миграцията
+
+1. Отворете SQL Editor: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/sql/new
+2. Копирайте съдържанието от `supabase/migrations/20251206000001_add_regional_manager.sql`
+3. Поставете го в SQL Editor и изпълнете
+
+#### Стъпка 2: Създайте потребителите в Authentication
+
+1. Отворете: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/auth/users
+2. Създайте следните потребители (Add User):
+   - **krasi.katev@xnvd.com** / Парола: `Krasi123!`
+   - **lazar.bundev@xnvd.com** / Парола: `Lazar123!`
+   - **georgi.penev@xnvd.com** / Парола: `Georgi123!`
+   - **kamen.georgiev@xnvd.com** / Парола: `Kamen123!`
+3. За всеки потребител, маркирайте **"Auto Confirm User"** или потвърдете email ръчно
+
+#### Стъпка 3: Изпълнете SQL скрипта
+
+1. Отворете SQL Editor: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/sql/new
+2. Копирайте съдържанието от `create-managers-accounts.sql`
+3. Поставете го в SQL Editor и изпълнете
+
+### Вариант 2: Чрез Node.js скрипт (Изисква Service Role Key)
+
+#### Стъпка 1: Добавете Service Role Key в .env
 
 1. Отворете: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/settings/api
 2. Намерете **`service_role`** key в секцията "Project API keys"
@@ -14,15 +38,13 @@
    SUPABASE_SERVICE_ROLE_KEY="вашият-service-role-key-тук"
    ```
 
-### 2. Приложете миграцията в Supabase
-
-Преди да изпълните скрипта, трябва да приложите миграцията за `regional_manager` ролята:
+#### Стъпка 2: Приложете миграцията
 
 1. Отворете SQL Editor: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/sql/new
 2. Копирайте съдържанието от `supabase/migrations/20251206000001_add_regional_manager.sql`
 3. Поставете го в SQL Editor и изпълнете
 
-### 3. Изпълнете скрипта
+#### Стъпка 3: Изпълнете скрипта
 
 ```bash
 node create-managers-accounts.js
