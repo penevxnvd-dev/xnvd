@@ -42,21 +42,23 @@ if (typeof window !== 'undefined') {
     // Filter out SES (Secure EcmaScript) lockdown errors
     // These are caused by browser extensions (like MetaMask) injecting SES code
     // They don't affect the app's functionality and are safe to ignore
+    const allArgsStr = args.map(arg => {
+      if (arg instanceof Error) {
+        return `${arg.message} ${arg.stack || ''}`;
+      }
+      return String(arg);
+    }).join(' ');
+    
     if (message.includes('SES_UNCAUGHT_EXCEPTION') ||
-        message.includes('lockdown-install.js') ||
-        (message.includes('Removing unpermitted intrinsics') && message.includes('lockdown-install.js')) ||
-        (message.includes('toTemporalInstant') && message.includes('lockdown-install.js')) ||
-        (message.includes('getOrInsert') && message.includes('lockdown-install.js'))) {
+        message.includes('SES Removing') ||
+        message.startsWith('SES ') ||
+        allArgsStr.includes('SES_UNCAUGHT_EXCEPTION') ||
+        allArgsStr.includes('lockdown-install.js') ||
+        allArgsStr.includes('Removing unpermitted intrinsics') ||
+        allArgsStr.includes('Removing intrinsics.%') ||
+        allArgsStr.includes('toTemporalInstant') ||
+        allArgsStr.includes('getOrInsert')) {
       return; // Silently ignore SES security-related errors from browser extensions
-    }
-    // Also check if any argument contains SES-related content
-    const hasSESContent = args.some(arg => {
-      const argStr = String(arg);
-      return argStr.includes('SES_UNCAUGHT_EXCEPTION') ||
-             (argStr.includes('lockdown-install.js') && (argStr.includes('Removing') || argStr.includes('intrinsics')));
-    });
-    if (hasSESContent) {
-      return; // Silently ignore SES errors
     }
     originalError.apply(console, args);
   };
@@ -70,11 +72,16 @@ if (typeof window !== 'undefined') {
     }
     // Filter out SES (Secure EcmaScript) lockdown warnings about removing intrinsics
     // These are normal security-related messages and don't affect functionality
+    const allWarnArgsStr = args.map(arg => String(arg)).join(' ');
+    
     if (message.includes('Removing unpermitted intrinsics') || 
         message.includes('Removing intrinsics') ||
-        message.includes('lockdown-install.js') ||
-        message.includes('toTemporalInstant') ||
-        message.includes('getOrInsert')) {
+        message.includes('SES Removing') ||
+        message.startsWith('SES ') ||
+        allWarnArgsStr.includes('lockdown-install.js') ||
+        allWarnArgsStr.includes('Removing intrinsics') ||
+        allWarnArgsStr.includes('toTemporalInstant') ||
+        allWarnArgsStr.includes('getOrInsert')) {
       return; // Silently ignore these SES security warnings
     }
     // Filter out BrowserAutomation warnings (Cursor/VS Code browser automation)
