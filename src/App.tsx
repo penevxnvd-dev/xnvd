@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import '@/i18n/config';
 import Dashboard from "./pages/Dashboard";
@@ -14,6 +15,9 @@ import TrainingPage from "./pages/realtor/TrainingPage";
 import TrainingCalendarPage from "./pages/realtor/TrainingCalendarPage";
 import TrainingProgressPage from "./pages/realtor/TrainingProgressPage";
 import { getEnv } from "@/lib/env";
+import { analytics } from "@/lib/analytics";
+import { SearchDialog } from "@/components/SearchDialog";
+import { useState, useEffect } from "react";
 
 // Validate environment variables on app start
 try {
