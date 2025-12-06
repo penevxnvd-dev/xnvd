@@ -49,13 +49,13 @@ files.forEach(file => {
     // Update project URLs
     content = content.replace(
       /https:\/\/supabase\.com\/dashboard\/project\/[^\/\s"']+/g,
-      `https://supabase.com/dashboard/project/qxompdwqdnemsntssjot
+      `https://supabase.com/dashboard/project/${NEW_PROJECT}`
     );
     
     // Update organization URLs
     content = content.replace(
       /https:\/\/supabase\.com\/dashboard\/org\/[^\/\s"']+/g,
-      `https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep
+      `https://supabase.com/dashboard/org/${NEW_ORG}`
     );
     
     if (content !== originalContent) {
