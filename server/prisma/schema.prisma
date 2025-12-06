@@ -13,6 +13,7 @@ enum AppRole {
   realtor
   team_leader
   office_manager
+  regional_manager
 }
 
 model Profile {
@@ -26,6 +27,8 @@ model Profile {
   userRoles       UserRole[]
   realtor         Realtor?
   teams           Team[]    @relation("TeamLeader")
+  managedOffices  Office[]  @relation("OfficeManager")
+  managedCities   City[]    @relation("RegionalManager")
   sentMessages    Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
 
@@ -72,9 +75,11 @@ model City {
   id        String   @id @default(uuid())
   name      String   @db.Text
   countryId String   @map("country_id")
+  managerId String?  @map("manager_id")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   country  Country  @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  manager  Profile? @relation("RegionalManager", fields: [managerId], references: [id], onDelete: SetNull)
   offices  Office[]
 
   @@unique([name, countryId])
@@ -85,11 +90,13 @@ model Office {
   id        String   @id @default(uuid())
   name      String   @db.Text
   cityId    String   @map("city_id")
+  managerId String?  @map("manager_id")
   address   String?  @db.Text
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  city  City   @relation(fields: [cityId], references: [id], onDelete: Cascade)
-  teams Team[]
+  city    City    @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  manager Profile? @relation("OfficeManager", fields: [managerId], references: [id], onDelete: SetNull)
+  teams   Team[]
 
   @@unique([name, cityId])
   @@map("offices")

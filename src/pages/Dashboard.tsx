@@ -3,6 +3,7 @@ import AdminDashboard from './admin/AdminDashboard';
 import RealtorDashboard from './realtor/RealtorDashboard';
 import TeamLeaderDashboard from './team-leader/TeamLeaderDashboard';
 import OfficeManagerDashboard from './office-manager/OfficeManagerDashboard';
+import RegionalManagerDashboard from './regional-manager/RegionalManagerDashboard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -80,6 +81,10 @@ const Dashboard = () => {
 
   if (role === 'office_manager') {
     return <OfficeManagerDashboard userId={userId!} />;
+  }
+
+  if (role === 'regional_manager') {
+    return <RegionalManagerDashboard userId={userId!} />;
   }
 
   return null;

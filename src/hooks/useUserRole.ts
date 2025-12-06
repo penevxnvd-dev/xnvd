@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-export type UserRole = 'admin' | 'realtor' | 'team_leader' | 'office_manager' | null;
+export type UserRole = 'admin' | 'realtor' | 'team_leader' | 'office_manager' | 'regional_manager' | null;
 
 export const useUserRole = () => {
   const [role, setRole] = useState<UserRole>(null);
@@ -35,8 +35,8 @@ export const useUserRole = () => {
         }
 
         if (roles && roles.length > 0) {
-          // Priority: admin > office_manager > team_leader > realtor
-          const rolePriority = ['admin', 'office_manager', 'team_leader', 'realtor'];
+          // Priority: admin > regional_manager > office_manager > team_leader > realtor
+          const rolePriority = ['admin', 'regional_manager', 'office_manager', 'team_leader', 'realtor'];
           let determinedRole: UserRole = null;
           
           for (const priorityRole of rolePriority) {
