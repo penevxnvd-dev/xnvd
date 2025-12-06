@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { EnvCheck } from "@/components/EnvCheck";
 import '@/i18n/config';
 import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
@@ -14,17 +15,9 @@ import Auth from "./pages/Auth";
 import TrainingPage from "./pages/realtor/TrainingPage";
 import TrainingCalendarPage from "./pages/realtor/TrainingCalendarPage";
 import TrainingProgressPage from "./pages/realtor/TrainingProgressPage";
-import { getEnv } from "@/lib/env";
 import { analytics } from "@/lib/analytics";
 import { SearchDialog } from "@/components/SearchDialog";
 import { useState, useEffect } from "react";
-
-// Validate environment variables on app start
-try {
-  getEnv();
-} catch (error) {
-  console.error('Environment validation failed:', error);
-}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,34 +40,36 @@ const App = () => {
 
   return (
     <ErrorBoundary>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
-            <BrowserRouter
-              future={{
-                v7_startTransition: true,
-                v7_relativeSplatPath: true,
-              }}
-            >
-              <Routes>
-                <Route path="/" element={<Auth />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/analytics" element={<Analytics />} />
-                <Route path="/interviews" element={<Interviews />} />
-                <Route path="/training" element={<TrainingPage />} />
-                <Route path="/training-calendar" element={<TrainingCalendarPage />} />
-                <Route path="/training-progress" element={<TrainingProgressPage />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </QueryClientProvider>
-      </ThemeProvider>
+      <EnvCheck>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+              <BrowserRouter
+                future={{
+                  v7_startTransition: true,
+                  v7_relativeSplatPath: true,
+                }}
+              >
+                <Routes>
+                  <Route path="/" element={<Auth />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/analytics" element={<Analytics />} />
+                  <Route path="/interviews" element={<Interviews />} />
+                  <Route path="/training" element={<TrainingPage />} />
+                  <Route path="/training-calendar" element={<TrainingCalendarPage />} />
+                  <Route path="/training-progress" element={<TrainingProgressPage />} />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </TooltipProvider>
+          </QueryClientProvider>
+        </ThemeProvider>
+      </EnvCheck>
     </ErrorBoundary>
   );
 };

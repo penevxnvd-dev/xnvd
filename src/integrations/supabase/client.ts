@@ -3,7 +3,18 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { getEnv } from '@/lib/env';
 
-const { VITE_SUPABASE_URL: SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY: SUPABASE_PUBLISHABLE_KEY } = getEnv();
+// Get environment variables, but handle errors gracefully
+let SUPABASE_URL: string | undefined;
+let SUPABASE_PUBLISHABLE_KEY: string | undefined;
+
+try {
+  const env = getEnv();
+  SUPABASE_URL = env.VITE_SUPABASE_URL;
+  SUPABASE_PUBLISHABLE_KEY = env.VITE_SUPABASE_PUBLISHABLE_KEY;
+} catch (error) {
+  // Environment variables are missing - EnvCheck component will handle this
+  console.error('Failed to load Supabase environment variables:', error);
+}
 
 // Verify we're using REMOTE Supabase (not local)
 if (SUPABASE_URL && SUPABASE_URL.includes('localhost')) {
