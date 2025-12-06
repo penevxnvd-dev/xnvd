@@ -28,6 +28,15 @@ if (typeof window !== 'undefined') {
     if (message.includes('preloaded with link preload was not used') && message.includes('lovable.dev')) {
       return; // Silently ignore these optimization warnings
     }
+    // Filter out SES (Secure EcmaScript) lockdown warnings about removing intrinsics
+    // These are normal security-related messages and don't affect functionality
+    if (message.includes('Removing unpermitted intrinsics') || 
+        message.includes('Removing intrinsics') ||
+        message.includes('lockdown-install.js') ||
+        message.includes('toTemporalInstant') ||
+        message.includes('getOrInsert')) {
+      return; // Silently ignore these SES security warnings
+    }
     originalWarn.apply(console, args);
   };
 }
