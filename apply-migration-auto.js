@@ -31,7 +31,7 @@ if (!SUPABASE_URL) {
 }
 
 // Extract project reference
-const projectRef = SUPABASE_URL.match(/https?:\/\/([^.]+)\.supabase\.co/)?.[1] || 'ufpeftuanzmkiryohesd';
+const projectRef = SUPABASE_URL.match(/https?:\/\/([^.]+)\.supabase\.co/)?.[1] || 'rbpqagivdpacdvwlwgep';
 
 // Read migration file
 const migrationPath = join(process.cwd(), 'apply-supabase-migrations.sql');

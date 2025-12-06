@@ -4,7 +4,7 @@
 
 ### Стъпка 1: Отворете SQL Editor в Supabase
 
-1. Отидете на: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/sql/new
+1. Отидете на: https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/sql/new
 2. Влезте в акаунта си в Supabase
 
 ### Стъпка 2: Копирайте и изпълнете миграцията

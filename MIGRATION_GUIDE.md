@@ -4,7 +4,7 @@
 
 ### Стъпка 1: Добавете DATABASE_URL в .env
 
-1. Отворете: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/settings/database
+1. Отворете: https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/settings/database
 2. Скролнете до "Connection string"
 3. Изберете "Connection pooling" > "Session mode"
 4. Копирайте connection string-а
@@ -17,7 +17,7 @@ DATABASE_URL=postgresql://postgres.[project-ref]:[password]@aws-0-[region].poole
 **Или** използвайте директния connection string:
 
 ```env
-DATABASE_URL=postgresql://postgres:[password]@db.ufpeftuanzmkiryohesd.supabase.co:5432/postgres
+DATABASE_URL=postgresql://postgres:[password]@db.rbpqagivdpacdvwlwgep.supabase.co:5432/postgres
 ```
 
 ### Стъпка 2: Изпълнете миграцията
@@ -46,14 +46,14 @@ node run-migration.js
 
 След изпълнение, проверете в Supabase Dashboard:
 
-1. **Роли**: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/auth/roles
+1. **Роли**: https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/auth/roles
    - Трябва да видите: `team_leader`, `office_manager`, `regional_manager`
 
-2. **Таблици**: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/editor
+2. **Таблици**: https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/editor
    - `cities` таблицата трябва да има колона `manager_id`
    - `offices` таблицата трябва да има колона `manager_id`
 
-3. **RLS Policies**: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/auth/policies
+3. **RLS Policies**: https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/auth/policies
    - Трябва да има нови policies за новите роли
 
 ## Следващи стъпки
@@ -101,7 +101,7 @@ node run-migration.js
 2. **Supabase CLI** (ако е инсталиран):
    ```bash
    supabase login
-   supabase link --project-ref ufpeftuanzmkiryohesd
+   supabase link --project-ref rbpqagivdpacdvwlwgep
    supabase db push
    ```
 

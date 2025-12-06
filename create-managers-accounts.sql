@@ -1,5 +1,5 @@
 -- SQL Script to create manager accounts
--- Execute this in Supabase SQL Editor: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/sql/new
+-- Execute this in Supabase SQL Editor: https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/sql/new
 -- 
 -- IMPORTANT: First apply the migration: supabase/migrations/20251206000001_add_regional_manager.sql
 -- Then execute this script

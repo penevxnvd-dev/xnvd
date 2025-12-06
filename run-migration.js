@@ -34,9 +34,9 @@ if (!DATABASE_URL) {
   console.error('❌ DATABASE_URL не е намерен в .env');
   console.error('\n💡 Добавете DATABASE_URL в .env файла:');
   console.error('   Формат: postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres');
-  console.error('   Или: postgresql://postgres:[password]@db.ufpeftuanzmkiryohesd.supabase.co:5432/postgres');
+  console.error('   Или: postgresql://postgres:[password]@db.rbpqagivdpacdvwlwgep.supabase.co:5432/postgres');
   console.error('\n   Паролата може да се намери в:');
-  console.error('   https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/settings/database');
+  console.error('   https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/settings/database');
   console.error('   (Connection string > Connection pooling > Session mode)\n');
   process.exit(1);
 }

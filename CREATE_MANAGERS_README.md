@@ -6,13 +6,13 @@
 
 #### Стъпка 1: Приложете миграцията
 
-1. Отворете SQL Editor: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/sql/new
+1. Отворете SQL Editor: https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/sql/new
 2. Копирайте съдържанието от `supabase/migrations/20251206000001_add_regional_manager.sql`
 3. Поставете го в SQL Editor и изпълнете
 
 #### Стъпка 2: Създайте потребителите в Authentication
 
-1. Отворете: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/auth/users
+1. Отворете: https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/auth/users
 2. Създайте следните потребители (Add User):
    - **krasi.katev@xnvd.com** / Парола: `Krasi123!`
    - **lazar.bundev@xnvd.com** / Парола: `Lazar123!`
@@ -22,7 +22,7 @@
 
 #### Стъпка 3: Изпълнете SQL скрипта
 
-1. Отворете SQL Editor: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/sql/new
+1. Отворете SQL Editor: https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/sql/new
 2. Копирайте съдържанието от `create-managers-accounts.sql`
 3. Поставете го в SQL Editor и изпълнете
 
@@ -30,7 +30,7 @@
 
 #### Стъпка 1: Добавете Service Role Key в .env
 
-1. Отворете: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/settings/api
+1. Отворете: https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/settings/api
 2. Намерете **`service_role`** key в секцията "Project API keys"
 3. Копирайте ключа
 4. Добавете го в `.env` файла:
@@ -40,7 +40,7 @@
 
 #### Стъпка 2: Приложете миграцията
 
-1. Отворете SQL Editor: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/sql/new
+1. Отворете SQL Editor: https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/sql/new
 2. Копирайте съдържанието от `supabase/migrations/20251206000001_add_regional_manager.sql`
 3. Поставете го в SQL Editor и изпълнете
 

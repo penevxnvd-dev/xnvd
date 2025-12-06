@@ -31,7 +31,7 @@ async function checkSupabaseCLI() {
 }
 
 async function applyMigration() {
-  const PROJECT_REF = 'ufpeftuanzmkiryohesd';
+  const PROJECT_REF = 'rbpqagivdpacdvwlwgep';
   const migrationFile = join(process.cwd(), 'apply-supabase-migrations.sql');
 
   try {

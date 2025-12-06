@@ -10,7 +10,7 @@ console.log('\n━━━━━━━━━━━━━━━━━━━━━�
 console.log('🚀 Автоматично прилагане на миграция');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-const PROJECT_REF = 'ufpeftuanzmkiryohesd';
+const PROJECT_REF = 'rbpqagivdpacdvwlwgep';
 const migrationFile = join(process.cwd(), 'apply-supabase-migrations.sql');
 
 async function installSupabaseCLI() {

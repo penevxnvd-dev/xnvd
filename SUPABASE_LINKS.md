@@ -3,7 +3,7 @@
 ## API Settings (за service_role key)
 **Това е най-важният линк - тук ще намериш service_role key:**
 
-👉 https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/settings/api
+👉 https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/settings/api
 
 ### Как да вземеш service_role key:
 1. Отвори линка по-горе
@@ -17,16 +17,13 @@
 ## Други полезни линкове:
 
 ### Database Settings
-https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/settings/database
+https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/settings/database
 
 ### Project Overview
-https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd
-
-### SQL Editor
-https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/sql/new
+https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep//supabase.com/dashboard/project/rbpqagivdpacdvwlwgep/sql/new
 
 ### Table Editor
-https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/editor
+https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/editor
 
 ## ⚠️ Важно:
 

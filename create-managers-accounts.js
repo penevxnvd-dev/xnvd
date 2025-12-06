@@ -29,7 +29,7 @@ if (!SUPABASE_URL) {
 
 if (!SUPABASE_SERVICE_KEY) {
   console.error('❌ Липсва SUPABASE_SERVICE_ROLE_KEY в .env файла');
-  console.error('Моля добавете го от: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/settings/api');
+  console.error('Моля добавете го от: https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/settings/api');
   process.exit(1);
 }
 

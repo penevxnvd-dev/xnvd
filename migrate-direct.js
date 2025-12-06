@@ -26,7 +26,7 @@ envContent.split('\n').forEach(line => {
 
 const SUPABASE_URL = envVars.VITE_SUPABASE_URL || envVars.SUPABASE_URL;
 const SUPABASE_ACCESS_TOKEN = envVars.SUPABASE_ACCESS_TOKEN;
-const PROJECT_REF = SUPABASE_URL?.match(/https?:\/\/([^.]+)\.supabase\.co/)?.[1] || 'ufpeftuanzmkiryohesd';
+const PROJECT_REF = SUPABASE_URL?.match(/https?:\/\/([^.]+)\.supabase\.co/)?.[1] || 'rbpqagivdpacdvwlwgep';
 
 if (!SUPABASE_ACCESS_TOKEN) {
   console.error('❌ SUPABASE_ACCESS_TOKEN не е намерен в .env');

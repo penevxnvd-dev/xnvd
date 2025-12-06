@@ -28,7 +28,7 @@ if (!SUPABASE_URL) {
 }
 
 // Extract project reference
-const projectRef = SUPABASE_URL.match(/https?:\/\/([^.]+)\.supabase\.co/)?.[1] || 'ufpeftuanzmkiryohesd';
+const projectRef = SUPABASE_URL.match(/https?:\/\/([^.]+)\.supabase\.co/)?.[1] || 'rbpqagivdpacdvwlwgep';
 
 // Read migration file
 const migrationPath = join(process.cwd(), 'apply-supabase-migrations.sql');
@@ -38,7 +38,7 @@ console.log('\n━━━━━━━━━━━━━━━━━━━━━�
 console.log('🚀 Прилагане на миграция в Supabase');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-const sqlEditorUrl = `https://supabase.com/dashboard/project/${projectRef}/sql/new`;
+const sqlEditorUrl = `https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/sql/new`;
 
 console.log('📋 Инструкции:');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');

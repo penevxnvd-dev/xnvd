@@ -34,7 +34,7 @@ const hasSupabaseCLI = existsSync(SUPABASE_CLI);
 
 const DATABASE_URL = envVars.DATABASE_URL || envVars.SUPABASE_DATABASE_URL;
 const SUPABASE_ACCESS_TOKEN = envVars.SUPABASE_ACCESS_TOKEN;
-const PROJECT_REF = 'ufpeftuanzmkiryohesd';
+const PROJECT_REF = 'rbpqagivdpacdvwlwgep';
 
 // Read migration
 const migrationFile = join(process.cwd(), 'apply-supabase-migrations.sql');
@@ -209,12 +209,12 @@ async function main() {
   
   console.log('💡 Решения:');
   console.log('\n1. Добавете DATABASE_URL в .env:');
-  console.log('   DATABASE_URL=postgresql://postgres:[password]@db.ufpeftuanzmkiryohesd.supabase.co:5432/postgres');
-  console.log('   (Паролата от: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/settings/database)\n');
+  console.log('   DATABASE_URL=postgresql://postgres:[password]@db.rbpqagivdpacdvwlwgep.supabase.co:5432/postgres');
+  console.log('   (Паролата от: https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep/settings/database)\n');
   
   console.log('2. Или използвайте Supabase CLI:');
   console.log('   ~/.local/bin/supabase login');
-  console.log('   ~/.local/bin/supabase link --project-ref ufpeftuanzmkiryohesd\n');
+  console.log('   ~/.local/bin/supabase link --project-ref rbpqagivdpacdvwlwgep\n');
   
   process.exit(1);
 }
