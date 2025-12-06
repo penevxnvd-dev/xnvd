@@ -71,15 +71,16 @@ router.post('/register', async (req, res) => {
       },
       token
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors });
     }
     
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Register error:', error);
     res.status(500).json({ 
       error: 'Internal server error',
-      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: process.env.NODE_ENV === 'development' ? message : undefined
     });
   }
 });
@@ -131,15 +132,16 @@ router.post('/login', async (req, res) => {
       },
       token
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors });
     }
     
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Login error:', error);
     res.status(500).json({ 
       error: 'Internal server error',
-      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: process.env.NODE_ENV === 'development' ? message : undefined
     });
   }
 });
@@ -179,7 +181,7 @@ router.get('/me', async (req, res) => {
         roles: profile.userRoles.map(ur => ur.role)
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(401).json({ error: 'Invalid token' });
   }
 });
@@ -220,14 +222,15 @@ router.put('/profile', async (req, res) => {
         roles: profile.userRoles.map(ur => ur.role)
       }
     });
-  } catch (error: any) {
-    if (error.name === 'JsonWebTokenError') {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === 'JsonWebTokenError') {
       return res.status(401).json({ error: 'Invalid token' });
     }
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Update profile error:', error);
     res.status(500).json({ 
       error: 'Internal server error',
-      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: process.env.NODE_ENV === 'development' ? message : undefined
     });
   }
 });
@@ -281,10 +284,11 @@ router.put('/password', async (req, res) => {
     });
 
     res.json({ success: true });
-  } catch (error: any) {
-    if (error.name === 'JsonWebTokenError') {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === 'JsonWebTokenError') {
       return res.status(401).json({ error: 'Invalid token' });
     }
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Update password error:', error);
     res.status(500).json({ 
       error: 'Internal server error',

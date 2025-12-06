@@ -49,10 +49,11 @@ const Auth = () => {
         });
         navigate("/dashboard");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       toast({
         title: "Грешка",
-        description: error.message || "Възникна грешка",
+        description: message || "Възникна грешка",
         variant: "destructive",
       });
     } finally {

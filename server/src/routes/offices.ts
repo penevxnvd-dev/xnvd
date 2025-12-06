@@ -13,8 +13,9 @@ router.get('/city/:cityId', authenticate, async (req, res) => {
       orderBy: { name: 'asc' }
     });
     res.json(offices);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -78,9 +79,10 @@ router.get('/all/full', authenticate, async (req, res) => {
     }));
 
     res.json(transformed);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in /all/full:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(500).json({ error: message || 'Internal server error' });
   }
 });
 
@@ -149,8 +151,9 @@ router.get('/:id/full', authenticate, async (req, res) => {
     };
 
     res.json(transformed);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -162,8 +165,9 @@ router.post('/', authenticate, requireAdmin, async (req: AuthRequest, res) => {
       data: { name, cityId, address }
     });
     res.json(office);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -177,8 +181,9 @@ router.put('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => 
       data: { name, address }
     });
     res.json(office);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -190,8 +195,9 @@ router.delete('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) 
       where: { id }
     });
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 

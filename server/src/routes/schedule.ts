@@ -63,8 +63,9 @@ router.get('/week', authenticate, requireRealtor, async (req: AuthRequest, res) 
       buyer2_phone: s.buyer2Phone,
       buyer2_notes: s.buyer2Notes
     })));
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -104,8 +105,9 @@ router.get('/date/:date', authenticate, requireRealtor, async (req: AuthRequest,
       buyer2_phone: s.buyer2Phone,
       buyer2_notes: s.buyer2Notes
     })));
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -184,8 +186,9 @@ router.post('/', authenticate, requireRealtor, async (req: AuthRequest, res) => 
       buyer2_phone: result.buyer2Phone,
       buyer2_notes: result.buyer2Notes
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -220,8 +223,9 @@ router.delete('/:id', authenticate, requireRealtor, async (req: AuthRequest, res
     });
 
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 

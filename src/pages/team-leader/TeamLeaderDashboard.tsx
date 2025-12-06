@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -63,7 +63,7 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
   useEffect(() => {
     fetchTeamData();
     fetchUserInfo();
-  }, [userId]);
+  }, [userId, fetchTeamData]);
 
   const fetchUserInfo = async () => {
     try {
@@ -80,7 +80,8 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
     }
   };
 
-  const fetchTeamData = async () => {
+  const fetchTeamData = useCallback(async () => {
+    if (!userId) return;
     setLoading(true);
     try {
       // Find team where user is leader
@@ -122,17 +123,17 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
         name: team.name,
         office_id: team.office_id,
         leader_id: team.leader_id,
-        realtors: (team.realtors || []).map((r: any) => ({
-          id: r.id,
-          userId: r.user_id,
-          teamId: r.team_id,
-          level: r.level,
+        realtors: ((team.realtors as Record<string, unknown>[]) || []).map((r: Record<string, unknown>) => ({
+          id: r.id as string,
+          userId: r.user_id as string,
+          teamId: r.team_id as string,
+          level: r.level as number,
           user: {
-            fullName: r.user?.full_name || '',
-            email: r.user?.email || '',
+            fullName: ((r.user as Record<string, unknown>)?.full_name as string) || '',
+            email: ((r.user as Record<string, unknown>)?.email as string) || '',
           },
-          deals: r.deals || [],
-          diagnoses: r.diagnoses || [],
+          deals: (r.deals as unknown[]) || [],
+          diagnoses: (r.diagnoses as unknown[]) || [],
         })),
       };
 
@@ -141,20 +142,21 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
       // Calculate KPI
       const realtorData: RealtorData[] = transformedTeam.realtors.map(r => ({
         id: r.id,
-        deals: r.deals.map(d => ({
-          value: parseFloat(d.dealValue),
-          date: d.dealDate,
+        deals: r.deals.map((d: Record<string, unknown>) => ({
+          value: parseFloat(String(d.dealValue)),
+          date: d.dealDate as string,
         })),
-        diagnoses: r.diagnoses.map(d => ({
-          date: d.diagnosisDate,
+        diagnoses: r.diagnoses.map((d: Record<string, unknown>) => ({
+          date: d.diagnosisDate as string,
         })),
       }));
 
       const kpi = calculateTeamKPI(realtorData);
       setKpiMetrics(kpi);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       console.error('Error fetching team data:', error);
-      toast.error(error.message || 'Грешка при зареждане на данни');
+      toast.error(message || 'Грешка при зареждане на данни');
     } finally {
       setLoading(false);
     }

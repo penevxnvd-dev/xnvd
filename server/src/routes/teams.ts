@@ -13,8 +13,9 @@ router.get('/office/:officeId', authenticate, async (req, res) => {
       orderBy: { name: 'asc' }
     });
     res.json(teams);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -64,8 +65,9 @@ router.get('/:id/full', authenticate, async (req, res) => {
     };
 
     res.json(transformed);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -77,8 +79,9 @@ router.post('/', authenticate, requireAdmin, async (req: AuthRequest, res) => {
       data: { name, officeId, leaderId }
     });
     res.json(team);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -92,8 +95,9 @@ router.put('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => 
       data: { name, leaderId }
     });
     res.json(team);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -105,8 +109,9 @@ router.delete('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) 
       where: { id }
     });
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 

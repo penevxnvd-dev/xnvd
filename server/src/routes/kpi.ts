@@ -77,8 +77,9 @@ router.get('/realtor/:realtorId', authenticate, requireAdmin, async (req: AuthRe
 
     const kpi = calculateTeamKPI(realtorsData);
     res.json(kpi);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -95,8 +96,9 @@ router.get('/team/:teamId', authenticate, requireAdmin, async (req: AuthRequest,
     const kpi = calculateTeamKPI(realtorsData);
 
     res.json(kpi);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -130,8 +132,9 @@ router.get('/office/:officeId', authenticate, requireAdmin, async (req: AuthRequ
 
     const kpi = calculateOfficeKPI(teamRealtors);
     res.json(kpi);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -166,8 +169,9 @@ router.get('/city/:cityId', authenticate, requireAdmin, async (req: AuthRequest,
 
     const kpi = calculateCityKPI(officeRealtors);
     res.json(kpi);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -209,8 +213,9 @@ router.get('/country/:countryId', authenticate, requireAdmin, async (req: AuthRe
 
     const kpi = calculateCountryKPI(cityRealtors);
     res.json(kpi);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 

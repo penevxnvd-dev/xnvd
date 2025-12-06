@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -56,7 +56,7 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
   useEffect(() => {
     fetchCitiesData();
     fetchUserInfo();
-  }, [userId]);
+  }, [userId, fetchCitiesData]);
 
   const fetchUserInfo = async () => {
     try {
@@ -73,7 +73,8 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
     }
   };
 
-  const fetchCitiesData = async () => {
+  const fetchCitiesData = useCallback(async () => {
+    if (!userId) return;
     setLoading(true);
     try {
       // Find cities where user is regional manager
@@ -109,34 +110,35 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
 
       if (citiesError) throw citiesError;
 
-      const transformedCities: CityData[] = (citiesData || []).map((city: any) => ({
-        id: city.id,
-        name: city.name,
-        country_id: city.country_id,
-        offices: (city.offices || []).map((office: any) => ({
-          id: office.id,
-          name: office.name,
-          city_id: office.city_id,
-          teams: (office.teams || []).map((team: any) => ({
-            id: team.id,
-            name: team.name,
-            realtors: (team.realtors || []).map((r: any) => ({
-              id: r.id,
-              deals: r.deals || [],
-              diagnoses: r.diagnoses || [],
+      const transformedCities: CityData[] = (citiesData || []).map((city: Record<string, unknown>) => ({
+        id: city.id as string,
+        name: city.name as string,
+        country_id: city.country_id as string,
+        offices: ((city.offices as Record<string, unknown>[]) || []).map((office: Record<string, unknown>) => ({
+          id: office.id as string,
+          name: office.name as string,
+          city_id: office.city_id as string,
+          teams: ((office.teams as Record<string, unknown>[]) || []).map((team: Record<string, unknown>) => ({
+            id: team.id as string,
+            name: team.name as string,
+            realtors: ((team.realtors as Record<string, unknown>[]) || []).map((r: Record<string, unknown>) => ({
+              id: r.id as string,
+              deals: (r.deals as unknown[]) || [],
+              diagnoses: (r.diagnoses as unknown[]) || [],
             })),
           })),
         })),
       }));
 
       setCities(transformedCities);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       console.error('Error fetching cities data:', error);
-      toast.error(error.message || 'Грешка при зареждане на данни');
+      toast.error(message || 'Грешка при зареждане на данни');
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
   const handleLogout = async () => {
     await api.logout();

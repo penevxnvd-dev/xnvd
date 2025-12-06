@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
 console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-console.log('🔄 Обновяване на Supabase организация');
+console.log('[UPDATE] Обновяване на Supabase организация');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
 const OLD_ORG = 'qxompdwqdnemsntssjot';
@@ -51,26 +51,26 @@ filesToUpdate.forEach(file => {
     // Update organization URLs
     content = content.replace(
       /https:\/\/supabase\.com\/dashboard\/project\/[^\/]+/g,
-      `https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep
+      'https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep'
     );
     
     if (content !== originalContent) {
       writeFileSync(filePath, content, 'utf-8');
-      console.log(`✅ Обновен: ${file}`);
+      console.log(`[OK] Обновен: ${file}`);
       updatedCount++;
     }
   } catch (error) {
-    console.warn(`⚠️  Грешка при обновяване на ${file}:`, error.message);
+    console.warn(`[WARN] Грешка при обновяване на ${file}:`, error.message);
   }
 });
 
-console.log(`\n✅ Обновени ${updatedCount} файла\n`);
+console.log(`\n[OK] Обновени ${updatedCount} файла\n`);
 
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-console.log('📋 Следващи стъпки:');
+console.log('[INFO] Следващи стъпки:');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 console.log('1. Отворете новата организация:');
-console.log(`   https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep
+console.log('   https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep');
 console.log('2. Изберете или създайте проект в тази организация\n');
 console.log('3. Обновете .env файла с новите credentials:');
 console.log('   - VITE_SUPABASE_URL');

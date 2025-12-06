@@ -39,8 +39,9 @@ router.get('/me', authenticate, requireRealtor, async (req: AuthRequest, res) =>
       notes: d.notes,
       created_at: d.createdAt.toISOString()
     })));
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -76,8 +77,9 @@ router.post('/', authenticate, requireRealtor, async (req: AuthRequest, res) => 
       notes: diagnosis.notes,
       created_at: diagnosis.createdAt.toISOString()
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 

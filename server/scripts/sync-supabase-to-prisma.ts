@@ -75,8 +75,9 @@ async function syncProfiles(): Promise<number> {
         },
       });
       count++;
-    } catch (err: any) {
-      console.error(`  ❌ Грешка при синхронизация на profile ${profile.id}:`, err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`  ❌ Грешка при синхронизация на profile ${profile.id}:`, message);
     }
   }
   console.log(`  ✅ Синхронизирани ${count} profiles`);
@@ -112,8 +113,9 @@ async function syncUserRoles(): Promise<number> {
         },
       });
       count++;
-    } catch (err: any) {
-      console.error(`  ❌ Грешка при синхронизация на user_role ${role.id}:`, err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`  ❌ Грешка при синхронизация на user_role ${role.id}:`, message);
     }
   }
   console.log(`  ✅ Синхронизирани ${count} user_roles`);
@@ -149,8 +151,9 @@ async function syncCountries(): Promise<number> {
         },
       });
       count++;
-    } catch (err: any) {
-      console.error(`  ❌ Грешка при синхронизация на country ${country.id}:`, err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`  ❌ Грешка при синхронизация на country ${country.id}:`, message);
     }
   }
   console.log(`  ✅ Синхронизирани ${count} countries`);
@@ -186,8 +189,9 @@ async function syncCities(): Promise<number> {
         },
       });
       count++;
-    } catch (err: any) {
-      console.error(`  ❌ Грешка при синхронизация на city ${city.id}:`, err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`  ❌ Грешка при синхронизация на city ${city.id}:`, message);
     }
   }
   console.log(`  ✅ Синхронизирани ${count} cities`);
@@ -225,8 +229,9 @@ async function syncOffices(): Promise<number> {
         },
       });
       count++;
-    } catch (err: any) {
-      console.error(`  ❌ Грешка при синхронизация на office ${office.id}:`, err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`  ❌ Грешка при синхронизация на office ${office.id}:`, message);
     }
   }
   console.log(`  ✅ Синхронизирани ${count} offices`);
@@ -264,8 +269,9 @@ async function syncTeams(): Promise<number> {
         },
       });
       count++;
-    } catch (err: any) {
-      console.error(`  ❌ Грешка при синхронизация на team ${team.id}:`, err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`  ❌ Грешка при синхронизация на team ${team.id}:`, message);
     }
   }
   console.log(`  ✅ Синхронизирани ${count} teams`);
@@ -313,8 +319,9 @@ async function syncRealtors(): Promise<number> {
         },
       });
       count++;
-    } catch (err: any) {
-      console.error(`  ❌ Грешка при синхронизация на realtor ${realtor.id}:`, err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`  ❌ Грешка при синхронизация на realtor ${realtor.id}:`, message);
     }
   }
   console.log(`  ✅ Синхронизирани ${count} realtors`);
@@ -360,8 +367,9 @@ async function syncDeals(): Promise<number> {
         },
       });
       count++;
-    } catch (err: any) {
-      console.error(`  ❌ Грешка при синхронизация на deal ${deal.id}:`, err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`  ❌ Грешка при синхронизация на deal ${deal.id}:`, message);
     }
   }
   console.log(`  ✅ Синхронизирани ${count} deals`);
@@ -403,8 +411,9 @@ async function syncDiagnoses(): Promise<number> {
         },
       });
       count++;
-    } catch (err: any) {
-      console.error(`  ❌ Грешка при синхронизация на diagnosis ${diagnosis.id}:`, err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`  ❌ Грешка при синхронизация на diagnosis ${diagnosis.id}:`, message);
     }
   }
   console.log(`  ✅ Синхронизирани ${count} diagnoses`);
@@ -456,8 +465,9 @@ async function syncTrainingProgress(): Promise<number> {
         },
       });
       count++;
-    } catch (err: any) {
-      console.error(`  ❌ Грешка при синхронизация на training_progress ${progress.id}:`, err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`  ❌ Грешка при синхронизация на training_progress ${progress.id}:`, message);
     }
   }
   console.log(`  ✅ Синхронизирани ${count} training_progress записи`);
@@ -506,8 +516,9 @@ async function syncRealtorGoals(): Promise<number> {
         },
       });
       count++;
-    } catch (err: any) {
-      console.error(`  ❌ Грешка при синхронизация на realtor_goal ${goal.id}:`, err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`  ❌ Грешка при синхронизация на realtor_goal ${goal.id}:`, message);
     }
   }
   console.log(`  ✅ Синхронизирани ${count} realtor_goals`);
@@ -559,8 +570,9 @@ async function syncBuyerSchedule(): Promise<number> {
         },
       });
       count++;
-    } catch (err: any) {
-      console.error(`  ❌ Грешка при синхронизация на buyer_schedule ${schedule.id}:`, err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`  ❌ Грешка при синхронизация на buyer_schedule ${schedule.id}:`, message);
     }
   }
   console.log(`  ✅ Синхронизирани ${count} buyer_schedule записи`);
@@ -580,9 +592,10 @@ async function main() {
       process.exit(1);
     }
     console.log('✅ Успешно свързване с Supabase\n');
-  } catch (err: any) {
-    console.error('❌ Грешка при свързване с Supabase:', err.message);
-    if (err.message.includes('ECONNREFUSED')) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ Грешка при свързване с Supabase:', message);
+    if (err instanceof Error && err.message.includes('ECONNREFUSED')) {
       console.error('⚠️  Supabase сървърът не е достъпен. Проверете дали използвате правилния URL.');
     }
     process.exit(1);
@@ -633,7 +646,7 @@ async function main() {
     console.log(`  Training Progress: ${stats.trainingProgress}`);
     console.log(`  Realtor Goals: ${stats.realtorGoals}`);
     console.log(`  Buyer Schedule: ${stats.buyerSchedule}`);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('\n❌ Грешка при синхронизация:', error);
     stats.errors.push(error.message);
   } finally {

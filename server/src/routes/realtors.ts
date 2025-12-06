@@ -30,8 +30,9 @@ router.get('/team/:teamId', authenticate, async (req, res) => {
         email: r.user.email,
       },
     })));
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -102,9 +103,10 @@ router.get('/me', authenticate, requireRealtor, async (req: AuthRequest, res) =>
         } : null,
       } : null,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[Realtors /me] Error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: message });
   }
 });
 
@@ -140,8 +142,9 @@ router.post('/', authenticate, requireAdmin, async (req: AuthRequest, res) => {
         email: realtor.user.email,
       },
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -178,8 +181,9 @@ router.put('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => 
         email: realtor.user.email,
       },
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 

@@ -84,7 +84,7 @@ export const UserManagementDialog = ({
 
       if (error) throw error;
 
-      const usersList = (profiles || []).map((profile: any) => ({
+      const usersList = (profiles || []).map((profile: { id: string; full_name: string; email: string; user_roles?: Array<{ role?: string }> }) => ({
         id: profile.id,
         fullName: profile.full_name,
         email: profile.email,
@@ -92,7 +92,8 @@ export const UserManagementDialog = ({
       }));
 
       setUsers(usersList);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error('Грешка при зареждане на потребители');
       console.error(error);
     } finally {
@@ -171,8 +172,9 @@ export const UserManagementDialog = ({
       setNewUser({ fullName: '', email: '', password: '', role: 'realtor' });
       fetchUsers();
       onUpdate();
-    } catch (error: any) {
-      toast.error(error.message || 'Грешка при създаване на потребител');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(message || 'Грешка при създаване на потребител');
       console.error(error);
     } finally {
       setLoading(false);
@@ -197,8 +199,9 @@ export const UserManagementDialog = ({
       setSelectedUser(null);
       fetchUsers();
       onUpdate();
-    } catch (error: any) {
-      toast.error(error.message || 'Грешка при изтриване на потребител');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(message || 'Грешка при изтриване на потребител');
       console.error(error);
     } finally {
       setLoading(false);

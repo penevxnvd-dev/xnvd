@@ -29,10 +29,11 @@ export const ConnectionStatus = () => {
 
         setStatus('connected');
         setError(null);
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
         console.error('Connection check failed:', err);
         setStatus('disconnected');
-        setError(err.message || 'Connection failed');
+        setError(message || 'Connection failed');
       }
     };
 

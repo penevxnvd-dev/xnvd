@@ -250,7 +250,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     setLoading(true);
     try {
       const data = await api.getCitiesByCountry(countryId);
-      const mapped = data.map((city: any) => ({
+      const mapped = data.map((city: { id: string; name: string; countryId: string }) => ({
         id: city.id,
         name: city.name,
         country_id: city.countryId
@@ -268,7 +268,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     setLoading(true);
     try {
       const data = await api.getOfficesByCity(cityId);
-      const mapped = data.map((office: any) => ({
+      const mapped = data.map((office: { id: string; name: string; cityId: string; address?: string | null }) => ({
         id: office.id,
         name: office.name,
         city_id: office.cityId,
@@ -287,7 +287,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     setLoading(true);
     try {
       const data = await api.getTeamsByOffice(officeId);
-      const mapped = data.map((team: any) => ({
+      const mapped = data.map((team: { id: string; name: string; officeId: string; leaderId?: string | null; leader?: { full_name?: string } }) => ({
         id: team.id,
         name: team.name,
         office_id: team.officeId,
@@ -307,7 +307,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     setLoading(true);
     try {
       const data = await api.getRealtorsByTeam(teamId);
-      const mapped = data.map((realtor: any) => ({
+      const mapped = data.map((realtor: { id: string; user_id: string; team_id: string; level: number; profile?: { full_name?: string; email?: string } }) => ({
         id: realtor.id,
         userId: realtor.user_id,
         teamId: realtor.team_id,
@@ -596,12 +596,12 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     }
   };
 
-  const handleEdit = (item: any) => {
+  const handleEdit = (item: { id: string; name: string; [key: string]: unknown }) => {
     setSelectedItem(item);
     setEditDialogOpen(true);
   };
 
-  const handleDelete = (item: any) => {
+  const handleDelete = (item: { id: string; name: string; [key: string]: unknown }) => {
     setSelectedItem(item);
     setDeleteDialogOpen(true);
   };
@@ -649,8 +649,9 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
       } else if (currentView === 'realtors' && selectedTeam) {
         fetchRealtors(selectedTeam.id);
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Грешка при изтриване');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(message || 'Грешка при изтриване');
     }
   };
 
@@ -678,7 +679,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const handleTopologyOfficeClick = async (office: UIOffice) => {
     // Find the city and country for this office
     const dbOffices = await api.getAllOfficesFull();
-    const dbOffice = dbOffices.find((o: any) => o.id === office.id);
+    const dbOffice = dbOffices.find((o: { id: string; city?: { id: string; name: string; country?: { id: string; name: string; code?: string } }; address?: string | null }) => o.id === office.id);
     if (dbOffice?.city) {
       const city = dbOffice.city;
       const country = city.country;
@@ -703,7 +704,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
       await handleTopologyOfficeClick(office);
       // Find and select the team
       const teams = await api.getTeamsByOffice(office.id);
-      const team = teams.find((t: any) => t.leader_id === leader.id);
+      const team = teams.find((t: { leader_id?: string | null }) => t.leader_id === leader.id);
       if (team) {
         setSelectedTeam({ id: team.id, name: team.name, office_id: office.id, leader_id: team.leader_id || null });
         fetchRealtors(team.id);
@@ -723,7 +724,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
       const teams = await api.getTeamsByOffice(office.id);
       for (const team of teams) {
         const realtors = await api.getRealtorsByTeam(team.id);
-        const realtor = realtors.find((r: any) => r.profile?.id === agent.id);
+        const realtor = realtors.find((r: { profile?: { id?: string } }) => r.profile?.id === agent.id);
         if (realtor) {
           setSelectedTeam({ id: team.id, name: team.name, office_id: office.id, leader_id: team.leader_id || null });
           fetchRealtors(team.id);
@@ -1082,22 +1083,22 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                       
                       // Fetch deals and diagnoses
                       // TODO: Add API endpoints for realtor deals and diagnoses
-                      const deals: any[] = [];
-                      const diagnoses: any[] = [];
+                      const deals: Array<Record<string, unknown>> = [];
+                      const diagnoses: Array<Record<string, unknown>> = [];
                       
                       setSelectedRealtorDeals(deals);
                       setSelectedRealtorDiagnoses(diagnoses);
                       
                       // Fetch training progress
                       // TODO: Add API endpoint for training progress
-                      const trainingProgress: any[] = [];
+                      const trainingProgress: Array<{ section: string; subsection: string }> = [];
                       
                       if (trainingProgress && trainingProgress.length > 0) {
                         const updatedTrainingData = trainingStructure.map((section) => ({
                           ...section,
                           subsections: section.subsections.map((subsection) => {
                             const progressItem = trainingProgress.find(
-                              (p: any) => p.section === section.id && p.subsection === subsection.id
+                              (p: { section: string; subsection: string }) => p.section === section.id && p.subsection === subsection.id
                             );
                             return {
                               ...subsection,

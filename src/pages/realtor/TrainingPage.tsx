@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,7 @@ const TrainingPage = () => {
     if (realtorId) {
       fetchTrainingProgress();
     }
-  }, [realtorId]);
+  }, [realtorId, fetchTrainingProgress]);
 
   const fetchUserData = async () => {
     try {
@@ -56,7 +56,7 @@ const TrainingPage = () => {
     }
   };
 
-  const fetchTrainingProgress = async () => {
+  const fetchTrainingProgress = useCallback(async () => {
     if (!realtorId) return;
 
     try {
@@ -68,7 +68,7 @@ const TrainingPage = () => {
           ...section,
           subsections: section.subsections.map((subsection) => {
             const progressItem = progressData.find(
-              (p: any) => p.section === section.id && p.subsection === subsection.id
+              (p: { section: string; subsection: string }) => p.section === section.id && p.subsection === subsection.id
             );
             return {
               ...subsection,
@@ -91,7 +91,7 @@ const TrainingPage = () => {
     } catch (error) {
       console.error('Error fetching training progress:', error);
     }
-  };
+  }, [realtorId, trainingData]);
 
   const handleProgressUpdate = async (
     sectionId: string,

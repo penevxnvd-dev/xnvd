@@ -30,10 +30,10 @@ function toSnakeCase(str: string): string {
 }
 
 // Helper function to convert Prisma data to Supabase format
-function convertToSupabaseFormat(model: string, data: any): any {
-  if (!data || typeof data !== 'object') return data;
+function convertToSupabaseFormat(model: string, data: unknown): Record<string, unknown> {
+  if (!data || typeof data !== 'object') return data as Record<string, unknown>;
   
-  const converted: any = {};
+  const converted: Record<string, unknown> = {};
   
   for (const [key, value] of Object.entries(data)) {
     // Skip Prisma internal fields
@@ -65,10 +65,10 @@ function convertToSupabaseFormat(model: string, data: any): any {
 }
 
 // Helper function to convert Prisma where clause to Supabase format
-function convertWhereToSupabase(where: any): any {
-  if (!where || typeof where !== 'object') return where;
+function convertWhereToSupabase(where: unknown): Record<string, unknown> {
+  if (!where || typeof where !== 'object') return where as Record<string, unknown>;
   
-  const converted: any = {};
+  const converted: Record<string, unknown> = {};
   
   for (const [key, value] of Object.entries(where)) {
     const snakeKey = toSnakeCase(key);
@@ -92,7 +92,7 @@ function convertWhereToSupabase(where: any): any {
 }
 
 // Helper function to sync data to Supabase
-async function syncToSupabase(model: string, operation: 'create' | 'update' | 'delete' | 'upsert', data: any, where?: any, result?: any) {
+async function syncToSupabase(model: string, operation: 'create' | 'update' | 'delete' | 'upsert', data: unknown, where?: unknown, result?: unknown) {
   const tableName = modelToTableMap[model];
   if (!tableName) {
     console.warn(`⚠️  No Supabase table mapping for model: ${model}`);
@@ -153,8 +153,9 @@ async function syncToSupabase(model: string, operation: 'create' | 'update' | 'd
         }
       }
     }
-  } catch (error: any) {
-    console.error(`❌ Error syncing ${model} to Supabase:`, error.message);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`❌ Error syncing ${model} to Supabase:`, message);
   }
 }
 

@@ -10,8 +10,17 @@ const levelMap: Record<number, 'Чирак' | 'Реализатор' | 'Елит
   5: 'Елит'
 };
 
+// Database deal type
+interface DbDeal {
+  id: string;
+  dealDate: string | Date;
+  clientName: string;
+  commission?: number | null;
+  dealValue: number;
+}
+
 // Transform database deal to frontend Deal
-function transformDeal(dbDeal: any): Deal {
+function transformDeal(dbDeal: DbDeal): Deal {
   return {
     id: dbDeal.id,
     date: new Date(dbDeal.dealDate).toISOString().split('T')[0],
@@ -23,13 +32,26 @@ function transformDeal(dbDeal: any): Deal {
   };
 }
 
+// Database realtor type
+interface DbRealtor {
+  id: string;
+  level: number;
+  hireDate: string | Date;
+  trainingProgress?: Array<{ lectureCompleted?: boolean; videoCompleted?: boolean; practicalCompleted?: boolean }>;
+  deals?: DbDeal[];
+  user: {
+    fullName: string;
+    email: string;
+  };
+}
+
 // Transform database realtor to frontend Agent
-function transformAgent(dbRealtor: any): Agent {
+function transformAgent(dbRealtor: DbRealtor): Agent {
   const level = levelMap[dbRealtor.level] || 'Чирак';
   
   // Get training progress
   const trainingProgress = dbRealtor.trainingProgress || [];
-  const completedStages = trainingProgress.filter((tp: any) => 
+  const completedStages = trainingProgress.filter((tp: { lectureCompleted?: boolean; videoCompleted?: boolean; practicalCompleted?: boolean }) => 
     tp.lectureCompleted && tp.videoCompleted && tp.practicalCompleted
   ).length;
   const trainingStage = Math.min(completedStages + 1, 5) as 1 | 2 | 3 | 4 | 5;
@@ -91,8 +113,18 @@ function transformAgent(dbRealtor: any): Agent {
   };
 }
 
+// Database team type
+interface DbTeam {
+  id: string;
+  leader?: {
+    fullName: string;
+    realtor?: unknown;
+  };
+  realtors?: DbRealtor[];
+}
+
 // Transform database team to frontend TeamLeader
-function transformTeamLeader(dbTeam: any): TeamLeader | null {
+function transformTeamLeader(dbTeam: DbTeam): TeamLeader | null {
   if (!dbTeam.leader) return null;
 
   const leader = dbTeam.leader;
@@ -110,8 +142,16 @@ function transformTeamLeader(dbTeam: any): TeamLeader | null {
   };
 }
 
+// Database office type
+interface DbOffice {
+  id: string;
+  name: string;
+  address?: string;
+  teams?: DbTeam[];
+}
+
 // Transform database office to frontend Office
-export function transformOffice(dbOffice: any): Office {
+export function transformOffice(dbOffice: DbOffice): Office {
   const teamLeaders = (dbOffice.teams || [])
     .map(transformTeamLeader)
     .filter((tl: TeamLeader | null): tl is TeamLeader => tl !== null);
@@ -125,7 +165,7 @@ export function transformOffice(dbOffice: any): Office {
 }
 
 // Transform array of offices
-export function transformOffices(dbOffices: any[]): Office[] {
+export function transformOffices(dbOffices: DbOffice[]): Office[] {
   return dbOffices.map(transformOffice);
 }
 

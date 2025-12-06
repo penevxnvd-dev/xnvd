@@ -40,8 +40,9 @@ router.get('/me', authenticate, requireRealtor, async (req: AuthRequest, res) =>
       is_key: deal.isKey,
       is_exclusive: deal.isExclusive
     })));
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -64,8 +65,9 @@ router.get('/', authenticate, requireAdmin, async (req: AuthRequest, res) => {
 
     if (error) throw error;
     res.json(deals || []);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -97,8 +99,9 @@ router.post('/', authenticate, requireRealtor, async (req: AuthRequest, res) => 
 
     if (error) throw error;
     res.json(deal);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 

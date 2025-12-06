@@ -64,7 +64,7 @@ export const WeeklyBuyerSchedule = ({ realtorId }: WeeklyBuyerScheduleProps) => 
       const dateStr = selectedDate.toISOString().split('T')[0];
       const data = await api.getMySchedule(dateStr);
       setSchedule(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching schedule:', error);
       toast.error('Грешка при зареждане на графика');
     } finally {
@@ -116,7 +116,7 @@ export const WeeklyBuyerSchedule = ({ realtorId }: WeeklyBuyerScheduleProps) => 
       }
       setDialogOpen(false);
       fetchSchedule();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving schedule:', error);
       toast.error('Грешка при запазване на графика');
     }
@@ -130,7 +130,7 @@ export const WeeklyBuyerSchedule = ({ realtorId }: WeeklyBuyerScheduleProps) => 
       await api.deleteScheduleEntry(id);
       toast.success('Записът е изтрит');
       fetchSchedule();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting schedule:', error);
       toast.error('Грешка при изтриване на записа');
     }

@@ -110,8 +110,9 @@ export const CreateEditDialog = ({
 
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
-      toast.error(error.message || 'Грешка при запазване');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(message || 'Грешка при запазване');
       console.error(error);
     } finally {
       setLoading(false);

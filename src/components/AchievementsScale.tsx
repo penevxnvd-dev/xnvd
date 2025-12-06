@@ -60,7 +60,7 @@ export const AchievementsScale = ({ type, limit = 5 }: AchievementsScaleProps) =
         if (type === 'offices') {
           const offices = await supabaseApi.getAllOffices();
           const itemsWithKPI = await Promise.all(
-            offices.map(async (office: any) => {
+            offices.map(async (office: { id: string; name: string }) => {
               try {
                 const kpi = await supabaseApi.getOfficeKPI(office.id);
                 return {
@@ -80,7 +80,7 @@ export const AchievementsScale = ({ type, limit = 5 }: AchievementsScaleProps) =
           allItems = itemsWithKPI.filter((item): item is AchievementItem => item !== null);
         } else if (type === 'teams') {
           const offices = await supabaseApi.getAllOffices();
-          const allTeams: any[] = [];
+          const allTeams: Array<{ id: string; name: string }> = [];
           
           for (const office of offices) {
             try {
@@ -92,7 +92,7 @@ export const AchievementsScale = ({ type, limit = 5 }: AchievementsScaleProps) =
           }
 
           const itemsWithKPI = await Promise.all(
-            allTeams.map(async (team: any) => {
+            allTeams.map(async (team: { id: string; name: string }) => {
               try {
                 const kpi = await supabaseApi.getTeamKPI(team.id);
                 return {
@@ -112,7 +112,7 @@ export const AchievementsScale = ({ type, limit = 5 }: AchievementsScaleProps) =
           allItems = itemsWithKPI.filter((item): item is AchievementItem => item !== null);
         } else if (type === 'realtors') {
           const offices = await supabaseApi.getAllOffices();
-          const allRealtors: any[] = [];
+          const allRealtors: Array<{ id: string; profile?: { full_name?: string } }> = [];
           
           for (const office of offices) {
             try {
@@ -131,7 +131,7 @@ export const AchievementsScale = ({ type, limit = 5 }: AchievementsScaleProps) =
           }
 
           const itemsWithKPI = await Promise.all(
-            allRealtors.map(async (realtor: any) => {
+            allRealtors.map(async (realtor: { id: string; profile?: { full_name?: string } }) => {
               try {
                 const kpi = await supabaseApi.getRealtorKPI(realtor.id);
                 return {

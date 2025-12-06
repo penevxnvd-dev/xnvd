@@ -49,7 +49,17 @@ export const supabaseAdmin = createClient<Database>(
 
 // Create a client for a specific user (respects RLS)
 export function createSupabaseClient(authToken?: string) {
-  const options: any = {
+  const options: {
+    auth: {
+      autoRefreshToken: boolean;
+      persistSession: boolean;
+    };
+    global?: {
+      headers: {
+        Authorization: string;
+      };
+    };
+  } = {
     auth: {
       autoRefreshToken: true,
       persistSession: false

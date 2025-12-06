@@ -8,7 +8,7 @@ if (typeof window !== 'undefined') {
   const originalWarn = console.warn;
   
   // Filter CORS errors from Lovable development API
-  console.error = (...args: any[]) => {
+  console.error = (...args: unknown[]) => {
     const message = args[0]?.toString() || '';
     // Filter out CORS errors from api.lovable.dev (development tools)
     if (message.includes('Cross-Origin Request Blocked') && message.includes('api.lovable.dev')) {
@@ -43,7 +43,7 @@ if (typeof window !== 'undefined') {
   };
   
   // Filter preload warnings from Lovable assets
-  console.warn = (...args: any[]) => {
+  console.warn = (...args: unknown[]) => {
     const message = args[0]?.toString() || '';
     // Filter out preload warnings for Lovable fonts (optimization hints, not errors)
     if (message.includes('preloaded with link preload was not used') && message.includes('lovable.dev')) {

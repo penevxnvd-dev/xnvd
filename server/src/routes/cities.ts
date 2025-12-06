@@ -13,8 +13,9 @@ router.get('/country/:countryId', authenticate, async (req, res) => {
       orderBy: { name: 'asc' }
     });
     res.json(cities);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -26,8 +27,9 @@ router.post('/', authenticate, requireAdmin, async (req: AuthRequest, res) => {
       data: { name, countryId }
     });
     res.json(city);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -41,8 +43,9 @@ router.put('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => 
       data: { name }
     });
     res.json(city);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -54,8 +57,9 @@ router.delete('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) 
       where: { id }
     });
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 

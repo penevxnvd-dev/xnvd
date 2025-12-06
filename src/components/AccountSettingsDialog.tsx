@@ -65,8 +65,9 @@ export const AccountSettingsDialog = ({
       toast.success('Профилът е обновен успешно');
       onUpdate();
       onOpenChange(false);
-    } catch (error: any) {
-      toast.error(error.message || 'Грешка при обновяване на профила');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(message || 'Грешка при обновяване на профила');
       console.error(error);
     } finally {
       setLoading(false);
@@ -101,8 +102,9 @@ export const AccountSettingsDialog = ({
         newPassword: '',
         confirmPassword: '',
       });
-    } catch (error: any) {
-      toast.error(error.message || 'Грешка при промяна на паролата');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(message || 'Грешка при промяна на паролата');
       console.error(error);
     } finally {
       setLoading(false);

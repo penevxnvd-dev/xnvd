@@ -7,7 +7,7 @@ export function getNameEmoji(name: string): string {
   if (!name) return '';
   
   // Remove any existing emoji and "11:11" from the name before checking
-  const nameWithoutEmoji = name.replace(/^[🕊️🐙]\s*/, '').replace(/\s*11:11\s*/g, '').trim();
+  const nameWithoutEmoji = name.replace(/^[🕊️🐙]\s*/u, '').replace(/\s*11:11\s*/g, '').trim();
   
   // Normalize the name for comparison (remove extra spaces, convert to lowercase)
   const normalizedName = nameWithoutEmoji.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -39,7 +39,7 @@ export function formatNameWithEmoji(name: string): string {
   if (!name) return '';
   
   // Remove any existing emoji from the name before processing
-  const nameWithoutEmoji = name.replace(/^[🕊️🐙]\s*/, '').trim();
+  const nameWithoutEmoji = name.replace(/^[🕊️🐙]\s*/u, '').trim();
   const normalizedName = nameWithoutEmoji.toLowerCase().replace(/\s+/g, ' ').trim();
   
   // For "Краси Кътев", add "11:11" but NO emoji
@@ -52,7 +52,7 @@ export function formatNameWithEmoji(name: string): string {
   }
   
   // For other names, check if they already have an emoji
-  if (/^[🕊️🐙]\s/.test(name.trim())) {
+  if (/^[🕊️🐙]\s/u.test(name.trim())) {
     return name;
   }
   
@@ -76,8 +76,8 @@ export function formatNameWithoutElevenEleven(name: string): { displayName: stri
   const isKrasiKutev = normalizedName.includes('краси') && normalizedName.includes('кътев');
   
   // Format name with emoji but without "11:11"
-  const nameWithoutEmoji = nameWithoutElevenEleven.replace(/^[🕊️🐙]\s*/, '').trim();
-  const emoji = nameWithoutElevenEleven.match(/^[🕊️🐙]/)?.[0] || '';
+  const nameWithoutEmoji = nameWithoutElevenEleven.replace(/^[🕊️🐙]\s*/u, '').trim();
+  const emoji = nameWithoutElevenEleven.match(/^[🕊️🐙]/u)?.[0] || '';
   const displayName = emoji ? `${emoji} ${nameWithoutEmoji}` : nameWithoutEmoji;
   
   return {

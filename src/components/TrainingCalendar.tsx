@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { Calendar as CalendarIcon, Users, Award, BookOpen, UserPlus, Clock, Edit, Trash2, Plus, ChevronLeft, ChevronRight, PlayCircle, CheckCircle2, Search, Filter, Download, Printer, Copy, Grid3x3, List, Calendar, BarChart3, Bell, X, MoreVertical, LayoutGrid, LayoutList, GripVertical } from 'lucide-react';
-import { TrainingGroup } from '@/types';
+import { TrainingGroup, Agent } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { useState, useRef, useMemo, useEffect } from 'react';
 import { formatNameWithEmoji } from '@/utils/nameEmojis';
@@ -76,7 +76,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
   const [contextMenuDate, setContextMenuDate] = useState<Date | null>(null);
   const [showQuickAdd, setShowQuickAdd] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [draggedTrainee, setDraggedTrainee] = useState<{ trainee: any; groupId: string } | null>(null);
+  const [draggedTrainee, setDraggedTrainee] = useState<{ trainee: Agent; groupId: string } | null>(null);
   
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -230,7 +230,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
     }
   };
 
-  const handleEditTrainee = (trainee: any, groupId?: string) => {
+  const handleEditTrainee = (trainee: Agent, groupId?: string) => {
     setEditingTrainee({
       id: trainee.id,
       name: trainee.name,
@@ -430,7 +430,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
 
   // Sortable Trainee Item Component
   const SortableTraineeItem = ({ trainee, groupId, onEdit, onDelete }: { 
-    trainee: any; 
+    trainee: Agent; 
     groupId?: string;
     onEdit: () => void;
     onDelete: () => void;
@@ -795,7 +795,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
       </div>
 
       {/* View Tabs */}
-      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="w-full">
+      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'calendar' | 'list' | 'grid' | 'timeline')} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="month"><LayoutGrid className="h-4 w-4 mr-2" />Месечен</TabsTrigger>
           <TabsTrigger value="week"><Calendar className="h-4 w-4 mr-2" />Седмичен</TabsTrigger>
@@ -888,7 +888,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                     leader: '',
                     leaderId: '',
                     currentDay: 0,
-                    status: 'предстояща' as any,
+                    status: 'предстояща' as 'активна' | 'завършена' | 'предстояща',
                     trainees: g.trainees.map(t => ({
                       id: t.id,
                       name: t.name,
@@ -1293,7 +1293,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                     leader: '',
                     leaderId: '',
                     currentDay: 0,
-                    status: 'предстояща' as any,
+                    status: 'предстояща' as 'активна' | 'завършена' | 'предстояща',
                     trainees: group.trainees.map(t => ({
                       id: t.id,
                       name: t.name,
@@ -1374,7 +1374,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                             leader: selectedLeader,
                             leaderId: `leader-${selectedLeader}`,
                             currentDay: 0,
-                            status: 'предстояща' as any,
+                            status: 'предстояща' as 'активна' | 'завършена' | 'предстояща',
                             trainees: [newTraineeData]
                           };
                           onUpdateGroups?.([...groups, newGroup]);

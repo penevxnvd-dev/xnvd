@@ -5,7 +5,7 @@ export interface ExportOptions {
   format?: 'csv' | 'json';
 }
 
-export function exportToCSV(data: any[], filename: string = 'export.csv') {
+export function exportToCSV(data: Record<string, unknown>[], filename: string = 'export.csv') {
   if (!data || data.length === 0) {
     throw new Error('No data to export');
   }
@@ -40,7 +40,7 @@ export function exportToCSV(data: any[], filename: string = 'export.csv') {
   document.body.removeChild(link);
 }
 
-export function exportToJSON(data: any[], filename: string = 'export.json') {
+export function exportToJSON(data: Record<string, unknown>[], filename: string = 'export.json') {
   const jsonContent = JSON.stringify(data, null, 2);
   const blob = new Blob([jsonContent], { type: 'application/json' });
   const link = document.createElement('a');
@@ -53,7 +53,7 @@ export function exportToJSON(data: any[], filename: string = 'export.json') {
   document.body.removeChild(link);
 }
 
-export function exportKPIData(kpiData: any, filename: string = 'kpi-data') {
+export function exportKPIData(kpiData: Record<string, unknown>, filename: string = 'kpi-data') {
   const data = [
     {
       'Метрика': 'Диагнози',
@@ -76,7 +76,7 @@ export function exportKPIData(kpiData: any, filename: string = 'kpi-data') {
   exportToCSV(data, `${filename}.csv`);
 }
 
-export function exportTrainingProgress(progress: any[], filename: string = 'training-progress') {
+export function exportTrainingProgress(progress: Record<string, unknown>[], filename: string = 'training-progress') {
   const data = progress.map(p => ({
     'Раздел': p.section,
     'Подраздел': p.subsection,
@@ -90,7 +90,7 @@ export function exportTrainingProgress(progress: any[], filename: string = 'trai
   exportToCSV(data, `${filename}.csv`);
 }
 
-export function exportDeals(deals: any[], filename: string = 'deals') {
+export function exportDeals(deals: Record<string, unknown>[], filename: string = 'deals') {
   const data = deals.map(d => ({
     'Клиент': d.clientName || d.client_name,
     'Стойност': d.dealValue || d.deal_value,
@@ -102,7 +102,7 @@ export function exportDeals(deals: any[], filename: string = 'deals') {
   exportToCSV(data, `${filename}.csv`);
 }
 
-export function exportDiagnoses(diagnoses: any[], filename: string = 'diagnoses') {
+export function exportDiagnoses(diagnoses: Record<string, unknown>[], filename: string = 'diagnoses') {
   const data = diagnoses.map(d => ({
     'Клиент': d.clientName || d.client_name,
     'Дата': d.diagnosisDate || d.diagnosis_date,

@@ -59,7 +59,7 @@ export const PersonalGoalsCard = ({
         keysGoal: data.keysGoal || 0,
         exclusivesGoal: data.exclusivesGoal || 0,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching goals:', error);
       toast.error('Грешка при зареждане на целите');
     } finally {
@@ -80,7 +80,7 @@ export const PersonalGoalsCard = ({
       setGoals(updated);
       setIsEditing(false);
       toast.success('Целите са запазени успешно');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving goals:', error);
       toast.error('Грешка при запазване на целите');
     } finally {
@@ -136,7 +136,7 @@ export const PersonalGoalsCard = ({
     iconColor,
     borderColor
   }: {
-    icon: any;
+    icon: React.ComponentType<{ className?: string }>;
     label: string;
     current: number;
     goal: number;

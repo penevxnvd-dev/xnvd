@@ -64,8 +64,9 @@ router.get('/conversation/:userId', authenticate, requireRealtor, async (req: Au
         email: msg.receiver.email
       }
     })));
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -157,8 +158,9 @@ router.get('/conversations', authenticate, requireRealtor, async (req: AuthReque
       if (!b.lastMessage) return -1;
       return new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime();
     }));
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -214,8 +216,9 @@ router.post('/', authenticate, requireRealtor, async (req: AuthRequest, res) => 
         email: message.receiver.email
       }
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -235,8 +238,9 @@ router.put('/read/:userId', authenticate, requireRealtor, async (req: AuthReques
     });
 
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 

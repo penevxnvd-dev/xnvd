@@ -75,16 +75,18 @@ class SupabaseApiClient {
 
     try {
       return await attemptLogin();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errMessage = err instanceof Error ? err.message : String(err);
       // Retry once on network errors
-      if (err.message === 'NETWORK_ERROR' || err.message?.includes('Failed to fetch') || err.message?.includes('auth.supabase.io')) {
+      if (errMessage === 'NETWORK_ERROR' || errMessage.includes('Failed to fetch') || errMessage.includes('auth.supabase.io')) {
         console.warn('⚠️ Network error, retrying login...');
         // Wait 1 second before retry
         await new Promise(resolve => setTimeout(resolve, 1000));
         try {
           return await attemptLogin();
-        } catch (retryError: any) {
-          if (retryError.message === 'NETWORK_ERROR') {
+        } catch (retryError: unknown) {
+          const retryMessage = retryError instanceof Error ? retryError.message : String(retryError);
+          if (retryMessage === 'NETWORK_ERROR') {
             throw new Error('Проблем с връзката към сървъра. Моля проверете интернет връзката си и опитайте отново.');
           }
           throw retryError;
@@ -335,16 +337,17 @@ class SupabaseApiClient {
     if (teamsError) throw teamsError;
 
     // Group teams by office_id
-    const teamsByOffice = (allTeams || []).reduce((acc: any, team: any) => {
-      if (!acc[team.office_id]) {
-        acc[team.office_id] = [];
+    const teamsByOffice = (allTeams || []).reduce((acc: Record<string, Array<Record<string, unknown>>>, team: Record<string, unknown>) => {
+      const officeId = team.office_id as string;
+      if (!acc[officeId]) {
+        acc[officeId] = [];
       }
-      acc[team.office_id].push(team);
+      acc[officeId].push(team);
       return acc;
-    }, {});
+    }, {} as Record<string, Array<Record<string, unknown>>>);
 
     // Attach teams to offices
-    return (offices || []).map((office: any) => ({
+    return (offices || []).map((office: Record<string, unknown>) => ({
       ...office,
       teams: teamsByOffice[office.id] || [],
     }));
@@ -496,7 +499,7 @@ class SupabaseApiClient {
 
     // Extract unique leaders
     const leadersMap = new Map<string, { id: string; fullName: string; email: string }>();
-    (teams || []).forEach((team: any) => {
+    (teams || []).forEach((team: { leader?: { id?: string; full_name?: string; email?: string } }) => {
       if (team.leader && team.leader.id) {
         leadersMap.set(team.leader.id, {
           id: team.leader.id,
@@ -554,10 +557,10 @@ class SupabaseApiClient {
     if (profilesError) throw profilesError;
 
     // Filter to get profiles that are not realtors or realtors without a team
-    return (profiles || []).filter((profile: any) => {
+    return (profiles || []).filter((profile: { realtors?: Array<{ team_id?: string | null }> }) => {
       const realtor = profile.realtors?.[0];
       return !realtor || !realtor.team_id;
-    }).map((profile: any) => ({
+    }).map((profile: { id: string; full_name: string; email: string }) => ({
       id: profile.id,
       fullName: profile.full_name,
       email: profile.email,
@@ -1110,7 +1113,7 @@ class SupabaseApiClient {
       totalDiagnoses += diagnoses?.length || 0;
       totalDealValue += deals?.reduce((sum, deal) => sum + Number(deal.deal_value), 0) || 0;
 
-      const level = (realtor as any).level || 1;
+      const level = (realtor as { level?: number }).level || 1;
       levelDistribution[level] = (levelDistribution[level] || 0) + 1;
     }
 
@@ -1284,6 +1287,7 @@ class SupabaseApiClient {
     const targetMonth = month ?? now.getMonth() + 1;
     const targetYear = year ?? now.getFullYear();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any)
       .from('realtor_goals')
       .select('*')
@@ -1318,6 +1322,7 @@ class SupabaseApiClient {
       throw new Error('Realtor not found');
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any)
       .from('realtor_goals')
       .upsert({
@@ -1355,6 +1360,7 @@ class SupabaseApiClient {
       return [];
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any)
       .from('buyer_schedule')
       .select('*')
@@ -1362,7 +1368,7 @@ class SupabaseApiClient {
       .order('schedule_date', { ascending: true });
 
     if (error) throw error;
-    return (data || []).map((item: any) => ({
+    return (data || []).map((item: Record<string, unknown>) => ({
       ...item,
       scheduleDate: item.schedule_date,
       timeSlot: item.time_slot,
@@ -1415,6 +1421,7 @@ class SupabaseApiClient {
     };
 
     if (entryData.id) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from('buyer_schedule')
         .update(insertData)
@@ -1426,6 +1433,7 @@ class SupabaseApiClient {
       return data;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any)
       .from('buyer_schedule')
       .insert(insertData)
@@ -1437,6 +1445,7 @@ class SupabaseApiClient {
   }
 
   async deleteScheduleEntry(id: string) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)
       .from('buyer_schedule')
       .delete()
@@ -1454,6 +1463,7 @@ class SupabaseApiClient {
       throw new Error('Not authenticated');
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any)
       .from('messages')
       .select('*')
@@ -1461,7 +1471,7 @@ class SupabaseApiClient {
       .order('created_at', { ascending: true });
 
     if (error) throw error;
-    return (data || []).map((msg: any) => ({
+    return (data || []).map((msg: Record<string, unknown>) => ({
       ...msg,
       senderId: msg.sender_id,
       receiverId: msg.receiver_id,
@@ -1476,6 +1486,7 @@ class SupabaseApiClient {
       throw new Error('Not authenticated');
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any)
       .from('messages')
       .insert({
@@ -1502,6 +1513,8 @@ class SupabaseApiClient {
       throw new Error('Not authenticated');
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)
       .from('messages')
       .update({ read: true })

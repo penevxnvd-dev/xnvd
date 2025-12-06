@@ -63,7 +63,7 @@ export const AddPersonToTeamDialog = ({
     try {
       const profiles = await supabaseApi.getAvailableProfilesForTeam();
       setAvailableProfiles(profiles);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error('Грешка при зареждане на профили');
       console.error(error);
     } finally {
@@ -129,8 +129,9 @@ export const AddPersonToTeamDialog = ({
       setLevel('Чирак');
       setCreateNewAccount(false);
       setNewAccountData({ fullName: '', email: '', password: '', confirmPassword: '' });
-    } catch (error: any) {
-      toast.error(error.message || 'Грешка при добавяне на човек');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(message || 'Грешка при добавяне на човек');
       console.error(error);
     } finally {
       setLoading(false);

@@ -141,7 +141,7 @@ export const TopologySidebar = ({
             console.log(`📥 Fetching full team data from Prisma (via API) for office: ${foundOffice.id}`);
             // Use getOfficeFull to get complete team data with all realtors from Prisma
             const fullOffice = await api.getOfficeFull(foundOffice.id);
-            const fullTeam = fullOffice.teams?.find((t: any) => t.id === foundTeam.id);
+            const fullTeam = fullOffice.teams?.find((t: { id: string }) => t.id === foundTeam.id);
             if (fullTeam) {
               foundTeam = fullTeam;
               console.log(`✅ Loaded full team data from Prisma. Realtors: ${foundTeam.realtors?.length || 0}`);
@@ -179,7 +179,7 @@ export const TopologySidebar = ({
 
           // Extract ALL realtors from Supabase team data (same structure as admin dashboard)
           // This includes all team members with their profile data from Supabase
-          const allRealtors = (foundTeam.realtors || []).map((r: any) => {
+          const allRealtors = (foundTeam.realtors || []).map((r: { id: string; user_id?: string; level?: number; profile?: { full_name?: string; id?: string } }) => {
             // Handle both direct profile and nested profile structures from Supabase
             const profile = r.profile || {};
             return {
@@ -194,7 +194,7 @@ export const TopologySidebar = ({
           });
 
           // Filter out leader from members if they appear in realtors list
-          const members = allRealtors.filter((r: any) => {
+          const members = allRealtors.filter((r: { userId?: string }) => {
             const realtorUserId = r.userId;
             const leaderId = foundTeam.leader?.id;
             return realtorUserId !== leaderId;
@@ -231,12 +231,12 @@ export const TopologySidebar = ({
         const dbOffices = await api.getAllOfficesFull();
         const teamsMap = new Map<string, Array<{id: string; name: string; leaderName: string; members: Agent[]}>>();
         
-        dbOffices.forEach((dbOffice: any) => {
+        dbOffices.forEach((dbOffice: { teams?: Array<{ id: string; leader?: { full_name?: string }; realtors?: Array<{ id?: string; level?: number; hire_date?: string; profile?: { full_name?: string; email?: string; id?: string } }> }> }) => {
           const officeTeams: Array<{id: string; name: string; leaderName: string; members: Agent[]}> = [];
           
-          (dbOffice.teams || []).forEach((team: any) => {
+          (dbOffice.teams || []).forEach((team: { id: string; leader?: { full_name?: string }; realtors?: Array<{ id?: string; level?: number; hire_date?: string; profile?: { full_name?: string; email?: string; id?: string } }> }) => {
             const leaderName = formatNameWithoutElevenEleven(team.leader?.full_name || 'Без лидер').displayName;
-            const members = (team.realtors || []).map((realtor: any) => {
+            const members = (team.realtors || []).map((realtor: { id?: string; level?: number; hire_date?: string; profile?: { full_name?: string; email?: string; id?: string } }) => {
               const profile = realtor.profile;
               return {
                 id: realtor.id || profile?.id || `realtor-${Date.now()}`,
@@ -244,7 +244,7 @@ export const TopologySidebar = ({
                 phone: '',
                 position: '',
                 email: profile?.email || '',
-                level: realtor.level ? (realtor.level === 1 ? 'Чирак' : realtor.level === 3 ? 'Реализатор' : realtor.level === 5 ? 'Елит' : `Ниво ${realtor.level}`) : 'Чирак' as any,
+                level: realtor.level ? (realtor.level === 1 ? 'Чирак' : realtor.level === 3 ? 'Реализатор' : realtor.level === 5 ? 'Елит' : `Ниво ${realtor.level}`) : 'Чирак' as 'Чирак' | 'Реализатор' | 'Елит',
                 trainingStage: 1 as const,
                 dateOfHiring: realtor.hire_date || new Date().toISOString().split('T')[0],
                 department: '',
@@ -286,7 +286,7 @@ export const TopologySidebar = ({
         const dbOffices = await api.getAllOfficesFull();
         const countryMap = new Map<string, CountryData>();
 
-        dbOffices.forEach((dbOffice: any) => {
+        dbOffices.forEach((dbOffice: { city?: { country?: { id?: string; name?: string }; id?: string; name?: string } }) => {
           const city = dbOffice.city;
           const country = city?.country;
           
@@ -542,7 +542,7 @@ export const TopologySidebar = ({
                             "px-2 py-1.5 rounded-md transition-colors cursor-pointer",
                             onChatClick ? "hover:bg-accent/50" : "hover:bg-accent/30"
                           )}
-                          onClick={() => onChatClick && onChatClick((member as any).userId || member.id, member.name)}
+                          onClick={() => onChatClick && onChatClick((member as { userId?: string; id: string }).userId || member.id, member.name)}
                         >
                           <div className="flex items-center gap-2">
                             <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
