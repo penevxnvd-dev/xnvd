@@ -61,7 +61,7 @@ node create-managers-accounts.js
 
 ## Важно
 
-- Старият проект (`ufpeftuanzmkiryohesd`) вече не се използва
+- Старият проект (`qxompdwqdnemsntssjot`) вече не се използва
 - Всички данни трябва да бъдат мигрирани към новия проект
 - Уверете се, че всички environment variables са обновени
 

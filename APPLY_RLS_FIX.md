@@ -13,7 +13,7 @@ The RLS policies were missing the `WITH CHECK` clause, which is required for INS
 ### Option 1: Supabase Dashboard (Recommended) ⭐
 
 1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
-2. Select your project (ID: `ufpeftuanzmkiryohesd`)
+2. Select your project (ID: `qxompdwqdnemsntssjot`)
 3. Navigate to **SQL Editor** (left sidebar)
 4. Click **New Query**
 5. Copy the entire contents of `supabase/migrations/20250102000000_fix_rls_policies.sql`

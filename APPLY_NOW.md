@@ -4,7 +4,7 @@
 
 ```bash
 # 1. Get connection string from Supabase Dashboard:
-#    https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/settings/database
+#    https://supabase.com/dashboard/project/qxompdwqdnemsntssjot/settings/database
 #    Copy the "URI" connection string
 
 # 2. Apply migration:

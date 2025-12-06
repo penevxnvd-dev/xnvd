@@ -3,7 +3,7 @@
 -- ============================================================================
 -- This script applies all necessary migrations for the XNVD project
 -- Execute this in Supabase SQL Editor: 
--- https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/sql/new
+-- https://supabase.com/dashboard/project/qxompdwqdnemsntssjot/sql/new
 --
 -- IMPORTANT: Run this script in order (if you haven't already applied some migrations)
 -- ============================================================================

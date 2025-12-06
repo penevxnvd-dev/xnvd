@@ -7,7 +7,7 @@
 ## Стъпка 1: Вземете Connection String от Supabase
 
 1. Отидете в [Supabase Dashboard](https://supabase.com/dashboard)
-2. Изберете проекта: `ufpeftuanzmkiryohesd`
+2. Изберете проекта: `qxompdwqdnemsntssjot`
 3. Отидете в **Settings** > **Database**
 4. В секцията **Connection string** намерете:
    - **URI** (за директна връзка)
@@ -41,7 +41,7 @@ postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].supabase.com:5432/
 ```
 
 ### Параметри:
-- `[PROJECT_REF]` - вашият project reference (от config.toml: `ufpeftuanzmkiryohesd`)
+- `[PROJECT_REF]` - вашият project reference (от config.toml: `qxompdwqdnemsntssjot`)
 - `[PASSWORD]` - вашата database password (от Supabase Dashboard)
 - `[REGION]` - региона на вашия проект (например: `eu-central-1`, `us-east-1`)
 

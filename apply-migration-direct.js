@@ -185,7 +185,7 @@ async function applyMigration() {
     console.error('\n💡 Решение:');
     console.error('   Supabase не позволява директно изпълнение на SQL чрез API.');
     console.error('   Моля приложете миграцията ръчно:');
-    console.error('   1. Отворете: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/sql/new');
+    console.error('   1. Отворете: https://supabase.com/dashboard/project/qxompdwqdnemsntssjot/sql/new');
     console.error('   2. Копирайте съдържанието от apply-supabase-migrations.sql');
     console.error('   3. Поставете го в SQL Editor и изпълнете\n');
     process.exit(1);

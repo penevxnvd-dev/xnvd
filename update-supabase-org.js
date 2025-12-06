@@ -6,7 +6,7 @@ console.log('\n━━━━━━━━━━━━━━━━━━━━━�
 console.log('🔄 Обновяване на Supabase организация');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-const OLD_ORG = 'ufpeftuanzmkiryohesd';
+const OLD_ORG = 'qxompdwqdnemsntssjot';
 const NEW_ORG = 'rbpqagivdpacdvwlwgep';
 
 // Files to update
@@ -51,7 +51,7 @@ filesToUpdate.forEach(file => {
     // Update organization URLs
     content = content.replace(
       /https:\/\/supabase\.com\/dashboard\/project\/[^\/]+/g,
-      `https://supabase.com/dashboard/org/${NEW_ORG}`
+      `https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep
     );
     
     if (content !== originalContent) {
@@ -70,7 +70,7 @@ console.log('━━━━━━━━━━━━━━━━━━━━━━�
 console.log('📋 Следващи стъпки:');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 console.log('1. Отворете новата организация:');
-console.log(`   https://supabase.com/dashboard/org/${NEW_ORG}\n`);
+console.log(`   https://supabase.com/dashboard/org/rbpqagivdpacdvwlwgep
 console.log('2. Изберете или създайте проект в тази организация\n');
 console.log('3. Обновете .env файла с новите credentials:');
 console.log('   - VITE_SUPABASE_URL');

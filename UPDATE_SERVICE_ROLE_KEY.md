@@ -12,7 +12,7 @@
 ## Стъпки за обновяване
 
 1. **Вземете Service Role Key от Supabase Dashboard:**
-   - Отидете: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/settings/api
+   - Отидете: https://supabase.com/dashboard/project/qxompdwqdnemsntssjot/settings/api
    - В секцията **Project API keys** намерете **`service_role`** key
    - Копирайте ключа (започва с `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`)
 

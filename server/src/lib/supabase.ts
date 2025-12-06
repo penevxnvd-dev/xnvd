@@ -26,7 +26,7 @@ if (!SUPABASE_SERVICE_ROLE_KEY || SUPABASE_SERVICE_ROLE_KEY === 'REPLACE_WITH_RE
   console.warn('⚠️  WARNING: SUPABASE_SERVICE_ROLE_KEY not found or is placeholder.');
   console.warn('   Using anon key as fallback. Some admin operations may fail due to RLS policies.');
   console.warn('   For full functionality, set SUPABASE_SERVICE_ROLE_KEY or VITE_SUPABASE_SERVICE_ROLE_KEY');
-  console.warn('   Get it from: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/settings/api');
+  console.warn('   Get it from: https://supabase.com/dashboard/project/qxompdwqdnemsntssjot/settings/api');
 }
 
 // Use anon key as fallback if service_role is not available
