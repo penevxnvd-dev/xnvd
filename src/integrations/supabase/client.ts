@@ -27,15 +27,11 @@ export const supabase = (() => {
     
     supabaseInstance = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
       auth: {
-        storage: {
-          getItem: () => null, // Disable storage - always return null
-          setItem: () => {}, // Disable storage - do nothing
-          removeItem: () => {}, // Disable storage - do nothing
-        },
-        persistSession: false, // Disable automatic session persistence
-        autoRefreshToken: false, // Disable automatic token refresh
-        detectSessionInUrl: false, // Disable automatic session detection
+        persistSession: true, // Enable session persistence
+        autoRefreshToken: true, // Enable automatic token refresh
+        detectSessionInUrl: true, // Enable automatic session detection
         flowType: 'pkce', // Use PKCE flow for better security
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined, // Use localStorage in browser
       },
       // Global options to prevent multiple instances warning
       global: {

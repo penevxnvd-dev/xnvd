@@ -37,13 +37,28 @@ class SupabaseApiClient {
     
       // Get user profile
       if (data.user) {
+        // Wait a bit to ensure session is set
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', data.user.id)
           .single();
 
-        if (profileError) throw profileError;
+        if (profileError) {
+          console.error('Error fetching profile after login:', profileError);
+          // Don't throw - return user without profile data
+          // The profile might be created by a trigger
+          return {
+            user: {
+              ...data.user,
+              full_name: data.user.user_metadata?.full_name || data.user.email,
+              email: data.user.email,
+            },
+            session: data.session,
+          };
+        }
 
         return {
           user: {
