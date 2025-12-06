@@ -24,4 +24,4 @@ dist-ssr
 *.sw?
 .vercel
 .env*.local
-.env
+# .env - REMOVED FROM GITIGNORE - WARNING: This will expose sensitive credentials!
