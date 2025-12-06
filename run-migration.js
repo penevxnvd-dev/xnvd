@@ -1,109 +1,129 @@
-#!/usr/bin/env node
-/**
- * Apply RLS Policy Fix Migration to Supabase
- * 
- * Usage:
- *   1. Get your Supabase database connection string from:
- *      https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/settings/database
- *      (Look for "Connection string" -> "URI")
- * 
- *   2. Set it as environment variable:
- *      export SUPABASE_DB_URL="postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres"
- * 
- *   3. Run this script:
- *      node run-migration.js
- */
+// Simple migration script - requires DATABASE_URL in .env
+import { readFileSync, existsSync, writeFileSync, unlinkSync } from 'fs';
+import { join } from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import pg from 'pg';
+const execAsync = promisify(exec);
 
-const { Client } = pg;
+console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+console.log('🚀 Автоматично прилагане на миграция');
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// Get database connection
-const DB_URL = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
-
-if (!DB_URL) {
-  console.error('❌ Database connection string not found.');
-  console.error('');
-  console.error('Please set SUPABASE_DB_URL environment variable.');
-  console.error('');
-  console.error('To get your Supabase database connection string:');
-  console.error('  1. Go to: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/settings/database');
-  console.error('  2. Scroll to "Connection string" section');
-  console.error('  3. Select "URI" format');
-  console.error('  4. Copy the connection string');
-  console.error('  5. Run: export SUPABASE_DB_URL="postgresql://..."');
-  console.error('  6. Then run this script again');
+// Read .env
+const envPath = join(process.cwd(), '.env');
+if (!existsSync(envPath)) {
+  console.error('❌ .env файлът не съществува');
   process.exit(1);
 }
 
-async function applyMigration() {
-  const client = new Client({
-    connectionString: DB_URL,
-    ssl: DB_URL.includes('supabase.co') ? { rejectUnauthorized: false } : false,
-  });
-
-  try {
-    console.log('🔌 Connecting to Supabase database...');
-    await client.connect();
-    console.log('✅ Connected successfully');
-
-    console.log('📄 Reading migration file...');
-    const migrationPath = join(__dirname, 'supabase', 'migrations', '20250102000000_fix_rls_policies.sql');
-    const migrationSQL = readFileSync(migrationPath, 'utf-8');
-
-    console.log('🚀 Applying RLS policy fixes...');
-    console.log('');
-    
-    // Execute the migration SQL
-    await client.query(migrationSQL);
-
-    console.log('✅ Migration applied successfully!');
-    console.log('');
-    console.log('The following RLS policies have been fixed:');
-    console.log('  ✅ countries');
-    console.log('  ✅ cities');
-    console.log('  ✅ offices');
-    console.log('  ✅ teams');
-    console.log('  ✅ realtors');
-    console.log('  ✅ deals');
-    console.log('  ✅ diagnoses');
-    console.log('  ✅ training_progress');
-    console.log('  ✅ user_roles');
-    console.log('');
-    console.log('🎉 Admin users can now INSERT, UPDATE, and DELETE rows!');
-    console.log('   The database is ready for use.');
-
-  } catch (error) {
-    console.error('');
-    console.error('❌ Error applying migration:', error.message);
-    console.error('');
-    
-    if (error.message.includes('password authentication failed')) {
-      console.error('Authentication failed. Please check your database connection string and password.');
-    } else if (error.message.includes('does not exist')) {
-      console.error('Note: Some policies might already be dropped. This is OK.');
-      console.error('The migration should still complete successfully.');
-    } else {
-      console.error('Full error details:', error);
-    }
-    
-    console.error('');
-    console.error('If you continue to have issues, apply the migration manually:');
-    console.error('  1. Go to: https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/sql/new');
-    console.error('  2. Copy contents of: supabase/migrations/20250102000000_fix_rls_policies.sql');
-    console.error('  3. Paste and run in SQL Editor');
-    
-    process.exit(1);
-  } finally {
-    await client.end();
+const envContent = readFileSync(envPath, 'utf-8');
+const envVars = {};
+envContent.split('\n').forEach(line => {
+  const match = line.match(/^([^#=]+)=(.*)$/);
+  if (match) {
+    const key = match[1].trim();
+    const value = match[2].trim().replace(/^["']|["']$/g, '');
+    envVars[key] = value;
   }
+});
+
+const DATABASE_URL = envVars.DATABASE_URL || envVars.SUPABASE_DATABASE_URL;
+
+if (!DATABASE_URL) {
+  console.error('❌ DATABASE_URL не е намерен в .env');
+  console.error('\n💡 Добавете DATABASE_URL в .env файла:');
+  console.error('   Формат: postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres');
+  console.error('   Или: postgresql://postgres:[password]@db.ufpeftuanzmkiryohesd.supabase.co:5432/postgres');
+  console.error('\n   Паролата може да се намери в:');
+  console.error('   https://supabase.com/dashboard/project/ufpeftuanzmkiryohesd/settings/database');
+  console.error('   (Connection string > Connection pooling > Session mode)\n');
+  process.exit(1);
 }
 
-applyMigration();
+// Read migration
+const migrationFile = join(process.cwd(), 'apply-supabase-migrations.sql');
+if (!existsSync(migrationFile)) {
+  console.error(`❌ Файлът ${migrationFile} не съществува`);
+  process.exit(1);
+}
 
+const migrationSQL = readFileSync(migrationFile, 'utf-8');
+
+// Check psql
+try {
+  await execAsync('which psql');
+} catch {
+  console.error('❌ psql не е намерен');
+  console.error('   Моля инсталирайте PostgreSQL client: sudo apt-get install postgresql-client\n');
+  process.exit(1);
+}
+
+// Write to temp file
+const tempFile = join(process.cwd(), '.migration-temp.sql');
+writeFileSync(tempFile, migrationSQL);
+
+try {
+  console.log('⏳ Прилагане на миграция чрез psql...\n');
+  
+  // Extract password from URL for PGPASSWORD
+  const passwordMatch = DATABASE_URL.match(/:\/\/[^:]+:([^@]+)@/);
+  const password = passwordMatch ? passwordMatch[1] : '';
+  
+  const env = { ...process.env };
+  if (password) {
+    env.PGPASSWORD = password;
+  }
+
+  const { stdout, stderr } = await execAsync(
+    `psql "${DATABASE_URL}" -f "${tempFile}"`,
+    { env, timeout: 60000 }
+  );
+
+  // Clean up
+  unlinkSync(tempFile);
+
+  if (stdout) console.log(stdout);
+  if (stderr) {
+    // Filter out NOTICE messages and "already exists" warnings
+    const lines = stderr.split('\n').filter(line => {
+      const lower = line.toLowerCase();
+      return !lower.includes('notice') && 
+             !lower.includes('already exists') &&
+             !lower.includes('does not exist, skipping') &&
+             line.trim().length > 0;
+    });
+    if (lines.length > 0) {
+      console.warn('⚠️  Предупреждения:');
+      console.warn(lines.join('\n'));
+    }
+  }
+
+  console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('✅ Миграцията е приложена успешно!');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+  
+  console.log('📋 Следващи стъпки:');
+  console.log('   1. Проверете резултата в Supabase Dashboard');
+  console.log('   2. Изпълнете create-managers-accounts.sql за създаване на акаунти\n');
+
+} catch (error) {
+  // Clean up on error
+  if (existsSync(tempFile)) {
+    unlinkSync(tempFile);
+  }
+  
+  console.error('\n❌ Грешка:', error.message);
+  
+  if (error.message.includes('password authentication failed')) {
+    console.error('\n💡 Проверете паролата в DATABASE_URL');
+  } else if (error.message.includes('could not connect')) {
+    console.error('\n💡 Проверете DATABASE_URL и интернет връзката');
+    console.error('   Уверете се, че използвате правилния connection string');
+  } else if (error.message.includes('timeout')) {
+    console.error('\n💡 Миграцията отне твърде много време');
+    console.error('   Проверете дали базата данни е достъпна');
+  }
+  
+  process.exit(1);
+}
