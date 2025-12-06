@@ -35,11 +35,30 @@ export const supabase = (() => {
         persistSession: false, // Disable automatic session persistence
         autoRefreshToken: false, // Disable automatic token refresh
         detectSessionInUrl: false, // Disable automatic session detection
+        flowType: 'pkce', // Use PKCE flow for better security
       },
       // Global options to prevent multiple instances warning
       global: {
         headers: {
           'x-client-info': 'xnvd-app',
+        },
+        fetch: (url, options = {}) => {
+          // Add retry logic for network errors
+          return fetch(url, {
+            ...options,
+            // Add timeout
+            signal: AbortSignal.timeout(30000), // 30 second timeout
+          }).catch((error) => {
+            // Retry once on network errors
+            if (error.name === 'AbortError' || error.message.includes('Failed to fetch')) {
+              console.warn('⚠️ Network error, retrying...');
+              return fetch(url, {
+                ...options,
+                signal: AbortSignal.timeout(30000),
+              });
+            }
+            throw error;
+          });
         },
       },
     });

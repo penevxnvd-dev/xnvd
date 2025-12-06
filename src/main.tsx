@@ -18,6 +18,11 @@ if (typeof window !== 'undefined') {
     if (message.includes('Failed to load resource') && (message.includes('register-iframe') || message.includes('403'))) {
       return; // Silently ignore these development-only errors
     }
+    // Filter out temporary network errors from Supabase Auth (will retry automatically)
+    if (message.includes('Failed to fetch') && message.includes('auth.supabase.io')) {
+      // Don't show these errors - they're handled with retry logic
+      return;
+    }
     originalError.apply(console, args);
   };
   

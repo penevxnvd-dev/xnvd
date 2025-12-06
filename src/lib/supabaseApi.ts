@@ -14,21 +14,26 @@ class SupabaseApiClient {
 
   // Auth methods - using Supabase Auth
   async login(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      // Provide more user-friendly error messages
-      if (error.message.includes('Invalid login credentials') || error.message.includes('Email not confirmed')) {
-        throw new Error('Невалиден имейл или парола. Моля проверете данните си.');
+      if (error) {
+        // Handle network errors
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+          throw new Error('Проблем с интернет връзката. Моля проверете връзката си и опитайте отново.');
+        }
+        // Provide more user-friendly error messages
+        if (error.message.includes('Invalid login credentials') || error.message.includes('Email not confirmed')) {
+          throw new Error('Невалиден имейл или парола. Моля проверете данните си.');
+        }
+        if (error.message.includes('Email not confirmed')) {
+          throw new Error('Моля потвърдете имейла си преди да влезете.');
+        }
+        throw error;
       }
-      if (error.message.includes('Email not confirmed')) {
-        throw new Error('Моля потвърдете имейла си преди да влезете.');
-      }
-      throw error;
-    }
     
     // Get user profile
     if (data.user) {
