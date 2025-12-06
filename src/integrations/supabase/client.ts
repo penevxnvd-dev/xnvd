@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { getEnv } from '@/lib/env';
 
-const { VITE_SUPABASE_URL: SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY } = getEnv();
+const { VITE_SUPABASE_URL: SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY: SUPABASE_PUBLISHABLE_KEY } = getEnv();
 
 // Verify we're using REMOTE Supabase (not local)
 if (SUPABASE_URL && SUPABASE_URL.includes('localhost')) {
