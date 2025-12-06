@@ -64,6 +64,11 @@ This project is built with:
 
 Simply open [Lovable](https://lovable.dev/projects/68725b4e-91c3-4ac6-8199-2b27abd35408) and click on Share -> Publish.
 
+**Automated CI/CD Deployment:**
+This project uses GitHub Actions for automated deployment to Vercel. Every push to the `main` branch triggers:
+- Automated testing and linting
+- Production deployment to Vercel (if tests pass)
+
 ## Can I connect a custom domain to my Lovable project?
 
 Yes, you can!
