@@ -36,8 +36,11 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
 import { UserManagementDialog } from '@/components/UserManagementDialog';
-import { Settings, Users } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { NotificationCenter } from '@/components/NotificationCenter';
+import { Settings, Users, Download } from 'lucide-react';
 import { LogOut, ChevronLeft, Home, Plus, Pencil, Trash2, Calendar, Menu, User, ChevronDown, FileText, Target, CheckCircle2, XCircle, Award, TrendingUp } from 'lucide-react';
+import { exportKPIData, exportDeals, exportDiagnoses } from '@/lib/export';
 import logo from '@/assets/logo.jpeg';
 import { CreateEditDialog } from '@/components/admin/CreateEditDialog';
 import { AddPersonToTeamDialog } from '@/components/admin/AddPersonToTeamDialog';
@@ -800,6 +803,54 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                   <span className="hidden sm:inline">Добави човек</span>
                 </Button>
               )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                    <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Експорт</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Експорт на данни</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {selectedRealtorKPI && (
+                    <>
+                      <DropdownMenuItem onClick={() => {
+                        exportKPIData(selectedRealtorKPI, `kpi-realtor-${selectedRealtor?.user.fullName}-${new Date().toISOString().split('T')[0]}`);
+                        toast.success('KPI данните са експортирани');
+                      }}>
+                        <BarChart3 className="h-4 w-4 mr-2" />
+                        KPI данни (Реализатор)
+                      </DropdownMenuItem>
+                      {selectedRealtorDeals.length > 0 && (
+                        <DropdownMenuItem onClick={() => {
+                          exportDeals(selectedRealtorDeals, `deals-${selectedRealtor?.user.fullName}-${new Date().toISOString().split('T')[0]}`);
+                          toast.success('Сделките са експортирани');
+                        }}>
+                          <TrendingUp className="h-4 w-4 mr-2" />
+                          Сделки (Реализатор)
+                        </DropdownMenuItem>
+                      )}
+                      {selectedRealtorDiagnoses.length > 0 && (
+                        <DropdownMenuItem onClick={() => {
+                          exportDiagnoses(selectedRealtorDiagnoses, `diagnoses-${selectedRealtor?.user.fullName}-${new Date().toISOString().split('T')[0]}`);
+                          toast.success('Диагнозите са експортирани');
+                        }}>
+                          <Users className="h-4 w-4 mr-2" />
+                          Диагнози (Реализатор)
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  <DropdownMenuItem disabled>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Експорт на всички данни (скоро)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <NotificationCenter />
+              <ThemeToggle />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="text-xs sm:text-sm">

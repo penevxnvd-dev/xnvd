@@ -3,11 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
-import { Settings, Sparkles } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { NotificationCenter } from '@/components/NotificationCenter';
+import { Settings, Sparkles, Download } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { LogOut, TrendingUp, Users, Target, CheckCircle2, XCircle, BookOpen, Menu, Zap, Award, BarChart3 } from 'lucide-react';
+import { exportKPIData, exportDeals, exportDiagnoses, exportTrainingProgress } from '@/lib/export';
 import logo from '@/assets/logo.jpeg';
 import { trainingStructure, calculateTrainingProgress, TrainingSection } from '@/data/trainingStructure';
 import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
@@ -493,6 +504,59 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
               </div>
 
               <div className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="hover:bg-accent/50 transition-colors">
+                      <Download className="h-4 w-4 mr-2" />
+                      <span className="hidden sm:inline">Експорт</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Експорт на данни</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => {
+                      const kpiData = {
+                        diagnoses: diagnoses.length,
+                        deals: deals.length,
+                        successRate: calculateSuccessRate(),
+                        realtors: 1,
+                      };
+                      exportKPIData(kpiData, `kpi-${realtorData.user.fullName}-${new Date().toISOString().split('T')[0]}`);
+                      toast.success('KPI данните са експортирани');
+                    }}>
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      KPI данни
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      exportDeals(deals, `deals-${new Date().toISOString().split('T')[0]}`);
+                      toast.success('Сделките са експортирани');
+                    }}>
+                      <TrendingUp className="h-4 w-4 mr-2" />
+                      Сделки
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      exportDiagnoses(diagnoses, `diagnoses-${new Date().toISOString().split('T')[0]}`);
+                      toast.success('Диагнозите са експортирани');
+                    }}>
+                      <Users className="h-4 w-4 mr-2" />
+                      Диагнози
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={async () => {
+                      try {
+                        const progress = await supabaseApi.getTrainingProgress();
+                        exportTrainingProgress(progress, `training-${new Date().toISOString().split('T')[0]}`);
+                        toast.success('Обучението е експортирано');
+                      } catch (error) {
+                        toast.error('Грешка при експорт на обучение');
+                      }
+                    }}>
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      Обучение
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <NotificationCenter />
+                <ThemeToggle />
                 <Button 
                   variant="outline" 
                   size="sm" 

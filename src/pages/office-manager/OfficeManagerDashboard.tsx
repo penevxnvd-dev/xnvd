@@ -4,9 +4,20 @@ import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { LogOut, Building2, Users, TrendingUp } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { LogOut, Building2, Users, TrendingUp, Download, BarChart3 } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { NotificationCenter } from '@/components/NotificationCenter';
+import { exportKPIData } from '@/lib/export';
 import { TeamCardWithKPI } from '@/components/cards/TeamCardWithKPI';
 import { calculateOfficeKPI, KPIMetrics, formatSuccessRate } from '@/utils/kpiCalculations';
 import { supabase } from '@/integrations/supabase/client';
@@ -206,6 +217,29 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Download className="h-4 w-4 mr-2" />
+                  Експорт
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Експорт на данни</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => {
+                  if (kpiMetrics) {
+                    exportKPIData(kpiMetrics, `kpi-office-${officeData.name}-${new Date().toISOString().split('T')[0]}`);
+                    toast.success('KPI данните са експортирани');
+                  }
+                }}>
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  KPI данни
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <NotificationCenter />
+            <ThemeToggle />
             <AccountSettingsDialog />
             <Button onClick={handleLogout} variant="outline" size="sm">
               <LogOut className="h-4 w-4 mr-2" />
