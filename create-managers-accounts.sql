@@ -73,7 +73,7 @@ BEGIN
   
   IF v_user_id IS NOT NULL THEN
     -- Create profile and role
-    PERFORM create_manager_account('krasi.katev@xnvd.com', 'Krasi123!', 'Краси Кътев', 'office_manager');
+    PERFORM create_manager_account('krasi.katev@xnvd.com', 'Краси Кътев', 'office_manager');
     
     -- Find or create Бургас city
     SELECT id INTO v_city_id FROM cities WHERE name = 'Бургас' LIMIT 1;
@@ -111,7 +111,7 @@ BEGIN
   SELECT id INTO v_user_id FROM auth.users WHERE email = 'lazar.bundev@xnvd.com' LIMIT 1;
   
   IF v_user_id IS NOT NULL THEN
-    PERFORM create_manager_account('lazar.bundev@xnvd.com', 'Lazar123!', 'Лазар Бундев', 'team_leader');
+    PERFORM create_manager_account('lazar.bundev@xnvd.com', 'Лазар Бундев', 'team_leader');
     
     SELECT id INTO v_city_id FROM cities WHERE name = 'Бургас' LIMIT 1;
     IF v_city_id IS NULL THEN
@@ -154,7 +154,7 @@ BEGIN
   SELECT id INTO v_user_id FROM auth.users WHERE email = 'georgi.penev@xnvd.com' LIMIT 1;
   
   IF v_user_id IS NOT NULL THEN
-    PERFORM create_manager_account('georgi.penev@xnvd.com', 'Georgi123!', 'Георги Пенев', 'team_leader');
+    PERFORM create_manager_account('georgi.penev@xnvd.com', 'Георги Пенев', 'team_leader');
     
     SELECT id INTO v_city_id FROM cities WHERE name = 'Бургас' LIMIT 1;
     IF v_city_id IS NULL THEN
@@ -195,7 +195,7 @@ BEGIN
   SELECT id INTO v_user_id FROM auth.users WHERE email = 'kamen.georgiev@xnvd.com' LIMIT 1;
   
   IF v_user_id IS NOT NULL THEN
-    PERFORM create_manager_account('kamen.georgiev@xnvd.com', 'Kamen123!', 'Камен Георгиев', 'regional_manager');
+    PERFORM create_manager_account('kamen.georgiev@xnvd.com', 'Камен Георгиев', 'regional_manager');
     
     -- Set manager for Бургас
     SELECT id INTO v_city_id FROM cities WHERE name = 'Бургас' LIMIT 1;
@@ -224,17 +224,21 @@ BEGIN
 END $$;
 
 -- Cleanup function
-DROP FUNCTION IF EXISTS create_manager_account(TEXT, TEXT, TEXT, TEXT);
+DROP FUNCTION IF EXISTS create_manager_account(TEXT, TEXT, TEXT);
 
-RAISE NOTICE '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
-RAISE NOTICE '✅ Скриптът е изпълнен!';
-RAISE NOTICE '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
-RAISE NOTICE '';
-RAISE NOTICE '📋 СЪЗДАДЕНИ АКАУНТИ:';
-RAISE NOTICE '1. Краси Кътев - Office Manager (Бургас)';
-RAISE NOTICE '2. Лазар Бундев - Team Leader (Бургас)';
-RAISE NOTICE '3. Георги Пенев - Team Leader (Бургас)';
-RAISE NOTICE '4. Камен Георгиев - Regional Manager (Бургас, Пловдив)';
-RAISE NOTICE '';
-RAISE NOTICE '🌐 Влезте на: https://xnvd.vercel.app/auth';
+-- Summary message
+DO $$
+BEGIN
+  RAISE NOTICE '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+  RAISE NOTICE '✅ Скриптът е изпълнен!';
+  RAISE NOTICE '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+  RAISE NOTICE '';
+  RAISE NOTICE '📋 СЪЗДАДЕНИ АКАУНТИ:';
+  RAISE NOTICE '1. Краси Кътев - Office Manager (Бургас)';
+  RAISE NOTICE '2. Лазар Бундев - Team Leader (Бургас)';
+  RAISE NOTICE '3. Георги Пенев - Team Leader (Бургас)';
+  RAISE NOTICE '4. Камен Георгиев - Regional Manager (Бургас, Пловдив)';
+  RAISE NOTICE '';
+  RAISE NOTICE '🌐 Влезте на: https://xnvd.vercel.app/auth';
+END $$;
 
