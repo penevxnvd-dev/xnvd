@@ -12,9 +12,16 @@ This happens because the `VERCEL_TOKEN` GitHub secret is not configured.
 
 ### Step 1: Get Your Vercel Token
 
+**If you already created a token named "github":**
+1. Go to [Vercel Dashboard](https://vercel.com/account/tokens)
+2. Find your token named "github"
+3. **⚠️ Important:** If you can't see the token value, you'll need to create a new one (tokens are only shown once when created)
+4. If you still have the token value, copy it
+
+**If you need to create a new token:**
 1. Go to [Vercel Dashboard](https://vercel.com/account/tokens)
 2. Click **"Create Token"**
-3. Give it a name (e.g., "GitHub Actions CI/CD")
+3. Give it a name (e.g., "GitHub Actions CI/CD" or "github")
 4. Set expiration (or leave as "No expiration")
 5. Click **"Create"**
 6. **Copy the token immediately** (you won't be able to see it again!)
