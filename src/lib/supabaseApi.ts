@@ -14,7 +14,7 @@ class SupabaseApiClient {
 
   // Auth methods - using Supabase Auth
   async login(email: string, password: string) {
-    try {
+    const attemptLogin = async () => {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -22,8 +22,8 @@ class SupabaseApiClient {
 
       if (error) {
         // Handle network errors
-        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-          throw new Error('Проблем с интернет връзката. Моля проверете връзката си и опитайте отново.');
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError') || error.message.includes('auth.supabase.io')) {
+          throw new Error('NETWORK_ERROR');
         }
         // Provide more user-friendly error messages
         if (error.message.includes('Invalid login credentials') || error.message.includes('Email not confirmed')) {
@@ -35,26 +35,47 @@ class SupabaseApiClient {
         throw error;
       }
     
-    // Get user profile
-    if (data.user) {
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
+      // Get user profile
+      if (data.user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
 
-      if (profileError) throw profileError;
+        if (profileError) throw profileError;
 
-      return {
-        user: {
-          ...data.user,
-          ...profile,
-        },
-        session: data.session,
-      };
+        return {
+          user: {
+            ...data.user,
+            ...profile,
+          },
+          session: data.session,
+        };
+      }
+
+      return { user: data.user, session: data.session };
+    };
+
+    try {
+      return await attemptLogin();
+    } catch (err: any) {
+      // Retry once on network errors
+      if (err.message === 'NETWORK_ERROR' || err.message?.includes('Failed to fetch') || err.message?.includes('auth.supabase.io')) {
+        console.warn('⚠️ Network error, retrying login...');
+        // Wait 1 second before retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+          return await attemptLogin();
+        } catch (retryError: any) {
+          if (retryError.message === 'NETWORK_ERROR') {
+            throw new Error('Проблем с връзката към сървъра. Моля проверете интернет връзката си и опитайте отново.');
+          }
+          throw retryError;
+        }
+      }
+      throw err;
     }
-
-    return { user: data.user, session: data.session };
   }
 
   async register(email: string, password: string, fullName: string) {
