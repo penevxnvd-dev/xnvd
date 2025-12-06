@@ -75,7 +75,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 </CommandItem>
               ))}
             </CommandGroup>
-          </CommandGroup>
+          </CommandList>
         </Command>
         <div className="text-xs text-muted-foreground mt-2">
           Натиснете <kbd className="px-1.5 py-0.5 bg-muted rounded">Esc</kbd> за затваряне
