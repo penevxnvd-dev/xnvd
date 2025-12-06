@@ -1,0 +1,38 @@
+{
+  "common": {
+    "loading": "Зареждане...",
+    "error": "Грешка",
+    "success": "Успех",
+    "save": "Запази",
+    "cancel": "Отказ",
+    "delete": "Изтрий",
+    "edit": "Редактирай",
+    "create": "Създай",
+    "update": "Обнови",
+    "search": "Търсене",
+    "logout": "Изход"
+  },
+  "auth": {
+    "login": "Вход",
+    "register": "Регистрация",
+    "email": "Имейл",
+    "password": "Парола",
+    "fullName": "Пълно име",
+    "forgotPassword": "Забравена парола"
+  },
+  "dashboard": {
+    "title": "Табло",
+    "deals": "Сделки",
+    "diagnoses": "Диагнози",
+    "successRate": "Успеваемост",
+    "training": "Обучение",
+    "progress": "Прогрес"
+  },
+  "roles": {
+    "admin": "Администратор",
+    "realtor": "Реализатор",
+    "teamLeader": "Ръководител на екип",
+    "officeManager": "Мениджър на офис"
+  }
+}
+

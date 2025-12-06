@@ -1,0 +1,38 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "update": "Update",
+    "search": "Search",
+    "logout": "Logout"
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "email": "Email",
+    "password": "Password",
+    "fullName": "Full Name",
+    "forgotPassword": "Forgot Password"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "deals": "Deals",
+    "diagnoses": "Diagnoses",
+    "successRate": "Success Rate",
+    "training": "Training",
+    "progress": "Progress"
+  },
+  "roles": {
+    "admin": "Administrator",
+    "realtor": "Realtor",
+    "teamLeader": "Team Leader",
+    "officeManager": "Office Manager"
+  }
+}
+
