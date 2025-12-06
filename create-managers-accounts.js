@@ -16,8 +16,11 @@ envContent.split('\n').forEach(line => {
   }
 });
 
+// Map environment variables - support multiple naming conventions
 const SUPABASE_URL = envVars.VITE_SUPABASE_URL || envVars.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = envVars.SUPABASE_SERVICE_ROLE_KEY || envVars.VITE_SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SERVICE_KEY = envVars.SUPABASE_SERVICE_ROLE_KEY || 
+                             envVars.VITE_SUPABASE_SERVICE_ROLE_KEY ||
+                             envVars.VITE_SUPABASE_PUBLISHABLE_KEY; // Fallback to anon key
 
 if (!SUPABASE_URL) {
   console.error('❌ Липсва VITE_SUPABASE_URL в .env файла');
