@@ -21,7 +21,7 @@ if (!existsSync(backupDir)) {
   mkdirSync(backupDir, { recursive: true });
 }
 
-// Data extracted from MCP Supabase
+// Data extracted from MCP Supabase (latest sync)
 const allData = {
   countries: [
     {
