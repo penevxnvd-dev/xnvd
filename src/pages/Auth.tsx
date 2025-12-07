@@ -68,12 +68,6 @@ const Auth = () => {
           <div className="flex justify-center mb-4">
             <img src={logo} alt="HRCO Logo" className="h-20 w-20 object-contain" />
           </div>
-          <CardTitle>{isLogin ? "Вход" : "Регистрация"}</CardTitle>
-          <CardDescription>
-            {isLogin
-              ? "Въведете вашия имейл и парола"
-              : "Създайте нов акаунт"}
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleAuth} className="space-y-4">
@@ -117,29 +111,6 @@ const Auth = () => {
             </Button>
           </form>
           <div className="mt-4 space-y-2">
-            <div className="text-center text-sm">
-              {isLogin ? (
-                <>
-                  Нямате акаунт?{" "}
-                  <button
-                    onClick={() => setIsLogin(false)}
-                    className="text-primary hover:underline"
-                  >
-                    Регистрирайте се
-                  </button>
-                </>
-              ) : (
-                <>
-                  Имате акаунт?{" "}
-                  <button
-                    onClick={() => setIsLogin(true)}
-                    className="text-primary hover:underline"
-                  >
-                    Влезте
-                  </button>
-                </>
-              )}
-            </div>
             <div className="text-center">
               <button
                 onClick={() => {
