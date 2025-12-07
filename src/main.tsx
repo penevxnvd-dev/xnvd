@@ -49,6 +49,28 @@ if (typeof window !== 'undefined') {
       // Don't show these errors - they're handled with retry logic
       return;
     }
+    // Filter out WebSocket/Realtime connection errors (not critical if Realtime isn't used)
+    if (message.includes('websocket') || 
+        message.includes('WebSocket') || 
+        message.includes('realtime') ||
+        message.includes('Realtime') ||
+        message.includes('NS_ERROR_WEBSOCKET') ||
+        allArgsStr.includes('websocket') ||
+        allArgsStr.includes('realtime/v1/websocket') ||
+        allArgsStr.includes('ns_error_websocket') ||
+        allArgsStr.includes('connection_refused')) {
+      // These are non-critical - Realtime is optional
+      if (!import.meta.env.DEV) {
+        return; // Filter in production
+      }
+      // In dev, show as debug but don't clutter console
+      console.debug('WebSocket connection attempt (Realtime):', args[0]);
+      return;
+    }
+    // Filter out cookie domain warnings (browser security, not app errors)
+    if (message.includes('Cookie') && message.includes('rejected') && message.includes('domain')) {
+      return; // Browser security warnings, not app errors
+    }
     // Filter out SES (Secure EcmaScript) lockdown errors
     // These are caused by browser extensions (like MetaMask) injecting SES code
     // They don't affect the app's functionality and are safe to ignore
@@ -115,6 +137,19 @@ if (typeof window !== 'undefined') {
     // Filter out BrowserAutomation warnings (Cursor/VS Code browser automation)
     if (message.includes('BrowserAutomation') || message.includes('MCP server') || message.includes('Tab ID already registered')) {
       return; // Silently ignore browser automation tool warnings
+    }
+    // Filter out WebSocket/Realtime warnings (non-critical)
+    if (message.includes('websocket') || 
+        message.includes('WebSocket') || 
+        message.includes('realtime') ||
+        message.includes('Realtime') ||
+        allWarnArgsStr.includes('websocket') ||
+        allWarnArgsStr.includes('realtime')) {
+      return; // Silently ignore Realtime warnings
+    }
+    // Filter out cookie domain warnings (browser security, not app errors)
+    if (message.includes('Cookie') && message.includes('rejected') && message.includes('domain')) {
+      return; // Browser security warnings, not app errors
     }
     originalWarn.apply(console, args);
   };
