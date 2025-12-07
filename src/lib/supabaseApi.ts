@@ -1,35 +1,9 @@
-// Supabase-based API client - uses hardcoded data as PRIMARY source
-// Priority: 1. Hardcoded data, 2. Local backup, 3. Supabase (fallback)
+// Supabase-based API client - loads data directly from Supabase
+// Priority: 1. Supabase (primary), 2. Local backup (fallback)
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { handleSupabaseError } from './errorHandler';
-import { localBackup } from './localBackup';
-import { 
-  getHardcodedAccounts, 
-  getHardcodedCountries, 
-  getHardcodedCities, 
-  getHardcodedOffices, 
-  getHardcodedTeams,
-  getHardcodedProfiles,
-  getHardcodedRealtors,
-  getHardcodedUserRoles,
-  getHardcodedDeals,
-  getHardcodedDiagnoses,
-  getHardcodedTrainingProgress,
-  getHardcodedRealtorGoals,
-  getHardcodedBuyerSchedule,
-  getHardcodedMessages,
-  findAccountByEmail,
-  getTeamsByOffice,
-  getOfficesByCity,
-  getCitiesByCountry,
-  getRealtorsByTeam,
-  getDealsByRealtor,
-  getDiagnosesByRealtor,
-  getTrainingProgressByRealtor,
-  getRealtorGoalsByRealtor,
-  getBuyerScheduleByRealtor,
-} from './hardcodedData';
+import { withLocalBackupFirst } from './localBackup';
 
 type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
 type TablesInsert<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert'];
@@ -39,7 +13,7 @@ type TablesUpdate<T extends keyof Database['public']['Tables']> = Database['publ
  * Helper function: Try hardcoded data first, then local backup, then Supabase
  * Priority: 1. Hardcoded, 2. Local backup, 3. Supabase (fallback only)
  */
-async function withHardcodedFirst<T>(
+async function withLocalBackupFirst<T>(
   tableName: string,
   getHardcoded: () => T[],
   getHardcodedFiltered?: (filter: (item: T) => boolean) => T[],
@@ -59,7 +33,7 @@ async function withHardcodedFirst<T>(
     }
     
     if (hardcodedData && hardcodedData.length > 0) {
-      console.info(`[withHardcodedFirst] Using hardcoded data for ${tableName} (${hardcodedData.length} records)`);
+      console.info(`[withLocalBackupFirst] Using hardcoded data for ${tableName} (${hardcodedData.length} records)`);
       return {
         data: hardcodedData,
         fromHardcoded: true,
@@ -67,14 +41,14 @@ async function withHardcodedFirst<T>(
       };
     }
   } catch (error) {
-    console.warn(`[withHardcodedFirst] Error getting hardcoded ${tableName}:`, error);
+    console.warn(`[withLocalBackupFirst] Error getting hardcoded ${tableName}:`, error);
   }
 
   // 2. Try local backup (SECONDARY source)
   try {
     const backupData = await localBackup.queryTable<T>(tableName, filter);
     if (backupData && backupData.length > 0) {
-      console.info(`[withHardcodedFirst] Using local backup for ${tableName} (${backupData.length} records)`);
+      console.info(`[withLocalBackupFirst] Using local backup for ${tableName} (${backupData.length} records)`);
       return {
         data: backupData,
         fromHardcoded: false,
@@ -82,16 +56,16 @@ async function withHardcodedFirst<T>(
       };
     }
   } catch (error) {
-    console.warn(`[withHardcodedFirst] Error getting local backup for ${tableName}:`, error);
+    console.warn(`[withLocalBackupFirst] Error getting local backup for ${tableName}:`, error);
   }
 
   // 3. Try Supabase (FALLBACK only)
   if (supabaseCall) {
     try {
-      console.info(`[withHardcodedFirst] Hardcoded and backup empty for ${tableName}, trying Supabase...`);
+      console.info(`[withLocalBackupFirst] Hardcoded and backup empty for ${tableName}, trying Supabase...`);
       const result = await supabaseCall();
       if (!result.error && result.data && result.data.length > 0) {
-        console.info(`[withHardcodedFirst] Using Supabase for ${tableName} (${result.data.length} records)`);
+        console.info(`[withLocalBackupFirst] Using Supabase for ${tableName} (${result.data.length} records)`);
         return {
           data: result.data,
           fromHardcoded: false,
@@ -99,12 +73,12 @@ async function withHardcodedFirst<T>(
         };
       }
     } catch (error) {
-      console.warn(`[withHardcodedFirst] Error getting Supabase data for ${tableName}:`, error);
+      console.warn(`[withLocalBackupFirst] Error getting Supabase data for ${tableName}:`, error);
     }
   }
 
   // All sources failed or empty - return empty array
-  console.info(`[withHardcodedFirst] All sources empty for ${tableName}, returning empty array`);
+  console.info(`[withLocalBackupFirst] All sources empty for ${tableName}, returning empty array`);
   return {
     data: [],
     fromHardcoded: false,
@@ -118,55 +92,8 @@ class SupabaseApiClient {
     return supabase;
   }
 
-  // Auth methods - using hardcoded data as PRIMARY source
+  // Auth methods - using Supabase directly
   async login(email: string, password: string) {
-    // First try hardcoded data (PRIMARY source)
-    const hardcodedAccount = findAccountByEmail(email.trim());
-    if (hardcodedAccount) {
-      // Check password for hardcoded accounts
-      if (password !== hardcodedAccount.password) {
-        throw new Error('Невалиден имейл или парола. Моля проверете данните си.');
-      }
-      
-      console.info('[Login] Using hardcoded account (PRIMARY source):', email);
-      
-      const profile = getHardcodedProfiles().find(p => p.id === hardcodedAccount.id);
-      const userRoles = getHardcodedUserRoles().filter(ur => ur.user_id === hardcodedAccount.id);
-      
-      const session = {
-        access_token: 'hardcoded-offline-token',
-        refresh_token: 'hardcoded-offline-refresh',
-        expires_in: 3600,
-        expires_at: Date.now() + 3600000,
-        token_type: 'bearer',
-        user: {
-          id: hardcodedAccount.id,
-          email: hardcodedAccount.email,
-          user_metadata: {
-            full_name: hardcodedAccount.full_name,
-          },
-        },
-        hardcoded: true, // Flag to indicate this is from hardcoded data
-      };
-      
-      // Store hardcoded session in localStorage
-      localStorage.setItem('hardcoded-session', JSON.stringify(session));
-      
-      return {
-        user: {
-          id: hardcodedAccount.id,
-          email: hardcodedAccount.email,
-          full_name: hardcodedAccount.full_name,
-          ...profile,
-          roles: userRoles.map(ur => ur.role),
-        },
-        session,
-        hardcoded: true,
-      };
-    }
-
-    // Fallback to Supabase (only if hardcoded account not found)
-    console.info('[Login] Hardcoded account not found, trying Supabase...');
     const attemptLogin = async () => {
       if (!supabase) {
         throw new Error('Supabase client not initialized. Please check environment variables.');
@@ -262,47 +189,13 @@ class SupabaseApiClient {
   }
 
   async logout() {
-    // Clear hardcoded session
-    localStorage.removeItem('hardcoded-session');
-    
-    // Also logout from Supabase if logged in
     if (supabase) {
       await supabase.auth.signOut();
     }
   }
 
   async getCurrentUser() {
-    // Check for hardcoded session first (PRIMARY)
-    const hardcodedSession = localStorage.getItem('hardcoded-session');
-    if (hardcodedSession) {
-      try {
-        const session = JSON.parse(hardcodedSession);
-        if (session.user && session.hardcoded) {
-          console.log('[getCurrentUser] Using hardcoded session (PRIMARY source)');
-          const profile = getHardcodedProfiles().find(p => p.id === session.user.id);
-          const userRoles = getHardcodedUserRoles().filter(ur => ur.user_id === session.user.id);
-          
-          if (!profile) {
-            console.warn('[getCurrentUser] No profile found for hardcoded user:', session.user.id);
-          }
-          
-          return {
-            user: {
-              id: session.user.id,
-              email: session.user.email,
-              full_name: session.user.user_metadata?.full_name || profile?.full_name || session.user.email,
-              ...profile,
-              roles: userRoles.map(ur => ur.role),
-            },
-          };
-        }
-      } catch (e) {
-        console.error('[getCurrentUser] Error processing hardcoded session:', e);
-        localStorage.removeItem('hardcoded-session');
-      }
-    }
-
-    // Fallback to Supabase
+    // Get user from Supabase
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
@@ -325,13 +218,10 @@ class SupabaseApiClient {
     };
   }
 
-  // Countries - hardcoded first, then backup, then Supabase
+  // Countries - Supabase first, then local backup
   async getCountries() {
-    return withHardcodedFirst(
+    const result = await withLocalBackupFirst(
       'countries',
-      () => getHardcodedCountries(),
-      undefined,
-      undefined,
       async () => {
         const { data, error } = await supabase
           .from('countries')
@@ -339,16 +229,17 @@ class SupabaseApiClient {
           .order('name', { ascending: true });
         return { data, error };
       }
-    ).then(result => result.data as Tables<'countries'>[]);
+    );
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+    return (result.data as Tables<'countries'>[]) || [];
   }
 
-  // Cities - hardcoded first, then backup, then Supabase
+  // Cities - Supabase first, then local backup
   async getCitiesByCountry(countryId: string) {
-    return withHardcodedFirst(
+    const result = await withLocalBackupFirst(
       'cities',
-      () => getHardcodedCities(),
-      (filter) => getCitiesByCountry(countryId),
-      (city) => (city as { country_id?: string }).country_id === countryId,
       async () => {
         const { data, error } = await supabase
           .from('cities')
@@ -356,16 +247,21 @@ class SupabaseApiClient {
           .eq('country_id', countryId)
           .order('name', { ascending: true });
         return { data, error };
-      }
-    ).then(result => result.data as Tables<'cities'>[]);
+      },
+      (city) => (city as { country_id?: string }).country_id === countryId
+    );
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+    return (result.data as Tables<'cities'>[]) || [];
   }
 
   // Offices - hardcoded first, then backup, then Supabase
   async getOfficesByCity(cityId: string) {
-    return withHardcodedFirst(
+    return withLocalBackupFirst(
       'offices',
-      () => getHardcodedOffices(),
-      (filter) => getOfficesByCity(cityId),
+      () => [],
+      ,
       (office) => (office as { city_id?: string }).city_id === cityId,
       async () => {
         const { data, error } = await supabase
@@ -379,9 +275,9 @@ class SupabaseApiClient {
   }
 
   async getAllOffices() {
-    return withHardcodedFirst(
+    return withLocalBackupFirst(
       'offices',
-      () => getHardcodedOffices(),
+      () => [],
       undefined,
       undefined,
       async () => {
@@ -418,10 +314,10 @@ class SupabaseApiClient {
 
   // Teams - hardcoded first, then backup, then Supabase
   async getTeamsByOffice(officeId: string) {
-    return withHardcodedFirst(
+    return withLocalBackupFirst(
       'teams',
-      () => getHardcodedTeams(),
-      (filter) => getTeamsByOffice(officeId),
+      () => [],
+      ,
       (team) => (team as { office_id?: string }).office_id === officeId,
       async () => {
         const { data, error } = await supabase
@@ -436,10 +332,10 @@ class SupabaseApiClient {
 
   // Realtors - hardcoded first, then backup, then Supabase
   async getRealtorsByTeam(teamId: string) {
-    return withHardcodedFirst(
+    return withLocalBackupFirst(
       'realtors',
-      () => getHardcodedRealtors(),
-      (filter) => getRealtorsByTeam(teamId),
+      () => [],
+      ,
       (realtor) => (realtor as { team_id?: string }).team_id === teamId,
       async () => {
         const { data, error } = await supabase
@@ -453,9 +349,9 @@ class SupabaseApiClient {
   }
 
   async getAllTeamLeaders() {
-    const teams = await withHardcodedFirst(
+    const teams = await withLocalBackupFirst(
       'teams',
-      () => getHardcodedTeams(),
+      () => [],
       undefined,
       undefined,
       async () => {
@@ -470,19 +366,19 @@ class SupabaseApiClient {
       .map(t => (t as { leader_id?: string }).leader_id)
       .filter((id): id is string => !!id);
     
-    const profiles = getHardcodedProfiles();
+    const profiles = [];
     return profiles.filter(p => leaderIds.includes(p.id));
   }
 
   async getAvailableProfilesForTeam(teamId: string) {
     const teamRealtors = await this.getRealtorsByTeam(teamId);
-    const allProfiles = getHardcodedProfiles();
+    const allProfiles = [];
     const assignedIds = new Set(teamRealtors.map(r => (r as { user_id?: string }).user_id));
     return allProfiles.filter(p => !assignedIds.has(p.id));
   }
 
   async getCurrentRealtor(userId: string) {
-    const realtors = getHardcodedRealtors();
+    const realtors = [];
     const realtor = realtors.find(r => (r as { user_id?: string }).user_id === userId);
     if (realtor) {
       return realtor as Tables<'realtors'>;
@@ -504,10 +400,10 @@ class SupabaseApiClient {
     const realtor = await this.getCurrentRealtor(userId);
     if (!realtor) return [];
     
-    return withHardcodedFirst(
+    return withLocalBackupFirst(
       'deals',
-      () => getHardcodedDeals(),
-      (filter) => getDealsByRealtor(realtor.id),
+      () => [],
+      ,
       (deal) => (deal as { realtor_id?: string }).realtor_id === realtor.id,
       async () => {
         const { data, error } = await supabase
@@ -525,10 +421,10 @@ class SupabaseApiClient {
     const realtor = await this.getCurrentRealtor(userId);
     if (!realtor) return [];
     
-    return withHardcodedFirst(
+    return withLocalBackupFirst(
       'diagnoses',
-      () => getHardcodedDiagnoses(),
-      (filter) => getDiagnosesByRealtor(realtor.id),
+      () => [],
+      ,
       (diagnosis) => (diagnosis as { realtor_id?: string }).realtor_id === realtor.id,
       async () => {
         const { data, error } = await supabase
@@ -546,10 +442,10 @@ class SupabaseApiClient {
     const realtor = await this.getCurrentRealtor(userId);
     if (!realtor) return [];
     
-    return withHardcodedFirst(
+    return withLocalBackupFirst(
       'training_progress',
-      () => getHardcodedTrainingProgress(),
-      (filter) => getTrainingProgressByRealtor(realtor.id),
+      () => [],
+      ,
       (progress) => (progress as { realtor_id?: string }).realtor_id === realtor.id,
       async () => {
         const { data, error } = await supabase
@@ -574,10 +470,10 @@ class SupabaseApiClient {
     }
 
     const deals = await this.getMyDeals(userId);
-    const goals = await withHardcodedFirst(
+    const goals = await withLocalBackupFirst(
       'realtor_goals',
-      () => getHardcodedRealtorGoals(),
-      (filter) => getRealtorGoalsByRealtor(realtor.id),
+      () => [],
+      ,
       (goal) => (goal as { realtor_id?: string }).realtor_id === realtor.id,
       async () => {
         const { data, error } = await supabase
@@ -657,10 +553,10 @@ class SupabaseApiClient {
     const realtor = await this.getCurrentRealtor(userId);
     if (!realtor) return [];
     
-    return withHardcodedFirst(
+    return withLocalBackupFirst(
       'buyer_schedule',
-      () => getHardcodedBuyerSchedule(),
-      (filter) => getBuyerScheduleByRealtor(realtor.id),
+      () => [],
+      ,
       (schedule) => (schedule as { realtor_id?: string }).realtor_id === realtor.id,
       async () => {
         const { data, error } = await supabase
@@ -675,9 +571,9 @@ class SupabaseApiClient {
 
   // Messages - hardcoded first, then backup, then Supabase
   async getMessages(userId: string) {
-    return withHardcodedFirst(
+    return withLocalBackupFirst(
       'messages',
-      () => getHardcodedMessages(),
+      () => [],
       undefined,
       (msg) => {
         const message = msg as { sender_id?: string; receiver_id?: string };
