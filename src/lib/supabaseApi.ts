@@ -16,24 +16,35 @@ class SupabaseApiClient {
   // Auth methods - using Supabase Auth
   async login(email: string, password: string) {
     const attemptLogin = async () => {
+      // Ensure Supabase client is properly initialized
+      if (!supabase) {
+        throw new Error('Supabase client not initialized. Please check environment variables.');
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: email.trim(),
+        password: password,
       });
 
       if (error) {
+        // Handle 400 Bad Request errors (invalid credentials)
+        if (error.status === 400 || error.message.includes('Invalid login credentials') || error.message.includes('invalid_grant')) {
+          throw new Error('Невалиден имейл или парола. Моля проверете данните си.');
+        }
+        
+        // Handle email not confirmed
+        if (error.message.includes('Email not confirmed') || error.message.includes('email_not_confirmed')) {
+          throw new Error('Моля потвърдете имейла си преди да влезете.');
+        }
+
         // Handle network errors
         if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError') || error.message.includes('auth.supabase.io')) {
           throw new Error('NETWORK_ERROR');
         }
-        // Provide more user-friendly error messages
-        if (error.message.includes('Invalid login credentials') || error.message.includes('Email not confirmed')) {
-          throw new Error('Невалиден имейл или парола. Моля проверете данните си.');
-        }
-        if (error.message.includes('Email not confirmed')) {
-          throw new Error('Моля потвърдете имейла си преди да влезете.');
-        }
-        throw error;
+
+        // Handle other errors
+        console.error('Login error:', error);
+        throw new Error(error.message || 'Грешка при влизане. Моля опитайте отново.');
       }
     
       // Get user profile
