@@ -36,19 +36,29 @@ function loadEnv() {
 
 const env = loadEnv();
 const SUPABASE_URL = env.VITE_SUPABASE_URL || env.SUPABASE_URL;
+// Try to get service role key from various possible env variable names
 const SUPABASE_SERVICE_KEY = env.SUPABASE_SERVICE_ROLE_KEY || 
                              env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
-                             env.SUPABASE_SERVICE_KEY;
+                             env.SUPABASE_SERVICE_KEY ||
+                             env.SERVICE_ROLE_KEY ||
+                             env.SUPABASE_SERVICE_ROLE;
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  console.error('❌ Missing Supabase credentials');
+if (!SUPABASE_URL) {
+  console.error('❌ Missing Supabase URL');
   console.error('   Required: VITE_SUPABASE_URL');
-  console.error('   Required: SUPABASE_SERVICE_ROLE_KEY (for creating users)');
+  process.exit(1);
+}
+
+if (!SUPABASE_SERVICE_KEY) {
+  console.error('❌ Missing Service Role Key');
+  console.error('   Required: SUPABASE_SERVICE_ROLE_KEY or SERVICE_ROLE_KEY');
   console.error('');
   console.error('📖 How to get Service Role Key:');
   console.error('   1. Go to: https://supabase.com/dashboard/project/qxompdwqdnemsntssjot/settings/api');
   console.error('   2. Find "service_role" key (secret)');
   console.error('   3. Add to .env: SUPABASE_SERVICE_ROLE_KEY=your_key_here');
+  console.error('');
+  console.error('⚠️  Note: Service Role Key is required to create auth users via Admin API');
   process.exit(1);
 }
 
