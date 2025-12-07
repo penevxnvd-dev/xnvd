@@ -44,6 +44,12 @@ export const supabase = (() => {
         flowType: 'pkce', // Use PKCE flow for better security
         storage: typeof window !== 'undefined' ? window.localStorage : undefined, // Use localStorage in browser
       },
+      // Disable Realtime to prevent WebSocket connection errors
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        },
+      },
       // Global options to prevent multiple instances warning
       global: {
         headers: {

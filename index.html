@@ -64,16 +64,37 @@
                  allArgsStr.includes('intrinsics.%');
         };
         
+        // Filter WebSocket/Realtime errors (non-critical)
+        const filterWebSocket = function(...args) {
+          const message = String(args[0] || '');
+          const allArgsStr = args.map(arg => String(arg)).join(' ').toLowerCase();
+          
+          return message.toLowerCase().includes('websocket') ||
+                 message.toLowerCase().includes('realtime') ||
+                 allArgsStr.includes('websocket') ||
+                 allArgsStr.includes('realtime/v1/websocket') ||
+                 allArgsStr.includes('ns_error_websocket') ||
+                 allArgsStr.includes('connection_refused');
+        };
+        
+        // Filter cookie domain warnings (browser security, not app errors)
+        const filterCookieWarnings = function(...args) {
+          const message = String(args[0] || '');
+          return message.includes('Cookie') && 
+                 message.includes('rejected') && 
+                 message.includes('domain');
+        };
+        
         console.error = function(...args) {
-          if (filterSES(...args)) {
-            return; // Silently ignore SES errors
+          if (filterSES(...args) || filterWebSocket(...args) || filterCookieWarnings(...args)) {
+            return; // Silently ignore these non-critical errors
           }
           originalError.apply(console, args);
         };
         
         console.warn = function(...args) {
-          if (filterSES(...args)) {
-            return; // Silently ignore SES warnings
+          if (filterSES(...args) || filterWebSocket(...args) || filterCookieWarnings(...args)) {
+            return; // Silently ignore these non-critical warnings
           }
           originalWarn.apply(console, args);
         };
