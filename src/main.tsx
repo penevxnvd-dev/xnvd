@@ -74,17 +74,24 @@ if (typeof window !== 'undefined') {
         message.includes('Realtime') ||
         message.includes('NS_ERROR_WEBSOCKET') ||
         message.includes('ufpeftuanzmkiryohesd') ||
+        message.includes('qxompdwqdnemsntssjot') || // Also filter new project WebSocket errors
         message.includes('wss://ufpeftuanzmkiryohesd') ||
+        message.includes('wss://qxompdwqdnemsntssjot') || // Filter new project too
         message.includes('realtime/v1/websocket') ||
+        message.includes('WebSocket is closed') ||
+        message.includes('connection is established') ||
         allArgsStr.includes('websocket') ||
         allArgsStr.includes('realtime/v1/websocket') ||
         allArgsStr.includes('ns_error_websocket') ||
         allArgsStr.includes('connection_refused') ||
         allArgsStr.includes('ufpeftuanzmkiryohesd') ||
+        allArgsStr.includes('qxompdwqdnemsntssjot') ||
         allArgsStr.includes('wss://ufpeftuanzmkiryohesd') ||
-        allArgsStr.includes('__cf_bm')) {
-      // These are non-critical - Realtime is disabled and old project is cached
-      return; // Always filter these - they're from cached old project data
+        allArgsStr.includes('wss://qxompdwqdnemsntssjot') ||
+        allArgsStr.includes('__cf_bm') ||
+        allArgsStr.includes('websocket is closed')) {
+      // These are non-critical - Realtime is disabled
+      return; // Always filter these - Realtime is not used
     }
     // Filter out cookie domain warnings (browser security, not app errors)
     if (message.includes('Cookie') && message.includes('rejected') && message.includes('domain')) {

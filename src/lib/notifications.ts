@@ -38,41 +38,68 @@ class NotificationService {
       this.unsubscribe();
     }
 
-    // Subscribe to Supabase Realtime for messages
-    this.channel = supabase
-      .channel(`notifications:${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `receiver_id=eq.${userId}`,
-        },
-        (payload) => {
-          const notification: Notification = {
-            id: payload.new.id,
-            title: 'Ново съобщение',
-            message: payload.new.content,
-            type: 'info',
-            read: false,
-            createdAt: payload.new.created_at,
-          };
+    // Realtime is disabled, so we'll use polling instead
+    // Check for new messages every 30 seconds
+    const pollInterval = setInterval(async () => {
+      try {
+        const { data: messages, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('receiver_id', userId)
+          .eq('read', false)
+          .order('created_at', { ascending: false })
+          .limit(10);
 
-          this.notifyListeners(notification);
-          this.showBrowserNotification(notification.title, {
-            body: notification.message,
+        if (error) {
+          console.error('Error fetching messages:', error);
+          return;
+        }
+
+        if (messages && messages.length > 0) {
+          messages.forEach((message) => {
+            const notification: Notification = {
+              id: message.id,
+              title: 'Ново съобщение',
+              message: message.content,
+              type: 'info',
+              read: false,
+              createdAt: message.created_at,
+            };
+
+            this.notifyListeners(notification);
+            this.showBrowserNotification(notification.title, {
+              body: notification.message,
+            });
           });
         }
-      )
-      .subscribe();
+      } catch (error) {
+        console.error('Error polling for messages:', error);
+      }
+    }, 30000); // Poll every 30 seconds
+
+    // Store interval ID for cleanup
+    this.channel = {
+      unsubscribe: () => {
+        clearInterval(pollInterval);
+      },
+    } as { unsubscribe: () => void };
 
     return () => this.unsubscribe();
   }
 
   unsubscribe() {
     if (this.channel) {
-      supabase.removeChannel(this.channel);
+      // If it's a polling interval, just call unsubscribe
+      if (typeof this.channel.unsubscribe === 'function') {
+        this.channel.unsubscribe();
+      } else {
+        // If it's a realtime channel, remove it
+        try {
+          supabase.removeChannel(this.channel);
+        } catch (e) {
+          // Ignore errors if channel doesn't exist
+        }
+      }
       this.channel = null;
     }
   }

@@ -76,9 +76,12 @@ export const supabase = (() => {
             return Promise.reject(new Error('Old project connection blocked - please update Vercel environment variables'));
           }
           
-          // Block WebSocket connections (Realtime is disabled)
-          if (urlString.includes('wss://') || urlString.includes('ws://')) {
-            console.debug('[Supabase] WebSocket connection blocked (Realtime disabled)');
+          // Block WebSocket connections (Realtime is disabled) - VERY AGGRESSIVE
+          if (urlString.includes('wss://') || 
+              urlString.includes('ws://') || 
+              urlString.includes('realtime/v1/websocket') ||
+              urlString.includes('/realtime/')) {
+            // Silently block - don't even log to reduce console noise
             return Promise.reject(new Error('WebSocket connections disabled'));
           }
           // Add retry logic for network errors
