@@ -46,13 +46,13 @@ const App = () => {
             <TooltipProvider>
               <Toaster />
               <Sonner />
-              <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
               <BrowserRouter
                 future={{
                   v7_startTransition: true,
                   v7_relativeSplatPath: true,
                 }}
               >
+                <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
                 <Routes>
                   <Route path="/" element={<Auth />} />
                   <Route path="/auth" element={<Auth />} />

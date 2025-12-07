@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, RefreshCw, Home } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+// Note: ErrorFallback is outside Router context, so we use window.location instead
 
 interface Props {
   children: ReactNode;
@@ -72,8 +72,12 @@ interface ErrorFallbackProps {
 }
 
 const ErrorFallback: React.FC<ErrorFallbackProps> = ({ error, onReset }) => {
-  const navigate = useNavigate();
   const isDev = import.meta.env.DEV;
+
+  const handleGoHome = () => {
+    // Use window.location since we're outside Router context
+    window.location.href = '/dashboard';
+  };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -110,7 +114,7 @@ const ErrorFallback: React.FC<ErrorFallbackProps> = ({ error, onReset }) => {
               <RefreshCw className="h-4 w-4 mr-2" />
               Опитай отново
             </Button>
-            <Button onClick={() => navigate('/dashboard')} variant="outline">
+            <Button onClick={handleGoHome} variant="outline">
               <Home className="h-4 w-4 mr-2" />
               Начало
             </Button>
