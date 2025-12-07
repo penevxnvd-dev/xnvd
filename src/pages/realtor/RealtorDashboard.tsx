@@ -273,42 +273,6 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
     }
   };
 
-  const fetchTrainingProgress = async () => {
-    try {
-      if (!realtorData?.id) return;
-
-      const progressData = await supabaseApi.getTrainingProgress();
-
-      if (progressData && progressData.length > 0) {
-        const updatedData = trainingStructure.map((section) => ({
-          ...section,
-          subsections: section.subsections.map((subsection) => {
-            const progressItem = progressData.find(
-              (p: { section: string; subsection: string }) => p.section === section.id && p.subsection === subsection.id
-            );
-            return {
-              ...subsection,
-              progress: progressItem
-                ? {
-                    lecture: progressItem.lecture_completed || false,
-                    video: progressItem.video_completed || false,
-                    practical: progressItem.practical_completed || false,
-                    handover: progressItem.handover_completed || false,
-                    exam: progressItem.exam_completed || false,
-                  }
-                : subsection.progress,
-            };
-          }),
-        }));
-
-        setTrainingData(updatedData);
-        setTrainingProgress(calculateTrainingProgress(updatedData));
-      }
-    } catch (error) {
-      console.error('Error fetching training progress:', error);
-    }
-  };
-
   const handleProgressUpdate = async (
     sectionId: string,
     subsectionId: string,
