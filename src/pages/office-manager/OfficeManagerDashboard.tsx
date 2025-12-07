@@ -15,7 +15,6 @@ import {
 import { LogOut, Building2, Users, TrendingUp, Download, BarChart3 } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { exportKPIData } from '@/lib/export';
 import { TeamCardWithKPI } from '@/components/cards/TeamCardWithKPI';
@@ -240,7 +239,6 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
               </DropdownMenuContent>
             </DropdownMenu>
             <NotificationCenter />
-            <ThemeToggle />
             <AccountSettingsDialog />
             <Button onClick={handleLogout} variant="outline" size="sm">
               <LogOut className="h-4 w-4 mr-2" />

@@ -12,7 +12,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { Settings, Sparkles, Download } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
@@ -554,7 +553,6 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <NotificationCenter />
-                <ThemeToggle />
                 <Button 
                   variant="outline" 
                   size="sm" 

@@ -36,7 +36,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
 import { UserManagementDialog } from '@/components/UserManagementDialog';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { Settings, Users, Download } from 'lucide-react';
 import { LogOut, ChevronLeft, Home, Plus, Pencil, Trash2, Calendar, Menu, User, ChevronDown, FileText, Target, CheckCircle2, XCircle, Award, TrendingUp } from 'lucide-react';
@@ -822,7 +821,6 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                 </DropdownMenuContent>
               </DropdownMenu>
               <NotificationCenter />
-              <ThemeToggle />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="text-xs sm:text-sm">

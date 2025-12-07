@@ -15,7 +15,6 @@ import {
 import { LogOut, Building2, Users, TrendingUp, Download, BarChart3, MapPin } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { exportKPIData } from '@/lib/export';
 import { CityCardWithKPI } from '@/components/cards/CityCardWithKPI';
@@ -232,7 +231,6 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
               </DropdownMenuContent>
             </DropdownMenu>
             <NotificationCenter />
-            <ThemeToggle />
             <AccountSettingsDialog />
             <Button onClick={handleLogout} variant="outline" size="sm">
               <LogOut className="h-4 w-4 mr-2" />

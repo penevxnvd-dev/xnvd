@@ -41,7 +41,7 @@ const App = () => {
   return (
     <ErrorBoundary>
       <EnvCheck>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider attribute="class" defaultTheme="light" forcedTheme="light">
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
               <Toaster />
