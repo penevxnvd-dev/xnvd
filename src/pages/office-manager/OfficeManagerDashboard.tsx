@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -52,12 +52,7 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
   const [kpiMetrics, setKpiMetrics] = useState<KPIMetrics | null>(null);
   const [userInfo, setUserInfo] = useState({ fullName: '', email: '', role: 'Мениджър на офис' });
 
-  useEffect(() => {
-    fetchOfficeData();
-    fetchUserInfo();
-  }, [userId]);
-
-  const fetchUserInfo = async () => {
+  const fetchUserInfo = useCallback(async () => {
     try {
       const { user } = await api.getCurrentUser();
       if (user) {
@@ -70,9 +65,9 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
     } catch (error) {
       console.error('Error fetching user info:', error);
     }
-  };
+  }, []);
 
-  const fetchOfficeData = async () => {
+  const fetchOfficeData = useCallback(async () => {
     setLoading(true);
     try {
       // Find office where user is manager
@@ -167,7 +162,12 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    fetchOfficeData();
+    fetchUserInfo();
+  }, [fetchOfficeData, fetchUserInfo]);
 
   const handleLogout = async () => {
     await api.logout();

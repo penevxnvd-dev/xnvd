@@ -1514,7 +1514,6 @@ class SupabaseApiClient {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)
       .from('messages')
       .update({ read: true })

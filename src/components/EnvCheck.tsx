@@ -13,10 +13,8 @@ export const EnvCheck: React.FC<EnvCheckProps> = ({ children }) => {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    
     // Add a timeout to prevent infinite loading
-    timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       setIsChecking(false);
       setEnvError('Environment check timed out. Please check browser console for errors.');
     }, 5000);
@@ -35,9 +33,7 @@ export const EnvCheck: React.FC<EnvCheckProps> = ({ children }) => {
     }
 
     return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      clearTimeout(timeoutId);
     };
   }, []);
 

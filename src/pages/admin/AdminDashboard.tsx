@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DndContext,
@@ -202,13 +202,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     })
   );
 
-  useEffect(() => {
-    fetchCountries();
-    fetchTopologyData();
-    fetchUserInfo();
-  }, []);
-
-  const fetchUserInfo = async () => {
+  const fetchUserInfo = useCallback(async () => {
     try {
       const { user } = await api.getCurrentUser();
       if (user) {
@@ -221,9 +215,9 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     } catch (error) {
       console.error('Error fetching user info:', error);
     }
-  };
+  }, []);
 
-  const fetchTopologyData = async () => {
+  const fetchTopologyData = useCallback(async () => {
     try {
       const dbOffices = await api.getAllOfficesFull();
       const transformedOffices = transformOffices(dbOffices);
@@ -231,9 +225,9 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     } catch (error) {
       console.error('Error fetching topology data:', error);
     }
-  };
+  }, []);
 
-  const fetchCountries = async () => {
+  const fetchCountries = useCallback(async () => {
     setLoading(true);
     try {
       const data = await api.getCountries();
@@ -244,7 +238,13 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchCountries();
+    fetchTopologyData();
+    fetchUserInfo();
+  }, [fetchCountries, fetchTopologyData, fetchUserInfo]);
 
   const fetchCities = async (countryId: string) => {
     setLoading(true);

@@ -16,7 +16,7 @@ import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, Command
 import { Calendar as CalendarIcon, Users, Award, BookOpen, UserPlus, Clock, Edit, Trash2, Plus, ChevronLeft, ChevronRight, PlayCircle, CheckCircle2, Search, Filter, Download, Printer, Copy, Grid3x3, List, Calendar, BarChart3, Bell, X, MoreVertical, LayoutGrid, LayoutList, GripVertical } from 'lucide-react';
 import { TrainingGroup, Agent } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { formatNameWithEmoji } from '@/utils/nameEmojis';
 import { toast } from '@/hooks/use-toast';
 import { supabaseApi } from '@/lib/supabaseApi';
@@ -143,7 +143,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
     };
     
     fetchLeaders();
-  }, [groups]);
+  }, [groups, selectedLeader]);
 
   const [registeredTrainees, setRegisteredTrainees] = useState<Array<{
     id: string;

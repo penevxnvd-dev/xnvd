@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,11 +45,7 @@ export const PersonalGoalsCard = ({
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
 
-  useEffect(() => {
-    fetchGoals();
-  }, []);
-
-  const fetchGoals = async () => {
+  const fetchGoals = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.getMyGoals(currentMonth, currentYear);
@@ -65,7 +61,11 @@ export const PersonalGoalsCard = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentMonth, currentYear]);
+
+  useEffect(() => {
+    fetchGoals();
+  }, [fetchGoals]);
 
   const handleSave = async () => {
     try {

@@ -54,11 +54,7 @@ export const WeeklyBuyerSchedule = ({ realtorId }: WeeklyBuyerScheduleProps) => 
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 }); // Monday
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  useEffect(() => {
-    fetchSchedule();
-  }, [selectedDate]);
-
-  const fetchSchedule = async () => {
+  const fetchSchedule = useCallback(async () => {
     try {
       setLoading(true);
       const dateStr = selectedDate.toISOString().split('T')[0];
@@ -70,7 +66,11 @@ export const WeeklyBuyerSchedule = ({ realtorId }: WeeklyBuyerScheduleProps) => 
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate]);
+
+  useEffect(() => {
+    fetchSchedule();
+  }, [fetchSchedule]);
 
   const handleAddEntry = (date: Date) => {
     setEditingEntry(null);

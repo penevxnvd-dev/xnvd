@@ -101,15 +101,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
     fetchRealtorData();
   }, [userId]);
 
-  useEffect(() => {
-    if (realtorData?.id) {
-      fetchTrainingProgress();
-      fetchTopologyData();
-      fetchCurrentTeam();
-    }
-  }, [realtorData?.id, realtorData?.user?.email, realtorData?.team_id]);
-
-  const fetchTopologyData = async () => {
+  const fetchTopologyData = useCallback(async () => {
     try {
       console.log('📥 Fetching topology data from Supabase...');
       const dbOffices = await supabaseApi.getAllOfficesFull();
@@ -132,9 +124,9 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
     } catch (error) {
       console.error('Error fetching topology data:', error);
     }
-  };
+  }, [realtorData?.user?.email, selectedAgentId]);
 
-  const fetchCurrentTeam = async () => {
+  const fetchCurrentTeam = useCallback(async () => {
     try {
       if (!realtorData?.team_id) {
         setCurrentTeam(null);
@@ -186,7 +178,49 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
       console.error('❌ Error fetching current team from Prisma:', error);
       setCurrentTeam(null);
     }
-  };
+  }, [realtorData?.team_id]);
+
+  const fetchTrainingProgress = useCallback(async () => {
+    try {
+      if (!realtorData?.id) return;
+
+      const progressData = await supabaseApi.getTrainingProgress();
+
+      if (progressData && progressData.length > 0) {
+        const updatedData = trainingStructure.map((section) => ({
+          ...section,
+          subsections: section.subsections.map((subsection) => {
+            const progressItem = progressData.find(
+              (p: { section: string; subsection: string }) => p.section === section.id && p.subsection === subsection.id
+            );
+            return {
+              ...subsection,
+              progress: progressItem
+                ? {
+                    completed: progressItem.completed || false,
+                    examCompleted: progressItem.exam_completed || false,
+                    examScore: progressItem.exam_score || null,
+                  }
+                : undefined,
+            };
+          }),
+        }));
+        setTrainingData(updatedData);
+        const progress = calculateTrainingProgress(updatedData);
+        setTrainingProgress(progress);
+      }
+    } catch (error) {
+      console.error('Error fetching training progress:', error);
+    }
+  }, [realtorData?.id]);
+
+  useEffect(() => {
+    if (realtorData?.id) {
+      fetchTrainingProgress();
+      fetchTopologyData();
+      fetchCurrentTeam();
+    }
+  }, [realtorData?.id, realtorData?.user?.email, realtorData?.team_id, fetchTrainingProgress, fetchTopologyData, fetchCurrentTeam]);
 
   const fetchRealtorData = async () => {
     setLoading(true);
