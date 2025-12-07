@@ -123,7 +123,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
     } catch (error) {
       console.error('Error fetching topology data:', error);
     }
-  }, [realtorData?.user?.email, selectedAgentId]);
+  }, [realtorData?.user?.email]);
 
   const fetchCurrentTeam = useCallback(async () => {
     try {
