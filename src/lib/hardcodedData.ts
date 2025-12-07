@@ -1,10 +1,10 @@
 // Hardcoded data for offline fallback
-// Generated: 2025-12-07T19:12:00.700Z
+// Generated: 2025-12-07T19:39:09.887Z
 // This file contains all necessary data for offline functionality
 // Data is base64 encoded to reduce file size and obfuscate slightly
 
 // Obfuscated data (base64 encoded JSON)
-const _d = 'eyJ2ZXJzaW9uIjoiMS4wLjAiLCJnZW5lcmF0ZWRfYXQiOiIyMDI1LTEyLTA3VDE5OjEyOjAwLjY5OVoiLCJhY2NvdW50cyI6e30sInN0cnVjdHVyZSI6W10sImNvdW50cmllcyI6W10sImNpdGllcyI6W10sIm9mZmljZXMiOltdLCJ0ZWFtcyI6W10sInByb2ZpbGVzIjpbXSwidXNlcl9yb2xlcyI6W10sInJlYWx0b3JzIjpbXX0=';
+const _d = 'eyJ2ZXJzaW9uIjoiMS4wLjAiLCJnZW5lcmF0ZWRfYXQiOiIyMDI1LTEyLTA3VDE5OjM5OjA5Ljg4N1oiLCJhY2NvdW50cyI6e30sInN0cnVjdHVyZSI6W10sImNvdW50cmllcyI6W10sImNpdGllcyI6W10sIm9mZmljZXMiOltdLCJ0ZWFtcyI6W10sInByb2ZpbGVzIjpbXSwidXNlcl9yb2xlcyI6W10sInJlYWx0b3JzIjpbXX0=';
 
 // Decode and parse data
 function _decode() {
