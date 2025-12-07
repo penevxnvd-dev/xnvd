@@ -50,18 +50,22 @@ if (typeof window !== 'undefined') {
       return;
     }
     // Filter out WebSocket/Realtime connection errors (not critical if Realtime isn't used)
-    // Also filter old project WebSocket attempts
+    // Also filter old project WebSocket attempts - VERY AGGRESSIVE
     if (message.includes('websocket') || 
         message.includes('WebSocket') || 
         message.includes('realtime') ||
         message.includes('Realtime') ||
         message.includes('NS_ERROR_WEBSOCKET') ||
         message.includes('ufpeftuanzmkiryohesd') ||
+        message.includes('wss://ufpeftuanzmkiryohesd') ||
+        message.includes('realtime/v1/websocket') ||
         allArgsStr.includes('websocket') ||
         allArgsStr.includes('realtime/v1/websocket') ||
         allArgsStr.includes('ns_error_websocket') ||
         allArgsStr.includes('connection_refused') ||
-        allArgsStr.includes('ufpeftuanzmkiryohesd')) {
+        allArgsStr.includes('ufpeftuanzmkiryohesd') ||
+        allArgsStr.includes('wss://ufpeftuanzmkiryohesd') ||
+        allArgsStr.includes('__cf_bm')) {
       // These are non-critical - Realtime is disabled and old project is cached
       return; // Always filter these - they're from cached old project data
     }

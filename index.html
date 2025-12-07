@@ -89,7 +89,20 @@
         };
         
         console.error = function(...args) {
-          if (filterSES(...args) || filterWebSocket(...args) || filterCookieWarnings(...args) || filterOldProjectError(...args)) {
+          const message = String(args[0] || '');
+          const allArgsStr = args.map(arg => String(arg)).join(' ').toLowerCase();
+          
+          // Aggressive filtering for old project WebSocket errors
+          if (filterSES(...args) || 
+              filterWebSocket(...args) || 
+              filterCookieWarnings(...args) || 
+              filterOldProjectError(...args) ||
+              message.includes('ufpeftuanzmkiryohesd') ||
+              allArgsStr.includes('ufpeftuanzmkiryohesd') ||
+              message.includes('wss://ufpeftuanzmkiryohesd') ||
+              allArgsStr.includes('wss://ufpeftuanzmkiryohesd') ||
+              message.includes('realtime/v1/websocket') ||
+              allArgsStr.includes('realtime/v1/websocket')) {
             return; // Silently ignore these non-critical errors
           }
           originalError.apply(console, args);

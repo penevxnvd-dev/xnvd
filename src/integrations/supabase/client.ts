@@ -57,6 +57,44 @@ export const supabase = (() => {
       // Completely disable Realtime to prevent WebSocket connection errors
       realtime: {
         disabled: true, // Disable Realtime completely
+        params: {
+          eventsPerSecond: 0, // Set to 0 to prevent any connection attempts
+        },
+      },
+      // Disable all realtime features
+      global: {
+        headers: {
+          'x-client-info': 'xnvd-app',
+        },
+        // Override fetch to prevent WebSocket connections
+        fetch: (url, options = {}) => {
+          // Block any WebSocket connections to old project
+          if (typeof url === 'string' && url.includes('ufpeftuanzmkiryohesd')) {
+            console.warn('[Supabase] Blocked connection attempt to old project:', url);
+            return Promise.reject(new Error('Old project connection blocked'));
+          }
+          // Block WebSocket connections
+          if (typeof url === 'string' && (url.includes('wss://') || url.includes('ws://'))) {
+            console.debug('[Supabase] WebSocket connection blocked (Realtime disabled)');
+            return Promise.reject(new Error('WebSocket connections disabled'));
+          }
+          // Add retry logic for network errors
+          return fetch(url, {
+            ...options,
+            // Add timeout
+            signal: AbortSignal.timeout(30000), // 30 second timeout
+          }).catch((error) => {
+            // Retry once on network errors
+            if (error.name === 'AbortError' || error.message.includes('Failed to fetch')) {
+              console.warn('⚠️ Network error, retrying...');
+              return fetch(url, {
+                ...options,
+                signal: AbortSignal.timeout(30000),
+              });
+            }
+            throw error;
+          });
+        },
       },
       // Global options to prevent multiple instances warning
       global: {
