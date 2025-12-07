@@ -9,7 +9,10 @@ const _d = 'eyJ2ZXJzaW9uIjoiMS4wLjAiLCJnZW5lcmF0ZWRfYXQiOiIyMDI1LTEyLTA3VDIwOjI5
 // Decode and parse data
 function _decode() {
   try {
-    return JSON.parse(Buffer.from(_d, 'base64').toString('utf8'));
+    // Use browser-compatible base64 decoding
+    // atob decodes base64 to binary string, which is already UTF-8 for JSON
+    const decoded = atob(_d);
+    return JSON.parse(decoded);
   } catch (e) {
     console.error('Failed to decode hardcoded data:', e);
     return null;
