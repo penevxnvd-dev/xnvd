@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { handleSupabaseError } from './errorHandler';
+import { withFallback, localBackup } from './localBackup';
 
 type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
 type TablesInsert<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert'];
@@ -203,22 +204,34 @@ class SupabaseApiClient {
 
   // Countries
   async getCountries() {
-    const { data, error } = await supabase
-      .from('countries')
-      .select('*')
-      .order('name', { ascending: true });
+    const result = await withFallback(
+      async () => {
+        const { data, error } = await supabase
+          .from('countries')
+          .select('*')
+          .order('name', { ascending: true });
+        return { data, error };
+      },
+      'countries'
+    );
 
-    if (error) {
+    if (result.error && !result.fromCache) {
       // Check if it's a 403 error and provide better context
-      if (error.code === 'PGRST301' || (error as { status?: number }).status === 403) {
+      if ((result.error as { code?: string; status?: number }).code === 'PGRST301' || 
+          (result.error as { status?: number }).status === 403) {
         console.error('403 Forbidden when fetching countries. Check:', {
           authenticated: (await supabase.auth.getUser()).data.user !== null,
-          error: error.message,
+          error: result.error instanceof Error ? result.error.message : String(result.error),
         });
       }
-      throw handleSupabaseError(error);
+      throw handleSupabaseError(result.error);
     }
-    return data || [];
+
+    if (result.fromCache) {
+      console.info('[getCountries] Using local backup data');
+    }
+
+    return (result.data as Tables<'countries'>[]) || [];
   }
 
   async createCountry(data: { name: string; code: string }) {
@@ -256,14 +269,31 @@ class SupabaseApiClient {
 
   // Cities
   async getCitiesByCountry(countryId: string) {
-    const { data, error } = await supabase
-      .from('cities')
-      .select('*')
-      .eq('country_id', countryId)
-      .order('name', { ascending: true });
+    const result = await withFallback(
+      async () => {
+        const { data, error } = await supabase
+          .from('cities')
+          .select('*')
+          .eq('country_id', countryId)
+          .order('name', { ascending: true });
+        return { data, error };
+      },
+      'cities',
+      (item: unknown) => {
+        const city = item as { country_id?: string };
+        return city.country_id === countryId;
+      }
+    );
 
-    if (error) throw error;
-    return data || [];
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+
+    if (result.fromCache) {
+      console.info('[getCitiesByCountry] Using local backup data');
+    }
+
+    return (result.data as Tables<'cities'>[]) || [];
   }
 
   async createCity(data: { name: string; countryId: string }) {
@@ -312,13 +342,26 @@ class SupabaseApiClient {
   }
 
   async getAllOffices() {
-    const { data, error } = await supabase
-      .from('offices')
-      .select('*')
-      .order('name', { ascending: true });
+    const result = await withFallback(
+      async () => {
+        const { data, error } = await supabase
+          .from('offices')
+          .select('*')
+          .order('name', { ascending: true });
+        return { data, error };
+      },
+      'offices'
+    );
 
-    if (error) throw error;
-    return data || [];
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+
+    if (result.fromCache) {
+      console.info('[getAllOffices] Using local backup data');
+    }
+
+    return (result.data as Tables<'offices'>[]) || [];
   }
 
   async getAllOfficesFull() {

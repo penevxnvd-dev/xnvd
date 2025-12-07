@@ -21,6 +21,18 @@ BACKUP_PATH="${BACKUP_DIR}/${BACKUP_NAME}"
 echo -e "${BLUE}📦 Starting Local Backup...${NC}"
 echo ""
 
+# Sync Supabase data to backup first
+if [ -f "sync-supabase-to-backup.js" ]; then
+    echo -e "${BLUE}🔄 Syncing Supabase data to backup...${NC}"
+    node sync-supabase-to-backup.js > /dev/null 2>&1 || {
+        echo -e "${YELLOW}⚠️  Supabase sync failed, continuing with backup...${NC}"
+    }
+    echo ""
+fi
+
+echo -e "${BLUE}📦 Starting Local Backup...${NC}"
+echo ""
+
 # Create backup directory if it doesn't exist
 mkdir -p "${BACKUP_PATH}"
 

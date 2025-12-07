@@ -18,6 +18,7 @@ import TrainingProgressPage from "./pages/realtor/TrainingProgressPage";
 import { analytics } from "@/lib/analytics";
 import { SearchDialog } from "@/components/SearchDialog";
 import { useState, useEffect } from "react";
+import { syncService } from "@/lib/syncService";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +37,13 @@ const App = () => {
   useEffect(() => {
     // Track page views
     analytics.trackPageView(window.location.pathname);
+    
+    // Initialize sync service (checks for local backup availability)
+    syncService.startAutoSync();
+    
+    return () => {
+      syncService.stopAutoSync();
+    };
   }, []);
 
   return (

@@ -1,0 +1,34 @@
+{
+  "synced_at": "2025-12-07T11:33:49.552Z",
+  "tables": [
+    "profiles",
+    "user_roles",
+    "countries",
+    "cities",
+    "offices",
+    "teams",
+    "realtors",
+    "deals",
+    "diagnoses",
+    "training_progress",
+    "realtor_goals",
+    "buyer_schedule",
+    "messages"
+  ],
+  "counts": {
+    "profiles": 0,
+    "user_roles": 0,
+    "countries": 0,
+    "cities": 0,
+    "offices": 0,
+    "teams": 0,
+    "realtors": 0,
+    "deals": 0,
+    "diagnoses": 0,
+    "training_progress": 0,
+    "realtor_goals": 0,
+    "buyer_schedule": 0,
+    "messages": 0
+  },
+  "errors": []
+}
