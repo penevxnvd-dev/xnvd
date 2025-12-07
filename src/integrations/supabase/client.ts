@@ -83,12 +83,14 @@ export const supabase = (() => {
             return Promise.reject(new Error('WebSocket connections disabled'));
           }
           
-          // Ensure API key is in headers
+          // Ensure API key is in headers for REST API calls
           const headers = new Headers(options.headers);
-          if (!headers.has('apikey')) {
+          // Only add apikey for REST API calls, not for auth calls (auth handles it differently)
+          if (urlString.includes('/rest/v1/') && !headers.has('apikey')) {
             headers.set('apikey', SUPABASE_PUBLISHABLE_KEY);
           }
-          if (!headers.has('Authorization')) {
+          // Don't override Authorization header if it's already set (for authenticated requests)
+          if (!headers.has('Authorization') && urlString.includes('/rest/v1/')) {
             headers.set('Authorization', `Bearer ${SUPABASE_PUBLISHABLE_KEY}`);
           }
           
