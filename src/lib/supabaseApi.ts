@@ -281,7 +281,6 @@ class SupabaseApiClient {
       'offices',
       () => [],
       undefined,
-      undefined,
       async () => {
         const { data, error } = await supabase
           .from('offices')
@@ -319,7 +318,6 @@ class SupabaseApiClient {
     return withLocalBackupFirst(
       'teams',
       () => [],
-      ,
       (team) => (team as { office_id?: string }).office_id === officeId,
       async () => {
         const { data, error } = await supabase
@@ -337,7 +335,6 @@ class SupabaseApiClient {
     return withLocalBackupFirst(
       'realtors',
       () => [],
-      ,
       (realtor) => (realtor as { team_id?: string }).team_id === teamId,
       async () => {
         const { data, error } = await supabase
@@ -354,7 +351,6 @@ class SupabaseApiClient {
     const teams = await withLocalBackupFirst(
       'teams',
       () => [],
-      undefined,
       undefined,
       async () => {
         const { data, error } = await supabase
@@ -405,7 +401,6 @@ class SupabaseApiClient {
     return withLocalBackupFirst(
       'deals',
       () => [],
-      ,
       (deal) => (deal as { realtor_id?: string }).realtor_id === realtor.id,
       async () => {
         const { data, error } = await supabase
@@ -426,7 +421,6 @@ class SupabaseApiClient {
     return withLocalBackupFirst(
       'diagnoses',
       () => [],
-      ,
       (diagnosis) => (diagnosis as { realtor_id?: string }).realtor_id === realtor.id,
       async () => {
         const { data, error } = await supabase
@@ -447,7 +441,6 @@ class SupabaseApiClient {
     return withLocalBackupFirst(
       'training_progress',
       () => [],
-      ,
       (progress) => (progress as { realtor_id?: string }).realtor_id === realtor.id,
       async () => {
         const { data, error } = await supabase
@@ -475,7 +468,6 @@ class SupabaseApiClient {
     const goals = await withLocalBackupFirst(
       'realtor_goals',
       () => [],
-      ,
       (goal) => (goal as { realtor_id?: string }).realtor_id === realtor.id,
       async () => {
         const { data, error } = await supabase
@@ -558,7 +550,6 @@ class SupabaseApiClient {
     return withLocalBackupFirst(
       'buyer_schedule',
       () => [],
-      ,
       (schedule) => (schedule as { realtor_id?: string }).realtor_id === realtor.id,
       async () => {
         const { data, error } = await supabase
@@ -576,7 +567,6 @@ class SupabaseApiClient {
     return withLocalBackupFirst(
       'messages',
       () => [],
-      undefined,
       (msg) => {
         const message = msg as { sender_id?: string; receiver_id?: string };
         return message.sender_id === userId || message.receiver_id === userId;
