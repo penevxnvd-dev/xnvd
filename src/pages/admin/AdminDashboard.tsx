@@ -233,8 +233,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     setLoading(true);
     try {
       const data = await api.getCountries();
-      const ordered = applyPositions(data, 'countries');
-      setCountries(ordered);
+      setCountries(data);
     } catch (error) {
       console.error('Error fetching countries:', error);
     } finally {
@@ -257,8 +256,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
         name: city.name,
         country_id: city.countryId
       }));
-      const ordered = applyPositions(mapped, 'cities', countryId);
-      setCities(ordered);
+      setCities(mapped);
     } catch (error) {
       console.error('Error fetching cities:', error);
     } finally {
@@ -276,8 +274,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
         city_id: office.cityId,
         address: office.address
       }));
-      const ordered = applyPositions(mapped, 'offices', cityId);
-      setOffices(ordered);
+      setOffices(mapped);
     } catch (error) {
       console.error('Error fetching offices:', error);
     } finally {
@@ -296,8 +293,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
         leader_id: team.leaderId,
         leaderName: team.leader?.full_name ? formatNameWithoutElevenEleven(team.leader.full_name).displayName : undefined
       }));
-      const ordered = applyPositions(mapped, 'teams', officeId);
-      setTeams(ordered);
+      setTeams(mapped);
     } catch (error) {
       console.error('Error fetching teams:', error);
     } finally {
@@ -319,8 +315,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
           email: realtor.user?.email || realtor.profile?.email || ''
         }
       }));
-      const ordered = applyPositions(mapped, 'realtors', teamId);
-      setRealtors(ordered);
+      setRealtors(mapped);
       
       // Изчисляване на KPI за екипа
       try {
