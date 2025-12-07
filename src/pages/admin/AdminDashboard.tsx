@@ -379,35 +379,6 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     }
   };
 
-  const applyPositions = <T extends { id: string }>(items: T[], view: ViewLevel, contextId?: string): T[] => {
-    const savedPositions = loadPositions(view, contextId);
-    if (!savedPositions || savedPositions.length === 0) {
-      return items;
-    }
-
-    // Create a map for quick lookup
-    const itemsMap = new Map(items.map(item => [item.id, item]));
-    
-    // Reorder based on saved positions, keeping items not in saved list at the end
-    const ordered: T[] = [];
-    const usedIds = new Set<string>();
-    
-    savedPositions.forEach(id => {
-      if (itemsMap.has(id)) {
-        ordered.push(itemsMap.get(id)!);
-        usedIds.add(id);
-      }
-    });
-    
-    // Add any items that weren't in the saved positions
-    items.forEach(item => {
-      if (!usedIds.has(item.id)) {
-        ordered.push(item);
-      }
-    });
-    
-    return ordered;
-  };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
