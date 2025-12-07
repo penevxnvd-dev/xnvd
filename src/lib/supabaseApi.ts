@@ -3,6 +3,20 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { handleSupabaseError } from './errorHandler';
 import { withLocalBackupFirst, localBackup } from './localBackup';
+import { 
+  getHardcodedAccounts, 
+  getHardcodedCountries, 
+  getHardcodedCities, 
+  getHardcodedOffices, 
+  getHardcodedTeams,
+  getHardcodedProfiles,
+  getHardcodedRealtors,
+  findAccountByEmail,
+  getTeamsByOffice,
+  getOfficesByCity,
+  getCitiesByCountry,
+  getRealtorsByTeam,
+} from './hardcodedData';
 
 type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
 type TablesInsert<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert'];
@@ -14,8 +28,43 @@ class SupabaseApiClient {
     return supabase;
   }
 
-  // Auth methods - using Supabase Auth
+  // Auth methods - using Supabase Auth with hardcoded fallback
   async login(email: string, password: string) {
+    // First try hardcoded data fallback (for offline access)
+    const hardcodedAccount = findAccountByEmail(email.trim());
+    if (hardcodedAccount) {
+      // Allow login with any password if account exists in hardcoded data
+      // This enables offline access when Supabase is unavailable
+      console.info('[Login] Using hardcoded account fallback for:', email);
+      
+      const profile = getHardcodedProfiles().find(p => p.id === hardcodedAccount.id);
+      
+      return {
+        user: {
+          id: hardcodedAccount.id,
+          email: hardcodedAccount.email,
+          full_name: hardcodedAccount.full_name,
+          ...profile,
+        },
+        session: {
+          access_token: 'hardcoded-offline-token',
+          refresh_token: 'hardcoded-offline-refresh',
+          expires_in: 3600,
+          expires_at: Date.now() + 3600000,
+          token_type: 'bearer',
+          user: {
+            id: hardcodedAccount.id,
+            email: hardcodedAccount.email,
+            user_metadata: {
+              full_name: hardcodedAccount.full_name,
+            },
+          },
+        },
+        hardcoded: true, // Flag to indicate this is from hardcoded data
+      };
+    }
+
+    // Try Supabase login
     const attemptLogin = async () => {
       // Ensure Supabase client is properly initialized
       if (!supabase) {
@@ -89,10 +138,44 @@ class SupabaseApiClient {
       return await attemptLogin();
     } catch (err: unknown) {
       const errMessage = err instanceof Error ? err.message : String(err);
-      // Retry once on network errors
+      
+      // On network errors, try hardcoded fallback
       if (errMessage === 'NETWORK_ERROR' || errMessage.includes('Failed to fetch') || errMessage.includes('auth.supabase.io')) {
+        console.warn('⚠️ Network error, trying hardcoded fallback...');
+        
+        // Check hardcoded accounts
+        const hardcodedAccount = findAccountByEmail(email.trim());
+        if (hardcodedAccount) {
+          console.info('[Login] Using hardcoded account fallback (network error)');
+          const profile = getHardcodedProfiles().find(p => p.id === hardcodedAccount.id);
+          
+          return {
+            user: {
+              id: hardcodedAccount.id,
+              email: hardcodedAccount.email,
+              full_name: hardcodedAccount.full_name,
+              ...profile,
+            },
+            session: {
+              access_token: 'hardcoded-offline-token',
+              refresh_token: 'hardcoded-offline-refresh',
+              expires_in: 3600,
+              expires_at: Date.now() + 3600000,
+              token_type: 'bearer',
+              user: {
+                id: hardcodedAccount.id,
+                email: hardcodedAccount.email,
+                user_metadata: {
+                  full_name: hardcodedAccount.full_name,
+                },
+              },
+            },
+            hardcoded: true,
+          };
+        }
+        
+        // Retry once on network errors
         console.warn('⚠️ Network error, retrying login...');
-        // Wait 1 second before retry
         await new Promise(resolve => setTimeout(resolve, 1000));
         try {
           return await attemptLogin();
@@ -202,7 +285,7 @@ class SupabaseApiClient {
     if (error) throw error;
   }
 
-  // Countries - uses local backup first
+  // Countries - uses local backup first, then hardcoded data
   async getCountries() {
     const result = await withLocalBackupFirst(
       'countries',
@@ -224,6 +307,14 @@ class SupabaseApiClient {
           error: result.error instanceof Error ? result.error.message : String(result.error),
         });
       }
+      
+      // Fallback to hardcoded data
+      const hardcoded = getHardcodedCountries();
+      if (hardcoded && hardcoded.length > 0) {
+        console.info('[getCountries] Using hardcoded data fallback');
+        return hardcoded as Tables<'countries'>[];
+      }
+      
       throw handleSupabaseError(result.error);
     }
 
@@ -263,7 +354,7 @@ class SupabaseApiClient {
     return { success: true };
   }
 
-  // Cities - uses local backup first
+  // Cities - uses local backup first, then hardcoded data
   async getCitiesByCountry(countryId: string) {
     const result = await withLocalBackupFirst(
       'cities',
@@ -280,6 +371,15 @@ class SupabaseApiClient {
         return city.country_id === countryId;
       }
     );
+
+    // Fallback to hardcoded data if Supabase fails
+    if (result.error && !result.fromCache) {
+      const hardcoded = getCitiesByCountry(countryId);
+      if (hardcoded && hardcoded.length > 0) {
+        console.info('[getCitiesByCountry] Using hardcoded data fallback');
+        return hardcoded as Tables<'cities'>[];
+      }
+    }
 
     if (result.error && !result.fromCache) {
       throw handleSupabaseError(result.error);
@@ -348,7 +448,7 @@ class SupabaseApiClient {
     return offices.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }
 
-  // Offices - uses local backup first
+  // Offices - uses local backup first, then hardcoded data
   async getAllOffices() {
     const result = await withLocalBackupFirst(
       'offices',
@@ -362,6 +462,12 @@ class SupabaseApiClient {
     );
 
     if (result.error && !result.fromCache) {
+      // Fallback to hardcoded data
+      const hardcoded = getHardcodedOffices();
+      if (hardcoded && hardcoded.length > 0) {
+        console.info('[getAllOffices] Using hardcoded data fallback');
+        return hardcoded as Tables<'offices'>[];
+      }
       throw handleSupabaseError(result.error);
     }
 
@@ -491,7 +597,7 @@ class SupabaseApiClient {
     return { success: true };
   }
 
-  // Teams - uses local backup first
+  // Teams - uses local backup first, then hardcoded data
   async getTeamsByOffice(officeId: string) {
     const result = await withLocalBackupFirst(
       'teams',
@@ -517,6 +623,12 @@ class SupabaseApiClient {
     );
 
     if (result.error && !result.fromCache) {
+      // Fallback to hardcoded data
+      const hardcoded = getTeamsByOffice(officeId);
+      if (hardcoded && hardcoded.length > 0) {
+        console.info('[getTeamsByOffice] Using hardcoded data fallback');
+        return hardcoded as Tables<'teams'>[];
+      }
       throw handleSupabaseError(result.error);
     }
 
@@ -572,42 +684,75 @@ class SupabaseApiClient {
     return { success: true };
   }
 
-  // Get all team leaders
+  // Get all team leaders - with hardcoded fallback
   async getAllTeamLeaders() {
-    const { data: teams, error } = await supabase
-      .from('teams')
-      .select(`
-        leader_id,
-        leader:profiles!teams_leader_id_fkey (
-          id,
-          full_name,
-          email
-        )
-      `)
-      .not('leader_id', 'is', null);
+    try {
+      const { data: teams, error } = await supabase
+        .from('teams')
+        .select(`
+          leader_id,
+          leader:profiles!teams_leader_id_fkey (
+            id,
+            full_name,
+            email
+          )
+        `)
+        .not('leader_id', 'is', null);
 
-    if (error) {
-      console.error('Error fetching team leaders:', error);
-      throw error;
+      if (error) {
+        throw error;
+      }
+
+      if (teams && teams.length > 0) {
+        // Extract unique leaders
+        const leadersMap = new Map<string, { id: string; fullName: string; email: string }>();
+        (teams || []).forEach((team: { leader?: { id?: string; full_name?: string; email?: string } }) => {
+          if (team.leader && team.leader.id) {
+            leadersMap.set(team.leader.id, {
+              id: team.leader.id,
+              fullName: team.leader.full_name || 'Неизвестен',
+              email: team.leader.email || '',
+            });
+          }
+        });
+
+        const leaders = Array.from(leadersMap.values()).sort((a, b) => 
+          a.fullName.localeCompare(b.fullName)
+        );
+
+        console.log('Fetched team leaders:', leaders);
+        return leaders;
+      }
+    } catch (error) {
+      console.warn('[getAllTeamLeaders] Supabase failed, using hardcoded fallback');
     }
 
-    // Extract unique leaders
+    // Fallback to hardcoded data
+    const teams = getHardcodedTeams();
+    const profiles = getHardcodedProfiles();
     const leadersMap = new Map<string, { id: string; fullName: string; email: string }>();
-    (teams || []).forEach((team: { leader?: { id?: string; full_name?: string; email?: string } }) => {
-      if (team.leader && team.leader.id) {
-        leadersMap.set(team.leader.id, {
-          id: team.leader.id,
-          fullName: team.leader.full_name || 'Неизвестен',
-          email: team.leader.email || '',
-        });
+    
+    teams.forEach(team => {
+      if (team.leader_id) {
+        const leader = getHardcodedRealtors().find(r => r.id === team.leader_id);
+        if (leader) {
+          const profile = profiles.find(p => p.id === leader.user_id);
+          if (profile && !leadersMap.has(profile.id)) {
+            leadersMap.set(profile.id, {
+              id: profile.id,
+              fullName: profile.full_name || 'Неизвестен',
+              email: profile.email || '',
+            });
+          }
+        }
       }
     });
-
+    
     const leaders = Array.from(leadersMap.values()).sort((a, b) => 
       a.fullName.localeCompare(b.fullName)
     );
-
-    console.log('Fetched team leaders:', leaders);
+    
+    console.log('[getAllTeamLeaders] Using hardcoded data fallback:', leaders.length, 'leaders');
     return leaders;
   }
 
