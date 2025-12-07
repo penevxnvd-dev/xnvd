@@ -36,14 +36,11 @@ export const supabase = (() => {
       throw new Error('Cannot use local Supabase. Please set VITE_SUPABASE_URL to remote Supabase URL.');
     }
     
-    // Verify we're using the correct project (not the old one)
+    // Verify we're using the correct project
     if (SUPABASE_URL && SUPABASE_URL.includes('ufpeftuanzmkiryohesd')) {
-      console.error('❌ ERROR: Old Supabase project detected! Please update VITE_SUPABASE_URL in Vercel environment variables.');
+      console.error('❌ ERROR: Very old Supabase project detected! Please update VITE_SUPABASE_URL.');
       console.error('   Current URL:', SUPABASE_URL);
       console.error('   Expected URL should contain: qxompdwqdnemsntssjot');
-      console.error('   Go to: https://vercel.com/dashboard → xnvd → Settings → Environment Variables');
-      // Don't throw - let the app try to work, but log the error clearly
-      // The app will likely fail on Supabase calls, but at least it won't crash immediately
     }
 
     supabaseInstance = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
@@ -70,10 +67,10 @@ export const supabase = (() => {
         fetch: (url, options = {}) => {
           const urlString = typeof url === 'string' ? url : url.toString();
           
-          // Block ANY connection to old project (HTTP, HTTPS, WebSocket)
+          // Block connections to very old project (ufpeftuanzmkiryohesd)
           if (urlString.includes('ufpeftuanzmkiryohesd')) {
-            console.warn('[Supabase] Blocked connection attempt to old project:', urlString);
-            return Promise.reject(new Error('Old project connection blocked - please update Vercel environment variables'));
+            console.warn('[Supabase] Blocked connection attempt to very old project:', urlString);
+            return Promise.reject(new Error('Very old project connection blocked'));
           }
           
           // Block WebSocket connections (Realtime is disabled) - VERY AGGRESSIVE
