@@ -321,16 +321,31 @@ class SupabaseApiClient {
     return { success: true };
   }
 
-  // Offices
+  // Offices by city - uses local backup first
   async getOfficesByCity(cityId: string) {
-    const { data, error } = await supabase
-      .from('offices')
-      .select('*')
-      .eq('city_id', cityId)
-      .order('name', { ascending: true });
+    const result = await withLocalBackupFirst(
+      'offices',
+      async () => {
+        const { data, error } = await supabase
+          .from('offices')
+          .select('*')
+          .eq('city_id', cityId)
+          .order('name', { ascending: true });
+        return { data, error };
+      },
+      (item: unknown) => {
+        const office = item as { city_id?: string };
+        return office.city_id === cityId;
+      }
+    );
 
-    if (error) throw error;
-    return data || [];
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+
+    // Sort by name if from cache
+    const offices = (result.data as Tables<'offices'>[]) || [];
+    return offices.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }
 
   // Offices - uses local backup first
@@ -610,11 +625,9 @@ class SupabaseApiClient {
       }
     }
 
-    return (result.data as Tables<'realtors'>[]) || [];
-      .order('level', { ascending: false });
-
-    if (error) throw error;
-    return data || [];
+    // Sort by level descending if we have data
+    const realtors = (result.data as Tables<'realtors'>[]) || [];
+    return realtors.sort((a, b) => (b.level || 0) - (a.level || 0));
   }
 
   // Get all profiles that can be added to a team (not realtors or realtors without team)
