@@ -22,11 +22,21 @@ if (typeof window !== 'undefined') {
     if (message.includes('BrowserAutomation') || message.includes('registerWithMCP') || message.includes('localhost:46197')) {
       return; // Silently ignore browser automation tool errors
     }
-    // Filter out 403 errors from Supabase RLS (expected when not authenticated)
+    // Filter out 403 errors from Supabase RLS only if they're expected (e.g., during initial load)
+    // But log them for debugging in development
     if (message.includes('Failed to load resource') && (message.includes('403') || message.includes('Forbidden'))) {
       const url = args.find(arg => typeof arg === 'string' && (arg.includes('supabase.co') || arg.includes('supabase.io')));
       if (url) {
-        return; // Silently ignore Supabase 403 errors - they're handled by the app
+        // In development, log 403 errors for debugging
+        if (import.meta.env.DEV) {
+          console.warn('⚠️ Supabase 403 error (RLS policy):', url);
+          console.warn('   This may indicate an authentication or permission issue.');
+          console.warn('   Check: 1) User is authenticated, 2) RLS policies allow access, 3) User has correct role');
+        }
+        // Still filter in production to reduce console noise
+        if (!import.meta.env.DEV) {
+          return;
+        }
       }
       // Also filter localhost MCP server errors
       const localhostUrl = args.find(arg => typeof arg === 'string' && arg.includes('localhost:46197'));

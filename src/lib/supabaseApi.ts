@@ -198,6 +198,13 @@ class SupabaseApiClient {
       .order('name', { ascending: true });
 
     if (error) {
+      // Check if it's a 403 error and provide better context
+      if (error.code === 'PGRST301' || (error as { status?: number }).status === 403) {
+        console.error('403 Forbidden when fetching countries. Check:', {
+          authenticated: (await supabase.auth.getUser()).data.user !== null,
+          error: error.message,
+        });
+      }
       throw handleSupabaseError(error);
     }
     return data || [];
