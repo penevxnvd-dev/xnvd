@@ -1279,7 +1279,7 @@ class SupabaseApiClient {
     const { data: existingProgress } = await supabase
       .from('training_progress')
       .select('*')
-      .eq('realtor_id', realtor.id)
+      .eq('realtor_id', realtorId)
       .eq('section', data.section)
       .eq('subsection', data.subsection)
       .maybeSingle();

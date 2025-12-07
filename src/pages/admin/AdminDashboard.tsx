@@ -38,7 +38,7 @@ import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
 import { UserManagementDialog } from '@/components/UserManagementDialog';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { Settings, Users, Download } from 'lucide-react';
-import { LogOut, ChevronLeft, Home, Plus, Pencil, Trash2, Calendar, Menu, User, ChevronDown, FileText, Target, CheckCircle2, XCircle, Award, TrendingUp } from 'lucide-react';
+import { LogOut, ChevronLeft, Home, Plus, Pencil, Trash2, Calendar, Menu, User, ChevronDown, FileText, Target, CheckCircle2, XCircle, Award, TrendingUp, GraduationCap } from 'lucide-react';
 import { exportKPIData, exportDeals, exportDiagnoses } from '@/lib/export';
 import logo from '@/assets/logo.jpeg';
 import { CreateEditDialog } from '@/components/admin/CreateEditDialog';
@@ -48,6 +48,7 @@ import { CityCardWithKPI } from '@/components/cards/CityCardWithKPI';
 import { OfficeCardWithKPI } from '@/components/cards/OfficeCardWithKPI';
 import { TeamCardWithKPI } from '@/components/cards/TeamCardWithKPI';
 import { RealizatorCardWithKPI } from '@/components/cards/RealizatorCardWithKPI';
+import { TrainingManagementDialog } from '@/components/TrainingManagementDialog';
 import { TopologySidebar } from '@/components/TopologySidebar';
 import { transformOffices } from '@/utils/dataTransform';
 import { Office as UIOffice, TeamLeader, Agent } from '@/types';
@@ -182,6 +183,8 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [userManagementOpen, setUserManagementOpen] = useState(false);
+  const [trainingDialogOpen, setTrainingDialogOpen] = useState(false);
+  const [selectedRealtorForTraining, setSelectedRealtorForTraining] = useState<{ id: string; name: string } | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [kpiMetrics, setKpiMetrics] = useState<KPIMetrics | null>(null);
@@ -1025,78 +1028,93 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
             {currentView === 'realtors' && realtors.map((realtor) => (
               realtor.user && (
                 <SortableCard key={realtor.id} id={realtor.id}>
-                <RealizatorCardWithKPI
-                  realtor={{
-                    id: realtor.id,
-                    name: realtor.user.fullName,
-                    email: realtor.user.email,
-                    level: realtor.level,
-                    confidence: false,
-                    salesResilience: false,
-                    successMindset: false
-                  }}
-                  onClick={async () => {
-                    // Fetch full realtor data with all fields
-                    try {
-                      // Get realtor details - using API
-                      // TODO: Add API endpoint for full realtor details with all fields
-                      setSelectedRealtor({
-                        ...realtor,
-                        confidence: false,
-                        salesResilience: false,
-                        successMindset: false,
-                      });
-                      
-                      const kpi = await api.getRealtorKPI(realtor.id);
-                      setSelectedRealtorKPI(kpi);
-                      
-                      // Fetch deals and diagnoses
-                      // TODO: Add API endpoints for realtor deals and diagnoses
-                      const deals: Array<Record<string, unknown>> = [];
-                      const diagnoses: Array<Record<string, unknown>> = [];
-                      
-                      setSelectedRealtorDeals(deals);
-                      setSelectedRealtorDiagnoses(diagnoses);
-                      
-                      // Fetch training progress
-                      // TODO: Add API endpoint for training progress
-                      const trainingProgress: Array<{ section: string; subsection: string }> = [];
-                      
-                      if (trainingProgress && trainingProgress.length > 0) {
-                        const updatedTrainingData = trainingStructure.map((section) => ({
-                          ...section,
-                          subsections: section.subsections.map((subsection) => {
-                            const progressItem = trainingProgress.find(
-                              (p: { section: string; subsection: string }) => p.section === section.id && p.subsection === subsection.id
-                            );
-                            return {
-                              ...subsection,
-                              progress: progressItem
-                                ? {
-                                    lecture: progressItem.lecture_completed || false,
-                                    video: progressItem.video_completed || false,
-                                    practical: progressItem.practical_completed || false,
-                                    handover: progressItem.handover_completed || false,
-                                    exam: progressItem.exam_completed || false,
-                                  }
-                                : subsection.progress,
-                            };
-                          }),
-                        }));
-                        setSelectedRealtorTrainingData(updatedTrainingData);
-                        setSelectedRealtorTrainingProgress(calculateTrainingProgress(updatedTrainingData));
-                      } else {
-                        setSelectedRealtorTrainingData(trainingStructure);
-                        setSelectedRealtorTrainingProgress(0);
+                <div className="relative group">
+                  <RealizatorCardWithKPI
+                    realtor={{
+                      id: realtor.id,
+                      name: realtor.user.fullName,
+                      email: realtor.user.email,
+                      level: realtor.level,
+                      confidence: false,
+                      salesResilience: false,
+                      successMindset: false
+                    }}
+                    onClick={async () => {
+                      // Fetch full realtor data with all fields
+                      try {
+                        // Get realtor details - using API
+                        // TODO: Add API endpoint for full realtor details with all fields
+                        setSelectedRealtor({
+                          ...realtor,
+                          confidence: false,
+                          salesResilience: false,
+                          successMindset: false,
+                        });
+                        
+                        const kpi = await api.getRealtorKPI(realtor.id);
+                        setSelectedRealtorKPI(kpi);
+                        
+                        // Fetch deals and diagnoses
+                        // TODO: Add API endpoints for realtor deals and diagnoses
+                        const deals: Array<Record<string, unknown>> = [];
+                        const diagnoses: Array<Record<string, unknown>> = [];
+                        
+                        setSelectedRealtorDeals(deals);
+                        setSelectedRealtorDiagnoses(diagnoses);
+                        
+                        // Fetch training progress
+                        // TODO: Add API endpoint for training progress
+                        const trainingProgress: Array<{ section: string; subsection: string }> = [];
+                        
+                        if (trainingProgress && trainingProgress.length > 0) {
+                          const updatedTrainingData = trainingStructure.map((section) => ({
+                            ...section,
+                            subsections: section.subsections.map((subsection) => {
+                              const progressItem = trainingProgress.find(
+                                (p: { section: string; subsection: string }) => p.section === section.id && p.subsection === subsection.id
+                              );
+                              return {
+                                ...subsection,
+                                progress: progressItem
+                                  ? {
+                                      lecture: progressItem.lecture_completed || false,
+                                      video: progressItem.video_completed || false,
+                                      practical: progressItem.practical_completed || false,
+                                      handover: progressItem.handover_completed || false,
+                                      exam: progressItem.exam_completed || false,
+                                    }
+                                  : subsection.progress,
+                              };
+                            }),
+                          }));
+                          setSelectedRealtorTrainingData(updatedTrainingData);
+                          setSelectedRealtorTrainingProgress(calculateTrainingProgress(updatedTrainingData));
+                        } else {
+                          setSelectedRealtorTrainingData(trainingStructure);
+                          setSelectedRealtorTrainingProgress(0);
+                        }
+                        
+                        setCurrentView('realtor-detail');
+                      } catch (error) {
+                        console.error('Error fetching realtor details:', error);
+                        toast.error('Грешка при зареждане на детайли');
                       }
-                      
-                      setCurrentView('realtor-detail');
-                    } catch (error) {
-                      console.error('Error fetching realtor details:', error);
-                      toast.error('Грешка при зареждане на детайли');
-                    }
-                  }}
-                />
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedRealtorForTraining({ id: realtor.id, name: realtor.user.fullName });
+                      setTrainingDialogOpen(true);
+                    }}
+                  >
+                    <GraduationCap className="h-4 w-4 mr-1" />
+                    Обучение
+                  </Button>
+                </div>
                 </SortableCard>
               )
             ))}
@@ -1392,6 +1410,16 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
         onOpenChange={setUserManagementOpen}
         onUpdate={fetchUserInfo}
       />
+
+      {/* Training Management Dialog */}
+      {selectedRealtorForTraining && (
+        <TrainingManagementDialog
+          open={trainingDialogOpen}
+          onOpenChange={setTrainingDialogOpen}
+          realtorId={selectedRealtorForTraining.id}
+          realtorName={selectedRealtorForTraining.name}
+        />
+      )}
       </div>
     </div>
   );

@@ -43,8 +43,9 @@ import {
   formatSuccessRate,
 } from '@/utils/kpiCalculations';
 import { RealizatorCardWithKPI } from '@/components/cards/RealizatorCardWithKPI';
+import { TrainingManagementDialog } from '@/components/TrainingManagementDialog';
 import logo from '@/assets/logo.jpeg';
-import { LogOut } from 'lucide-react';
+import { LogOut, GraduationCap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 type ViewLevel = 'realtors' | 'realtor-detail';
@@ -115,6 +116,8 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
   
   const [selectedRealtor, setSelectedRealtor] = useState<Realtor | null>(null);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [trainingDialogOpen, setTrainingDialogOpen] = useState(false);
+  const [selectedRealtorForTraining, setSelectedRealtorForTraining] = useState<{ id: string; name: string } | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [kpiMetrics, setKpiMetrics] = useState<KPIMetrics | null>(null);
@@ -446,21 +449,36 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
                   {currentView === 'realtors' && realtors.map((realtor) => (
                     realtor.user && (
                       <SortableCard key={realtor.id} id={realtor.id}>
-                        <RealizatorCardWithKPI
-                          realtor={{
-                            id: realtor.id,
-                            name: realtor.user.fullName,
-                            email: realtor.user.email,
-                            level: realtor.level,
-                            confidence: false,
-                            salesResilience: false,
-                            successMindset: false
-                          }}
-                          onClick={() => {
-                            setSelectedRealtor(realtor);
-                            setCurrentView('realtor-detail');
-                          }}
-                        />
+                        <div className="relative group">
+                          <RealizatorCardWithKPI
+                            realtor={{
+                              id: realtor.id,
+                              name: realtor.user.fullName,
+                              email: realtor.user.email,
+                              level: realtor.level,
+                              confidence: false,
+                              salesResilience: false,
+                              successMindset: false
+                            }}
+                            onClick={() => {
+                              setSelectedRealtor(realtor);
+                              setCurrentView('realtor-detail');
+                            }}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedRealtorForTraining({ id: realtor.id, name: realtor.user.fullName });
+                              setTrainingDialogOpen(true);
+                            }}
+                          >
+                            <GraduationCap className="h-4 w-4 mr-1" />
+                            Обучение
+                          </Button>
+                        </div>
                       </SortableCard>
                     )
                   ))}
@@ -483,6 +501,16 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
           }}
           onUpdate={fetchUserInfo}
           onLogout={handleLogout}
+        />
+      )}
+
+      {/* Training Management Dialog */}
+      {selectedRealtorForTraining && (
+        <TrainingManagementDialog
+          open={trainingDialogOpen}
+          onOpenChange={setTrainingDialogOpen}
+          realtorId={selectedRealtorForTraining.id}
+          realtorName={selectedRealtorForTraining.name}
         />
       )}
     </div>

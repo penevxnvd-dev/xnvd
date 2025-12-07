@@ -45,8 +45,9 @@ import {
 } from '@/utils/kpiCalculations';
 import { TeamCardWithKPI } from '@/components/cards/TeamCardWithKPI';
 import { RealizatorCardWithKPI } from '@/components/cards/RealizatorCardWithKPI';
+import { TrainingManagementDialog } from '@/components/TrainingManagementDialog';
 import logo from '@/assets/logo.jpeg';
-import { LogOut } from 'lucide-react';
+import { LogOut, GraduationCap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 type ViewLevel = 'teams' | 'realtors' | 'realtor-detail';
@@ -56,6 +57,14 @@ interface Office {
   name: string;
   city_id: string;
   address: string | null;
+  city?: {
+    id: string;
+    name: string;
+    country?: {
+      id: string;
+      name: string;
+    };
+  };
 }
 
 interface Team {
@@ -126,6 +135,8 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [selectedRealtor, setSelectedRealtor] = useState<Realtor | null>(null);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [trainingDialogOpen, setTrainingDialogOpen] = useState(false);
+  const [selectedRealtorForTraining, setSelectedRealtorForTraining] = useState<{ id: string; name: string } | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [kpiMetrics, setKpiMetrics] = useState<KPIMetrics | null>(null);
@@ -158,10 +169,23 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
     if (!userId) return;
     setLoading(true);
     try {
-      // Find office where user is manager
+      // Find office where user is manager with city and country info
       const { data: officesData, error: officesError } = await supabase
         .from('offices')
-        .select('id, name, city_id, address')
+        .select(`
+          id, 
+          name, 
+          city_id, 
+          address,
+          city:cities (
+            id,
+            name,
+            country:countries (
+              id,
+              name
+            )
+          )
+        `)
         .eq('manager_id', userId)
         .limit(1)
         .single();
@@ -173,7 +197,8 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
           id: officesData.id,
           name: officesData.name,
           city_id: officesData.city_id,
-          address: officesData.address
+          address: officesData.address,
+          city: officesData.city as { id: string; name: string; country?: { id: string; name: string } } | undefined
         };
         setOffice(officeData);
         fetchTeams(officeData.id);
@@ -299,6 +324,8 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
 
   const getBreadcrumb = () => {
     const parts = ['Начало'];
+    if (office?.city?.country) parts.push(office.city.country.name);
+    if (office?.city) parts.push(office.city.name);
     if (office) parts.push(office.name);
     if (selectedTeam) parts.push(selectedTeam.name);
     return parts.join(' / ');
@@ -350,7 +377,9 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
                 <img src={logo} alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 object-contain" />
               </button>
               <div className="min-w-0">
-                <h1 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground truncate">Офис: {office.name}</h1>
+                <h1 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground truncate">
+                  {office.city?.country?.name || 'България'} → {office.city?.name || 'Бургас'} → {office.name}
+                </h1>
                 <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{getBreadcrumb()}</p>
               </div>
             </div>
@@ -508,21 +537,36 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
                   {currentView === 'realtors' && realtors.map((realtor) => (
                     realtor.user && (
                       <SortableCard key={realtor.id} id={realtor.id}>
-                        <RealizatorCardWithKPI
-                          realtor={{
-                            id: realtor.id,
-                            name: realtor.user.fullName,
-                            email: realtor.user.email,
-                            level: realtor.level,
-                            confidence: false,
-                            salesResilience: false,
-                            successMindset: false
-                          }}
-                          onClick={() => {
-                            setSelectedRealtor(realtor);
-                            setCurrentView('realtor-detail');
-                          }}
-                        />
+                        <div className="relative group">
+                          <RealizatorCardWithKPI
+                            realtor={{
+                              id: realtor.id,
+                              name: realtor.user.fullName,
+                              email: realtor.user.email,
+                              level: realtor.level,
+                              confidence: false,
+                              salesResilience: false,
+                              successMindset: false
+                            }}
+                            onClick={() => {
+                              setSelectedRealtor(realtor);
+                              setCurrentView('realtor-detail');
+                            }}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedRealtorForTraining({ id: realtor.id, name: realtor.user.fullName });
+                              setTrainingDialogOpen(true);
+                            }}
+                          >
+                            <GraduationCap className="h-4 w-4 mr-1" />
+                            Обучение
+                          </Button>
+                        </div>
                       </SortableCard>
                     )
                   ))}
@@ -545,6 +589,16 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
           }}
           onUpdate={fetchUserInfo}
           onLogout={handleLogout}
+        />
+      )}
+
+      {/* Training Management Dialog */}
+      {selectedRealtorForTraining && (
+        <TrainingManagementDialog
+          open={trainingDialogOpen}
+          onOpenChange={setTrainingDialogOpen}
+          realtorId={selectedRealtorForTraining.id}
+          realtorName={selectedRealtorForTraining.name}
         />
       )}
     </div>
