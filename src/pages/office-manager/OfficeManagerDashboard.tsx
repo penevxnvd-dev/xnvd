@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, Building2, Users, TrendingUp, Download, BarChart3 } from 'lucide-react';
+import { LogOut, Building2, Users, TrendingUp, Download, BarChart3, Settings } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
 import { NotificationCenter } from '@/components/NotificationCenter';
@@ -50,6 +50,7 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
   const [officeData, setOfficeData] = useState<OfficeData | null>(null);
   const [kpiMetrics, setKpiMetrics] = useState<KPIMetrics | null>(null);
   const [userInfo, setUserInfo] = useState({ fullName: '', email: '', role: 'Мениджър на офис' });
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
 
   const fetchUserInfo = useCallback(async () => {
     try {
@@ -236,10 +237,24 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
                   <BarChart3 className="h-4 w-4 mr-2" />
                   KPI данни
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Настройки на акаунта
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <NotificationCenter />
-            <AccountSettingsDialog />
+            <AccountSettingsDialog
+              open={accountSettingsOpen}
+              onOpenChange={setAccountSettingsOpen}
+              userInfo={{
+                fullName: userInfo.fullName,
+                email: userInfo.email,
+              }}
+              onUpdate={fetchUserInfo}
+              onLogout={handleLogout}
+            />
             <Button onClick={handleLogout} variant="outline" size="sm">
               <LogOut className="h-4 w-4 mr-2" />
               Изход

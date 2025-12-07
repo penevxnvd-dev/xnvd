@@ -16,11 +16,11 @@ import { LogOut } from 'lucide-react';
 interface AccountSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  userInfo: {
+  userInfo?: {
     fullName: string;
     email: string;
   };
-  onUpdate: () => void;
+  onUpdate?: () => void;
   onLogout?: () => void;
 }
 
@@ -33,18 +33,18 @@ export const AccountSettingsDialog = ({
 }: AccountSettingsDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    fullName: userInfo.fullName,
-    email: userInfo.email,
+    fullName: userInfo?.fullName || '',
+    email: userInfo?.email || '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
 
   useEffect(() => {
-    if (open) {
+    if (open && userInfo) {
       setFormData({
-        fullName: userInfo.fullName,
-        email: userInfo.email,
+        fullName: userInfo.fullName || '',
+        email: userInfo.email || '',
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
@@ -58,12 +58,17 @@ export const AccountSettingsDialog = ({
       return;
     }
 
+    if (!userInfo) {
+      toast.error('Информацията за потребителя не е налична');
+      return;
+    }
+
     setLoading(true);
     try {
       // Update profile via API
       await api.updateProfile(formData.fullName);
       toast.success('Профилът е обновен успешно');
-      onUpdate();
+      onUpdate?.();
       onOpenChange(false);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -110,6 +115,11 @@ export const AccountSettingsDialog = ({
       setLoading(false);
     }
   };
+
+  // Don't render if userInfo is not available
+  if (!userInfo) {
+    return null;
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

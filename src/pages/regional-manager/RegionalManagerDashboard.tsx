@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, Building2, Users, TrendingUp, Download, BarChart3, MapPin } from 'lucide-react';
+import { LogOut, Building2, Users, TrendingUp, Download, BarChart3, MapPin, Settings } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
 import { NotificationCenter } from '@/components/NotificationCenter';
@@ -51,6 +51,7 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
   const [loading, setLoading] = useState(true);
   const [cities, setCities] = useState<CityData[]>([]);
   const [userInfo, setUserInfo] = useState({ fullName: '', email: '', role: 'Регионален мениджър' });
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
 
   useEffect(() => {
     fetchCitiesData();
@@ -228,10 +229,24 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
                   <BarChart3 className="h-4 w-4 mr-2" />
                   KPI данни (Всички градове)
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Настройки на акаунта
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <NotificationCenter />
-            <AccountSettingsDialog />
+            <AccountSettingsDialog
+              open={accountSettingsOpen}
+              onOpenChange={setAccountSettingsOpen}
+              userInfo={{
+                fullName: userInfo.fullName,
+                email: userInfo.email,
+              }}
+              onUpdate={fetchUserInfo}
+              onLogout={handleLogout}
+            />
             <Button onClick={handleLogout} variant="outline" size="sm">
               <LogOut className="h-4 w-4 mr-2" />
               Изход
