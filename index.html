@@ -91,6 +91,16 @@
                  message.includes('domain');
         };
         
+        // Filter "Old Supabase project" errors
+        const filterOldProjectError = function(...args) {
+          const message = String(args[0] || '');
+          const allArgsStr = args.map(arg => String(arg)).join(' ').toLowerCase();
+          return message.includes('Old Supabase project') || 
+                 message.includes('update environment variables') ||
+                 allArgsStr.includes('old supabase project') ||
+                 allArgsStr.includes('ufpeftuanzmkiryohesd');
+        };
+        
         console.error = function(...args) {
           const message = String(args[0] || '');
           const allArgsStr = args.map(arg => String(arg)).join(' ').toLowerCase();
@@ -112,7 +122,10 @@
         };
         
         console.warn = function(...args) {
-          if (filterSES(...args) || filterWebSocket(...args) || filterCookieWarnings(...args)) {
+          if (filterSES(...args) || 
+              filterWebSocket(...args) || 
+              filterCookieWarnings(...args) || 
+              filterOldProjectError(...args)) {
             return; // Silently ignore these non-critical warnings
           }
           originalWarn.apply(console, args);
