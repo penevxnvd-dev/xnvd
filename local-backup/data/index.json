@@ -1,5 +1,5 @@
 {
-  "synced_at": "2025-12-07T22:53:28.713Z",
+  "synced_at": "2025-12-07T23:02:08.040Z",
   "tables": [
     "profiles",
     "user_roles",
@@ -30,19 +30,5 @@
     "buyer_schedule": 0,
     "messages": 0
   },
-  "errors": [
-    "profiles",
-    "user_roles",
-    "countries",
-    "cities",
-    "offices",
-    "teams",
-    "realtors",
-    "deals",
-    "diagnoses",
-    "training_progress",
-    "realtor_goals",
-    "buyer_schedule",
-    "messages"
-  ]
+  "errors": []
 }
