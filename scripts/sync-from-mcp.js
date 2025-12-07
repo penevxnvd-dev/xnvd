@@ -182,24 +182,27 @@ const allData = {
   messages: []
 };
 
-// Add admin account to profiles and user_roles
-const adminProfile = {
-  id: "00000000-0000-0000-0000-000000000001",
-  full_name: "Администратор",
-  email: "admin@xnvd.com",
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString()
-};
+// Add admin account to profiles and user_roles (if not exists)
+const adminExists = allData.profiles.some(p => p.email === 'admin@xnvd.com');
+if (!adminExists) {
+  const adminProfile = {
+    id: "00000000-0000-0000-0000-000000000001",
+    full_name: "Администратор",
+    email: "admin@xnvd.com",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
 
-const adminRole = {
-  id: "00000000-0000-0000-0000-000000000002",
-  user_id: "00000000-0000-0000-0000-000000000001",
-  role: "admin",
-  created_at: new Date().toISOString()
-};
+  const adminRole = {
+    id: "00000000-0000-0000-0000-000000000002",
+    user_id: "00000000-0000-0000-0000-000000000001",
+    role: "admin",
+    created_at: new Date().toISOString()
+  };
 
-allData.profiles.push(adminProfile);
-allData.user_roles.push(adminRole);
+  allData.profiles.push(adminProfile);
+  allData.user_roles.push(adminRole);
+}
 
 console.log('🔄 Processing data from Supabase...\n');
 await processData(allData);
