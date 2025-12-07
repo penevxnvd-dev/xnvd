@@ -11,6 +11,7 @@ import {
   getHardcodedTeams,
   getHardcodedProfiles,
   getHardcodedRealtors,
+  getHardcodedUserRoles,
   findAccountByEmail,
   getTeamsByOffice,
   getOfficesByCity,
@@ -33,11 +34,36 @@ class SupabaseApiClient {
     // First try hardcoded data fallback (for offline access)
     const hardcodedAccount = findAccountByEmail(email.trim());
     if (hardcodedAccount) {
-      // Allow login with any password if account exists in hardcoded data
+      // Check password for hardcoded accounts
+      if (password !== hardcodedAccount.password) {
+        throw new Error('Невалиден имейл или парола. Моля проверете данните си.');
+      }
+      
+      // Allow login with hardcoded data
       // This enables offline access when Supabase is unavailable
       console.info('[Login] Using hardcoded account fallback for:', email);
       
       const profile = getHardcodedProfiles().find(p => p.id === hardcodedAccount.id);
+      const userRoles = getHardcodedUserRoles().filter(ur => ur.user_id === hardcodedAccount.id);
+      
+      const session = {
+        access_token: 'hardcoded-offline-token',
+        refresh_token: 'hardcoded-offline-refresh',
+        expires_in: 3600,
+        expires_at: Date.now() + 3600000,
+        token_type: 'bearer',
+        user: {
+          id: hardcodedAccount.id,
+          email: hardcodedAccount.email,
+          user_metadata: {
+            full_name: hardcodedAccount.full_name,
+          },
+        },
+        hardcoded: true, // Flag to indicate this is from hardcoded data
+      };
+      
+      // Store hardcoded session in localStorage
+      localStorage.setItem('hardcoded-session', JSON.stringify(session));
       
       return {
         user: {
@@ -45,22 +71,10 @@ class SupabaseApiClient {
           email: hardcodedAccount.email,
           full_name: hardcodedAccount.full_name,
           ...profile,
+          roles: userRoles.map(ur => ur.role),
         },
-        session: {
-          access_token: 'hardcoded-offline-token',
-          refresh_token: 'hardcoded-offline-refresh',
-          expires_in: 3600,
-          expires_at: Date.now() + 3600000,
-          token_type: 'bearer',
-          user: {
-            id: hardcodedAccount.id,
-            email: hardcodedAccount.email,
-            user_metadata: {
-              full_name: hardcodedAccount.full_name,
-            },
-          },
-        },
-        hardcoded: true, // Flag to indicate this is from hardcoded data
+        session,
+        hardcoded: true,
       };
     }
 
@@ -241,6 +255,30 @@ class SupabaseApiClient {
   }
 
   async getCurrentUser() {
+    // Check for hardcoded session first
+    const hardcodedSession = localStorage.getItem('hardcoded-session');
+    if (hardcodedSession) {
+      try {
+        const session = JSON.parse(hardcodedSession);
+        if (session.user && session.hardcoded) {
+          const profile = getHardcodedProfiles().find(p => p.id === session.user.id);
+          const userRoles = getHardcodedUserRoles().filter(ur => ur.user_id === session.user.id);
+          
+          return {
+            user: {
+              ...session.user,
+              ...profile,
+              roles: userRoles.map(ur => ur.role),
+            },
+          };
+        }
+      } catch (e) {
+        // Invalid hardcoded session, clear it
+        localStorage.removeItem('hardcoded-session');
+      }
+    }
+
+    // Try Supabase auth
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
@@ -265,6 +303,9 @@ class SupabaseApiClient {
   }
 
   async logout() {
+    // Clear hardcoded session
+    localStorage.removeItem('hardcoded-session');
+    
     // Sign out from Supabase
     const { error } = await supabase.auth.signOut();
     

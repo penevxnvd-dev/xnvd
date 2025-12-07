@@ -11,6 +11,33 @@ export const useUserRole = () => {
   useEffect(() => {
     const fetchUserRole = async () => {
       try {
+        // Check for hardcoded session first
+        const hardcodedSession = localStorage.getItem('hardcoded-session');
+        if (hardcodedSession) {
+          try {
+            const session = JSON.parse(hardcodedSession);
+            if (session.user && session.hardcoded) {
+              const { getHardcodedUserRoles } = await import('@/lib/hardcodedData');
+              const userRoles = getHardcodedUserRoles().filter(ur => ur.user_id === session.user.id);
+              
+              if (userRoles && userRoles.length > 0) {
+                const rolePriority = ['admin', 'regional_manager', 'office_manager', 'team_leader', 'realtor'];
+                for (const priorityRole of rolePriority) {
+                  if (userRoles.some(r => r.role === priorityRole)) {
+                    setRole(priorityRole as UserRole);
+                    setUserId(session.user.id);
+                    setLoading(false);
+                    return;
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            // Invalid hardcoded session, clear it
+            localStorage.removeItem('hardcoded-session');
+          }
+        }
+
         // Get current user from Supabase auth
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         
