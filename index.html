@@ -41,15 +41,23 @@
             return String(arg);
           }).join(' ');
           
+          // Comprehensive SES error filtering
           if (message.includes('SES_UNCAUGHT_EXCEPTION') ||
               message.includes('SES Removing') ||
+              message.includes('SES') ||
               message.startsWith('SES ') ||
               allArgsStr.includes('SES_UNCAUGHT_EXCEPTION') ||
+              allArgsStr.includes('SES Removing') ||
               allArgsStr.includes('lockdown-install.js') ||
               allArgsStr.includes('Removing unpermitted intrinsics') ||
+              allArgsStr.includes('Removing intrinsics') ||
               allArgsStr.includes('Removing intrinsics.%') ||
               allArgsStr.includes('toTemporalInstant') ||
-              allArgsStr.includes('getOrInsert')) {
+              allArgsStr.includes('getOrInsert') ||
+              allArgsStr.includes('getOrInsertComputed') ||
+              allArgsStr.includes('MapPrototype') ||
+              allArgsStr.includes('WeakMapPrototype') ||
+              allArgsStr.includes('DatePrototype')) {
             return; // Silently ignore SES errors
           }
           originalError.apply(console, args);
@@ -59,14 +67,21 @@
           const message = String(args[0] || '');
           const allArgsStr = args.map(arg => String(arg)).join(' ');
           
+          // Comprehensive SES warning filtering
           if (message.includes('Removing unpermitted intrinsics') ||
               message.includes('Removing intrinsics') ||
               message.includes('SES Removing') ||
+              message.includes('SES') ||
               message.startsWith('SES ') ||
               allArgsStr.includes('lockdown-install.js') ||
               allArgsStr.includes('Removing intrinsics') ||
+              allArgsStr.includes('Removing intrinsics.%') ||
               allArgsStr.includes('toTemporalInstant') ||
-              allArgsStr.includes('getOrInsert')) {
+              allArgsStr.includes('getOrInsert') ||
+              allArgsStr.includes('getOrInsertComputed') ||
+              allArgsStr.includes('MapPrototype') ||
+              allArgsStr.includes('WeakMapPrototype') ||
+              allArgsStr.includes('DatePrototype')) {
             return; // Silently ignore SES warnings
           }
           originalWarn.apply(console, args);

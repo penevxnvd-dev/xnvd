@@ -51,13 +51,20 @@ if (typeof window !== 'undefined') {
     
     if (message.includes('SES_UNCAUGHT_EXCEPTION') ||
         message.includes('SES Removing') ||
+        message.includes('SES') ||
         message.startsWith('SES ') ||
         allArgsStr.includes('SES_UNCAUGHT_EXCEPTION') ||
+        allArgsStr.includes('SES Removing') ||
         allArgsStr.includes('lockdown-install.js') ||
         allArgsStr.includes('Removing unpermitted intrinsics') ||
+        allArgsStr.includes('Removing intrinsics') ||
         allArgsStr.includes('Removing intrinsics.%') ||
         allArgsStr.includes('toTemporalInstant') ||
-        allArgsStr.includes('getOrInsert')) {
+        allArgsStr.includes('getOrInsert') ||
+        allArgsStr.includes('getOrInsertComputed') ||
+        allArgsStr.includes('MapPrototype') ||
+        allArgsStr.includes('WeakMapPrototype') ||
+        allArgsStr.includes('DatePrototype')) {
       return; // Silently ignore SES security-related errors from browser extensions
     }
     originalError.apply(console, args);
@@ -77,11 +84,17 @@ if (typeof window !== 'undefined') {
     if (message.includes('Removing unpermitted intrinsics') || 
         message.includes('Removing intrinsics') ||
         message.includes('SES Removing') ||
+        message.includes('SES') ||
         message.startsWith('SES ') ||
         allWarnArgsStr.includes('lockdown-install.js') ||
         allWarnArgsStr.includes('Removing intrinsics') ||
+        allWarnArgsStr.includes('Removing intrinsics.%') ||
         allWarnArgsStr.includes('toTemporalInstant') ||
-        allWarnArgsStr.includes('getOrInsert')) {
+        allWarnArgsStr.includes('getOrInsert') ||
+        allWarnArgsStr.includes('getOrInsertComputed') ||
+        allWarnArgsStr.includes('MapPrototype') ||
+        allWarnArgsStr.includes('WeakMapPrototype') ||
+        allWarnArgsStr.includes('DatePrototype')) {
       return; // Silently ignore these SES security warnings
     }
     // Filter out BrowserAutomation warnings (Cursor/VS Code browser automation)
