@@ -1,6 +1,8 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+// Block old project connections early
+import "./lib/blockOldProject";
 
 // Filter out development-only warnings that don't affect functionality
 if (typeof window !== 'undefined') {
@@ -101,12 +103,6 @@ if (typeof window !== 'undefined') {
     // Filter out SES (Secure EcmaScript) lockdown errors
     // These are caused by browser extensions (like MetaMask) injecting SES code
     // They don't affect the app's functionality and are safe to ignore
-    const allArgsStr = args.map(arg => {
-      if (arg instanceof Error) {
-        return `${arg.message || ''} ${arg.stack || ''}`;
-      }
-      return String(arg);
-    }).join(' ').toLowerCase();
     
     const messageLower = message.toLowerCase();
     
