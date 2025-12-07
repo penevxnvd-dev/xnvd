@@ -44,27 +44,30 @@ if (typeof window !== 'undefined') {
     // They don't affect the app's functionality and are safe to ignore
     const allArgsStr = args.map(arg => {
       if (arg instanceof Error) {
-        return `${arg.message} ${arg.stack || ''}`;
+        return `${arg.message || ''} ${arg.stack || ''}`;
       }
       return String(arg);
-    }).join(' ');
+    }).join(' ').toLowerCase();
     
-    if (message.includes('SES_UNCAUGHT_EXCEPTION') ||
-        message.includes('SES Removing') ||
-        message.includes('SES') ||
-        message.startsWith('SES ') ||
-        allArgsStr.includes('SES_UNCAUGHT_EXCEPTION') ||
-        allArgsStr.includes('SES Removing') ||
-        allArgsStr.includes('lockdown-install.js') ||
-        allArgsStr.includes('Removing unpermitted intrinsics') ||
-        allArgsStr.includes('Removing intrinsics') ||
-        allArgsStr.includes('Removing intrinsics.%') ||
-        allArgsStr.includes('toTemporalInstant') ||
-        allArgsStr.includes('getOrInsert') ||
-        allArgsStr.includes('getOrInsertComputed') ||
-        allArgsStr.includes('MapPrototype') ||
-        allArgsStr.includes('WeakMapPrototype') ||
-        allArgsStr.includes('DatePrototype')) {
+    const messageLower = message.toLowerCase();
+    
+    if (messageLower.includes('ses_uncaught_exception') ||
+        messageLower.includes('ses removing') ||
+        messageLower.includes('ses ') ||
+        messageLower.includes('lockdown-install') ||
+        allArgsStr.includes('ses_uncaught_exception') ||
+        allArgsStr.includes('ses removing') ||
+        allArgsStr.includes('lockdown-install') ||
+        allArgsStr.includes('removing unpermitted intrinsics') ||
+        allArgsStr.includes('removing intrinsics') ||
+        allArgsStr.includes('removing intrinsics.%') ||
+        allArgsStr.includes('totemporalinstant') ||
+        allArgsStr.includes('getorinsert') ||
+        allArgsStr.includes('getorinsertcomputed') ||
+        allArgsStr.includes('mapprototype') ||
+        allArgsStr.includes('weakmapprototype') ||
+        allArgsStr.includes('dateprototype') ||
+        allArgsStr.includes('intrinsics.%')) {
       return; // Silently ignore SES security-related errors from browser extensions
     }
     originalError.apply(console, args);
@@ -79,22 +82,24 @@ if (typeof window !== 'undefined') {
     }
     // Filter out SES (Secure EcmaScript) lockdown warnings about removing intrinsics
     // These are normal security-related messages and don't affect functionality
-    const allWarnArgsStr = args.map(arg => String(arg)).join(' ');
+    const allWarnArgsStr = args.map(arg => String(arg)).join(' ').toLowerCase();
+    const messageLower = message.toLowerCase();
     
-    if (message.includes('Removing unpermitted intrinsics') || 
-        message.includes('Removing intrinsics') ||
-        message.includes('SES Removing') ||
-        message.includes('SES') ||
-        message.startsWith('SES ') ||
-        allWarnArgsStr.includes('lockdown-install.js') ||
-        allWarnArgsStr.includes('Removing intrinsics') ||
-        allWarnArgsStr.includes('Removing intrinsics.%') ||
-        allWarnArgsStr.includes('toTemporalInstant') ||
-        allWarnArgsStr.includes('getOrInsert') ||
-        allWarnArgsStr.includes('getOrInsertComputed') ||
-        allWarnArgsStr.includes('MapPrototype') ||
-        allWarnArgsStr.includes('WeakMapPrototype') ||
-        allWarnArgsStr.includes('DatePrototype')) {
+    if (messageLower.includes('removing unpermitted intrinsics') || 
+        messageLower.includes('removing intrinsics') ||
+        messageLower.includes('ses removing') ||
+        messageLower.includes('ses ') ||
+        messageLower.includes('lockdown-install') ||
+        allWarnArgsStr.includes('lockdown-install') ||
+        allWarnArgsStr.includes('removing intrinsics') ||
+        allWarnArgsStr.includes('removing intrinsics.%') ||
+        allWarnArgsStr.includes('totemporalinstant') ||
+        allWarnArgsStr.includes('getorinsert') ||
+        allWarnArgsStr.includes('getorinsertcomputed') ||
+        allWarnArgsStr.includes('mapprototype') ||
+        allWarnArgsStr.includes('weakmapprototype') ||
+        allWarnArgsStr.includes('dateprototype') ||
+        allWarnArgsStr.includes('intrinsics.%')) {
       return; // Silently ignore these SES security warnings
     }
     // Filter out BrowserAutomation warnings (Cursor/VS Code browser automation)
