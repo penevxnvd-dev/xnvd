@@ -10,6 +10,21 @@ if (typeof window !== 'undefined') {
   // Filter CORS errors from Lovable development API
   console.error = (...args: unknown[]) => {
     const message = args[0]?.toString() || '';
+    const allArgsStr = args.map(arg => {
+      if (arg instanceof Error) {
+        return `${arg.message || ''} ${arg.stack || ''}`;
+      }
+      return String(arg);
+    }).join(' ').toLowerCase();
+    
+    // Filter out requests to old Supabase project (XHR, fetch, etc.)
+    if (message.includes('ufpeftuanzmkiryohesd') ||
+        allArgsStr.includes('ufpeftuanzmkiryohesd') ||
+        message.includes('ufpeftuanzmkiryohesd.supabase.co') ||
+        allArgsStr.includes('ufpeftuanzmkiryohesd.supabase.co')) {
+      return; // Silently ignore old project connection attempts
+    }
+    
     // Filter out CORS errors from api.lovable.dev (development tools)
     if (message.includes('Cross-Origin Request Blocked') && message.includes('api.lovable.dev')) {
       return; // Silently ignore these development-only errors

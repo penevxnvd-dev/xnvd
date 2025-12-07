@@ -66,15 +66,18 @@ export const supabase = (() => {
         headers: {
           'x-client-info': 'xnvd-app',
         },
-        // Override fetch to prevent WebSocket connections
+        // Override fetch to prevent connections to old project and WebSocket
         fetch: (url, options = {}) => {
-          // Block any WebSocket connections to old project
-          if (typeof url === 'string' && url.includes('ufpeftuanzmkiryohesd')) {
-            console.warn('[Supabase] Blocked connection attempt to old project:', url);
-            return Promise.reject(new Error('Old project connection blocked'));
+          const urlString = typeof url === 'string' ? url : url.toString();
+          
+          // Block ANY connection to old project (HTTP, HTTPS, WebSocket)
+          if (urlString.includes('ufpeftuanzmkiryohesd')) {
+            console.warn('[Supabase] Blocked connection attempt to old project:', urlString);
+            return Promise.reject(new Error('Old project connection blocked - please update Vercel environment variables'));
           }
-          // Block WebSocket connections
-          if (typeof url === 'string' && (url.includes('wss://') || url.includes('ws://'))) {
+          
+          // Block WebSocket connections (Realtime is disabled)
+          if (urlString.includes('wss://') || urlString.includes('ws://')) {
             console.debug('[Supabase] WebSocket connection blocked (Realtime disabled)');
             return Promise.reject(new Error('WebSocket connections disabled'));
           }
