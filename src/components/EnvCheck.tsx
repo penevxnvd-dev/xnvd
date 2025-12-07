@@ -13,15 +13,32 @@ export const EnvCheck: React.FC<EnvCheckProps> = ({ children }) => {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    // Add a timeout to prevent infinite loading
+    timeoutId = setTimeout(() => {
+      setIsChecking(false);
+      setEnvError('Environment check timed out. Please check browser console for errors.');
+    }, 5000);
+
     try {
       getEnv();
       setEnvError(null);
+      setIsChecking(false);
+      clearTimeout(timeoutId);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       setEnvError(message);
-    } finally {
       setIsChecking(false);
+      clearTimeout(timeoutId);
+      console.error('Environment check failed:', error);
     }
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, []);
 
   if (isChecking) {
