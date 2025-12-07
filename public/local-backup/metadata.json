@@ -1,7 +1,8 @@
 {
-  "last_sync": "2025-12-07T18:57:21.471Z",
+  "last_sync": "2025-12-07T19:11:58.363Z",
   "supabase_url": "https://qxompdwqdnemsntssjot.supabase.co",
   "tables_synced": 13,
   "total_records": 0,
-  "errors": 0
+  "errors": 0,
+  "last_hardcode": "2025-12-07T19:12:00.701Z"
 }
