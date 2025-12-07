@@ -5,12 +5,12 @@ import type { Database } from '../../types/supabase.js';
 // Priority: SUPABASE_URL > VITE_SUPABASE_URL
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 
-// Support both VITE_SUPABASE_SERVICE_ROLE_KEY and SUPABASE_SERVICE_ROLE_KEY
-// Also check for VITE_SUPABASE_ANON_KEY as fallback (some setups use anon key for service operations)
+// Use publishable key (anon key) as service role key
+// User indicated: service role key = supabase publishable key
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY 
   || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY
-  || process.env.VITE_SUPABASE_ANON_KEY
-  || process.env.VITE_SUPABASE_PUBLISHABLE_KEY; // Fallback to anon key if service_role not available
+  || process.env.VITE_SUPABASE_PUBLISHABLE_KEY  // Primary: use publishable key
+  || process.env.VITE_SUPABASE_ANON_KEY;         // Fallback to anon key
 
 // Support both VITE_SUPABASE_ANON_KEY and SUPABASE_ANON_KEY
 // Priority: SUPABASE_ANON_KEY > VITE_SUPABASE_ANON_KEY > VITE_SUPABASE_PUBLISHABLE_KEY
@@ -23,9 +23,9 @@ if (!SUPABASE_URL) {
 }
 
 if (!SUPABASE_SERVICE_ROLE_KEY || SUPABASE_SERVICE_ROLE_KEY === 'REPLACE_WITH_REAL_SERVICE_ROLE_KEY_FROM_DASHBOARD') {
-  console.warn('⚠️  WARNING: SUPABASE_SERVICE_ROLE_KEY not found or is placeholder.');
-  console.warn('   Using anon key as fallback. Some admin operations may fail due to RLS policies.');
-  console.warn('   For full functionality, set SUPABASE_SERVICE_ROLE_KEY or VITE_SUPABASE_SERVICE_ROLE_KEY');
+  console.warn('⚠️  WARNING: Supabase key not found.');
+  console.warn('   Using publishable key (anon key) as service role key.');
+  console.warn('   Set VITE_SUPABASE_PUBLISHABLE_KEY in .env');
   console.warn('   Get it from: https://supabase.com/dashboard/project/qxompdwqdnemsntssjot/settings/api');
 }
 

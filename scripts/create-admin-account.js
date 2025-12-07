@@ -36,12 +36,16 @@ function loadEnv() {
 
 const env = loadEnv();
 const SUPABASE_URL = env.VITE_SUPABASE_URL || env.SUPABASE_URL;
-// Try to get service role key from various possible env variable names
+// Use publishable key (anon key) as service role key
+// User indicated: service role key = supabase publishable key
 const SUPABASE_SERVICE_KEY = env.SUPABASE_SERVICE_ROLE_KEY || 
                              env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
                              env.SUPABASE_SERVICE_KEY ||
                              env.SERVICE_ROLE_KEY ||
-                             env.SUPABASE_SERVICE_ROLE;
+                             env.SUPABASE_SERVICE_ROLE ||
+                             env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+                             env.VITE_SUPABASE_ANON_KEY ||
+                             env.SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL) {
   console.error('❌ Missing Supabase URL');
@@ -167,8 +171,8 @@ async function createAdmin() {
   } catch (error) {
     console.error('\n❌ Fatal error:', error.message);
     if (error.message.includes('JWT') || error.message.includes('Invalid API key')) {
-      console.error('\n⚠️  Make sure you are using SERVICE_ROLE_KEY, not anon key!');
-      console.error('   SERVICE_ROLE_KEY is found in Supabase Dashboard > Settings > API\n');
+      console.error('\n⚠️  Using publishable key (anon key) - some operations may be limited by RLS');
+      console.error('   For full admin access, consider using SERVICE_ROLE_KEY from Supabase Dashboard > Settings > API\n');
     }
     process.exit(1);
   }
