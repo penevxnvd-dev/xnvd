@@ -105,10 +105,7 @@ async function testAccountTypes() {
     }
   }
 
-  if (error) {
-    log(`❌ Error fetching accounts: ${error.message}`, 'red');
-    return;
-  }
+  // Error handling is done per query above
 
   // Group accounts by role
   const accountsByRole = {};
