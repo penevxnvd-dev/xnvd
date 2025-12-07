@@ -58,10 +58,11 @@ export const supabase = (() => {
           eventsPerSecond: 0, // Set to 0 to prevent any connection attempts
         },
       },
-      // Disable all realtime features
+      // Global configuration for better data fetching
       global: {
         headers: {
           'x-client-info': 'xnvd-app',
+          'apikey': SUPABASE_PUBLISHABLE_KEY, // Ensure API key is always sent
         },
         // Override fetch to prevent connections to old project and WebSocket
         fetch: (url, options = {}) => {
@@ -73,7 +74,7 @@ export const supabase = (() => {
             return Promise.reject(new Error('Very old project connection blocked'));
           }
           
-          // Block WebSocket connections (Realtime is disabled) - VERY AGGRESSIVE
+          // Block WebSocket connections (Realtime is disabled)
           if (urlString.includes('wss://') || 
               urlString.includes('ws://') || 
               urlString.includes('realtime/v1/websocket') ||
@@ -81,9 +82,20 @@ export const supabase = (() => {
             // Silently block - don't even log to reduce console noise
             return Promise.reject(new Error('WebSocket connections disabled'));
           }
+          
+          // Ensure API key is in headers
+          const headers = new Headers(options.headers);
+          if (!headers.has('apikey')) {
+            headers.set('apikey', SUPABASE_PUBLISHABLE_KEY);
+          }
+          if (!headers.has('Authorization')) {
+            headers.set('Authorization', `Bearer ${SUPABASE_PUBLISHABLE_KEY}`);
+          }
+          
           // Add retry logic for network errors
           return fetch(url, {
             ...options,
+            headers,
             // Add timeout
             signal: AbortSignal.timeout(30000), // 30 second timeout
           }).catch((error) => {
@@ -92,12 +104,16 @@ export const supabase = (() => {
               console.warn('⚠️ Network error, retrying...');
               return fetch(url, {
                 ...options,
+                headers,
                 signal: AbortSignal.timeout(30000),
               });
             }
             throw error;
           });
         },
+      },
+      db: {
+        schema: 'public', // Explicitly set schema
       },
     });
   }

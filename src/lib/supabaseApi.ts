@@ -220,20 +220,51 @@ class SupabaseApiClient {
 
   // Countries - Supabase first, then local backup
   async getCountries() {
-    const result = await withLocalBackupFirst(
-      'countries',
-      async () => {
-        const { data, error } = await supabase
-          .from('countries')
-          .select('*')
-          .order('name', { ascending: true });
-        return { data, error };
+    try {
+      // Try Supabase first
+      const { data, error } = await supabase
+        .from('countries')
+        .select('*')
+        .order('name', { ascending: true });
+      
+      if (error) {
+        console.warn('[getCountries] Supabase error, trying local backup:', error.message);
+        // Fallback to local backup
+        const backupData = await withLocalBackupFirst(
+          'countries',
+          () => [],
+          undefined,
+          undefined,
+          async () => ({ data: null, error })
+        );
+        return (backupData.data as Tables<'countries'>[]) || [];
       }
-    );
-    if (result.error && !result.fromCache) {
-      throw handleSupabaseError(result.error);
+      
+      if (data && data.length > 0) {
+        return data as Tables<'countries'>[];
+      }
+      
+      // If Supabase returns empty, try local backup
+      const backupData = await withLocalBackupFirst(
+        'countries',
+        () => [],
+        undefined,
+        undefined,
+        async () => ({ data: [], error: null })
+      );
+      return (backupData.data as Tables<'countries'>[]) || [];
+    } catch (error) {
+      console.error('[getCountries] Error:', error);
+      // Final fallback to local backup
+      const backupData = await withLocalBackupFirst(
+        'countries',
+        () => [],
+        undefined,
+        undefined,
+        async () => ({ data: null, error })
+      );
+      return (backupData.data as Tables<'countries'>[]) || [];
     }
-    return (result.data as Tables<'countries'>[]) || [];
   }
 
   // Cities - Supabase first, then local backup
