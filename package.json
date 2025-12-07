@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "sync:hardcode": "node scripts/sync-and-hardcode.js",
+    "sync:all": "node scripts/sync-all-data.js",
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",

@@ -1,8 +1,9 @@
-// Supabase-based API client - replaces Express API calls
+// Supabase-based API client - uses hardcoded data as PRIMARY source
+// Priority: 1. Hardcoded data, 2. Local backup, 3. Supabase (fallback)
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { handleSupabaseError } from './errorHandler';
-import { withLocalBackupFirst, localBackup } from './localBackup';
+import { localBackup } from './localBackup';
 import { 
   getHardcodedAccounts, 
   getHardcodedCountries, 
@@ -12,16 +13,104 @@ import {
   getHardcodedProfiles,
   getHardcodedRealtors,
   getHardcodedUserRoles,
+  getHardcodedDeals,
+  getHardcodedDiagnoses,
+  getHardcodedTrainingProgress,
+  getHardcodedRealtorGoals,
+  getHardcodedBuyerSchedule,
+  getHardcodedMessages,
   findAccountByEmail,
   getTeamsByOffice,
   getOfficesByCity,
   getCitiesByCountry,
   getRealtorsByTeam,
+  getDealsByRealtor,
+  getDiagnosesByRealtor,
+  getTrainingProgressByRealtor,
+  getRealtorGoalsByRealtor,
+  getBuyerScheduleByRealtor,
 } from './hardcodedData';
 
 type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
 type TablesInsert<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert'];
 type TablesUpdate<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update'];
+
+/**
+ * Helper function: Try hardcoded data first, then local backup, then Supabase
+ * Priority: 1. Hardcoded, 2. Local backup, 3. Supabase (fallback only)
+ */
+async function withHardcodedFirst<T>(
+  tableName: string,
+  getHardcoded: () => T[],
+  getHardcodedFiltered?: (filter: (item: T) => boolean) => T[],
+  filter?: (item: T) => boolean,
+  supabaseCall?: () => Promise<{ data: T[] | null; error: unknown }>
+): Promise<{ data: T[]; fromHardcoded: boolean; fromBackup: boolean }> {
+  // 1. Try hardcoded data first (PRIMARY source)
+  try {
+    let hardcodedData: T[];
+    if (filter && getHardcodedFiltered) {
+      hardcodedData = getHardcodedFiltered(filter);
+    } else {
+      hardcodedData = getHardcoded();
+      if (filter) {
+        hardcodedData = hardcodedData.filter(filter);
+      }
+    }
+    
+    if (hardcodedData && hardcodedData.length > 0) {
+      console.info(`[withHardcodedFirst] Using hardcoded data for ${tableName} (${hardcodedData.length} records)`);
+      return {
+        data: hardcodedData,
+        fromHardcoded: true,
+        fromBackup: false,
+      };
+    }
+  } catch (error) {
+    console.warn(`[withHardcodedFirst] Error getting hardcoded ${tableName}:`, error);
+  }
+
+  // 2. Try local backup (SECONDARY source)
+  try {
+    const backupData = await localBackup.queryTable<T>(tableName, filter);
+    if (backupData && backupData.length > 0) {
+      console.info(`[withHardcodedFirst] Using local backup for ${tableName} (${backupData.length} records)`);
+      return {
+        data: backupData,
+        fromHardcoded: false,
+        fromBackup: true,
+      };
+    }
+  } catch (error) {
+    console.warn(`[withHardcodedFirst] Error getting local backup for ${tableName}:`, error);
+  }
+
+  // 3. Try Supabase (FALLBACK only)
+  if (supabaseCall) {
+    try {
+      console.info(`[withHardcodedFirst] Hardcoded and backup empty for ${tableName}, trying Supabase...`);
+      const result = await supabaseCall();
+      if (!result.error && result.data && result.data.length > 0) {
+        console.info(`[withHardcodedFirst] Using Supabase for ${tableName} (${result.data.length} records)`);
+        return {
+          data: result.data,
+          fromHardcoded: false,
+          fromBackup: false,
+        };
+      }
+    } catch (error) {
+      console.warn(`[withHardcodedFirst] Error getting Supabase data for ${tableName}:`, error);
+    }
+  }
+
+  // All sources failed or empty - return empty array
+  console.info(`[withHardcodedFirst] All sources empty for ${tableName}, returning empty array`);
+  return {
+    data: [],
+    fromHardcoded: false,
+    fromBackup: false,
+  };
+}
 
 class SupabaseApiClient {
   // Expose supabase client
@@ -29,9 +118,9 @@ class SupabaseApiClient {
     return supabase;
   }
 
-  // Auth methods - using Supabase Auth with hardcoded fallback
+  // Auth methods - using hardcoded data as PRIMARY source
   async login(email: string, password: string) {
-    // First try hardcoded data fallback (for offline access)
+    // First try hardcoded data (PRIMARY source)
     const hardcodedAccount = findAccountByEmail(email.trim());
     if (hardcodedAccount) {
       // Check password for hardcoded accounts
@@ -39,9 +128,7 @@ class SupabaseApiClient {
         throw new Error('Невалиден имейл или парола. Моля проверете данните си.');
       }
       
-      // Allow login with hardcoded data
-      // This enables offline access when Supabase is unavailable
-      console.info('[Login] Using hardcoded account fallback for:', email);
+      console.info('[Login] Using hardcoded account (PRIMARY source):', email);
       
       const profile = getHardcodedProfiles().find(p => p.id === hardcodedAccount.id);
       const userRoles = getHardcodedUserRoles().filter(ur => ur.user_id === hardcodedAccount.id);
@@ -78,9 +165,9 @@ class SupabaseApiClient {
       };
     }
 
-    // Try Supabase login
+    // Fallback to Supabase (only if hardcoded account not found)
+    console.info('[Login] Hardcoded account not found, trying Supabase...');
     const attemptLogin = async () => {
-      // Ensure Supabase client is properly initialized
       if (!supabase) {
         throw new Error('Supabase client not initialized. Please check environment variables.');
       }
@@ -91,156 +178,33 @@ class SupabaseApiClient {
       });
 
       if (error) {
-        // Handle 400 Bad Request errors (invalid credentials)
         if (error.status === 400 || error.message.includes('Invalid login credentials') || error.message.includes('invalid_grant')) {
           throw new Error('Невалиден имейл или парола. Моля проверете данните си.');
         }
         
-        // Handle email not confirmed
         if (error.message.includes('Email not confirmed') || error.message.includes('email_not_confirmed')) {
           throw new Error('Моля потвърдете имейла си преди да влезете.');
         }
-
-        // Handle network errors
-        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError') || error.message.includes('auth.supabase.io')) {
-          throw new Error('NETWORK_ERROR');
-        }
-
-        // Handle other errors
-        console.error('Login error:', error);
-        throw new Error(error.message || 'Грешка при влизане. Моля опитайте отново.');
+        
+        throw handleSupabaseError(error);
       }
-    
+
+      if (!data.user || !data.session) {
+        throw new Error('Неуспешно влизане. Моля опитайте отново.');
+      }
+
       // Get user profile
-      if (data.user) {
-        // Wait a bit to ensure session is set
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-
-        if (profileError) {
-          console.error('Error fetching profile after login:', profileError);
-          // Don't throw - return user without profile data
-          // The profile might be created by a trigger
-          return {
-            user: {
-              ...data.user,
-              full_name: data.user.user_metadata?.full_name || data.user.email,
-              email: data.user.email,
-            },
-            session: data.session,
-          };
-        }
-
-        return {
-          user: {
-            ...data.user,
-            ...profile,
-          },
-          session: data.session,
-        };
-      }
-
-      return { user: data.user, session: data.session };
-    };
-
-    try {
-      return await attemptLogin();
-    } catch (err: unknown) {
-      const errMessage = err instanceof Error ? err.message : String(err);
-      
-      // On network errors, try hardcoded fallback
-      if (errMessage === 'NETWORK_ERROR' || errMessage.includes('Failed to fetch') || errMessage.includes('auth.supabase.io')) {
-        console.warn('⚠️ Network error, trying hardcoded fallback...');
-        
-        // Check hardcoded accounts
-        const hardcodedAccount = findAccountByEmail(email.trim());
-        if (hardcodedAccount) {
-          console.info('[Login] Using hardcoded account fallback (network error)');
-          const profile = getHardcodedProfiles().find(p => p.id === hardcodedAccount.id);
-          
-          return {
-            user: {
-              id: hardcodedAccount.id,
-              email: hardcodedAccount.email,
-              full_name: hardcodedAccount.full_name,
-              ...profile,
-            },
-            session: {
-              access_token: 'hardcoded-offline-token',
-              refresh_token: 'hardcoded-offline-refresh',
-              expires_in: 3600,
-              expires_at: Date.now() + 3600000,
-              token_type: 'bearer',
-              user: {
-                id: hardcodedAccount.id,
-                email: hardcodedAccount.email,
-                user_metadata: {
-                  full_name: hardcodedAccount.full_name,
-                },
-              },
-            },
-            hardcoded: true,
-          };
-        }
-        
-        // Retry once on network errors
-        console.warn('⚠️ Network error, retrying login...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        try {
-          return await attemptLogin();
-        } catch (retryError: unknown) {
-          const retryMessage = retryError instanceof Error ? retryError.message : String(retryError);
-          if (retryMessage === 'NETWORK_ERROR') {
-            throw new Error('Проблем с връзката към сървъра. Моля проверете интернет връзката си и опитайте отново.');
-          }
-          throw retryError;
-        }
-      }
-      throw err;
-    }
-  }
-
-  async register(email: string, password: string, fullName: string) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-        },
-      },
-    });
-
-    if (error) throw error;
-
-    // Profile should be created automatically by trigger, but verify
-    if (data.user) {
-      // Wait a bit for trigger to create profile
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', data.user.id)
         .single();
 
-      if (profileError && profileError.code !== 'PGRST116') {
-        // If profile doesn't exist, create it manually
-        const { error: createError } = await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
-            full_name: fullName,
-            email: email,
-          });
-
-        if (createError) throw createError;
+      if (profileError) {
+        console.warn('[Login] Profile not found, using user metadata');
       }
+
+      const fullName = profile?.full_name || data.user.user_metadata?.full_name || email;
 
       return {
         user: {
@@ -249,19 +213,72 @@ class SupabaseApiClient {
         },
         session: data.session,
       };
+    };
+
+    try {
+      return await attemptLogin();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(message || 'Грешка при влизане. Моля опитайте отново.');
+    }
+  }
+
+  async register(email: string, password: string, fullName: string) {
+    // Registration always goes to Supabase (can't hardcode new users)
+    if (!supabase) {
+      throw new Error('Supabase client not initialized. Please check environment variables.');
     }
 
-    return { user: data.user, session: data.session };
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password: password,
+      options: {
+        data: {
+          full_name: fullName,
+        },
+      },
+    });
+
+    if (error) {
+      if (error.message.includes('User already registered')) {
+        throw new Error('Потребител с този имейл вече съществува.');
+      }
+      throw handleSupabaseError(error);
+    }
+
+    if (!data.user) {
+      throw new Error('Неуспешна регистрация. Моля опитайте отново.');
+    }
+
+    return {
+      user: {
+        ...data.user,
+        user_metadata: {
+          full_name: fullName,
+        },
+      },
+      session: data.session,
+    };
+  }
+
+  async logout() {
+    // Clear hardcoded session
+    localStorage.removeItem('hardcoded-session');
+    
+    // Also logout from Supabase if logged in
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
   }
 
   async getCurrentUser() {
-    // Check for hardcoded session first
+    // Check for hardcoded session first (PRIMARY)
     const hardcodedSession = localStorage.getItem('hardcoded-session');
     if (hardcodedSession) {
       try {
         const session = JSON.parse(hardcodedSession);
         if (session.user && session.hardcoded) {
-          console.log('[getCurrentUser] Using hardcoded session for user:', session.user.id);
+          console.log('[getCurrentUser] Using hardcoded session (PRIMARY source)');
           const profile = getHardcodedProfiles().find(p => p.id === session.user.id);
           const userRoles = getHardcodedUserRoles().filter(ur => ur.user_id === session.user.id);
           
@@ -281,19 +298,17 @@ class SupabaseApiClient {
         }
       } catch (e) {
         console.error('[getCurrentUser] Error processing hardcoded session:', e);
-        // Invalid hardcoded session, clear it
         localStorage.removeItem('hardcoded-session');
       }
     }
 
-    // Try Supabase auth
+    // Fallback to Supabase
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
       throw new Error('Not authenticated');
     }
 
-    // Get user profile
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
@@ -310,34 +325,13 @@ class SupabaseApiClient {
     };
   }
 
-  async logout() {
-    // Clear hardcoded session
-    localStorage.removeItem('hardcoded-session');
-    
-    // Sign out from Supabase
-    const { error } = await supabase.auth.signOut();
-    
-    // Clear all localStorage items related to auth
-    localStorage.removeItem('token');
-    
-    // Clear Supabase auth token if exists
-    try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      if (supabaseUrl) {
-        const storageKey = 'sb-' + supabaseUrl.split('//')[1]?.split('.')[0] + '-auth-token';
-        localStorage.removeItem(storageKey);
-      }
-    } catch (e) {
-      // Ignore errors
-    }
-    
-    if (error) throw error;
-  }
-
-  // Countries - uses local backup first, then hardcoded data
+  // Countries - hardcoded first, then backup, then Supabase
   async getCountries() {
-    const result = await withLocalBackupFirst(
+    return withHardcodedFirst(
       'countries',
+      () => getHardcodedCountries(),
+      undefined,
+      undefined,
       async () => {
         const { data, error } = await supabase
           .from('countries')
@@ -345,68 +339,16 @@ class SupabaseApiClient {
           .order('name', { ascending: true });
         return { data, error };
       }
-    );
-
-    if (result.error && !result.fromCache) {
-      // Check if it's a 403 error and provide better context
-      if ((result.error as { code?: string; status?: number }).code === 'PGRST301' || 
-          (result.error as { status?: number }).status === 403) {
-        console.error('403 Forbidden when fetching countries. Check:', {
-          authenticated: (await supabase.auth.getUser()).data.user !== null,
-          error: result.error instanceof Error ? result.error.message : String(result.error),
-        });
-      }
-      
-      // Fallback to hardcoded data
-      const hardcoded = getHardcodedCountries();
-      if (hardcoded && hardcoded.length > 0) {
-        console.info('[getCountries] Using hardcoded data fallback');
-        return hardcoded as Tables<'countries'>[];
-      }
-      
-      throw handleSupabaseError(result.error);
-    }
-
-    return (result.data as Tables<'countries'>[]) || [];
+    ).then(result => result.data as Tables<'countries'>[]);
   }
 
-  async createCountry(data: { name: string; code: string }) {
-    const { data: country, error } = await supabase
-      .from('countries')
-      .insert(data)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return country;
-  }
-
-  async updateCountry(id: string, data: { name: string; code: string }) {
-    const { data: country, error } = await supabase
-      .from('countries')
-      .update(data)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return country;
-  }
-
-  async deleteCountry(id: string) {
-    const { error } = await supabase
-      .from('countries')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-    return { success: true };
-  }
-
-  // Cities - uses local backup first, then hardcoded data
+  // Cities - hardcoded first, then backup, then Supabase
   async getCitiesByCountry(countryId: string) {
-    const result = await withLocalBackupFirst(
+    return withHardcodedFirst(
       'cities',
+      () => getHardcodedCities(),
+      (filter) => getCitiesByCountry(countryId),
+      (city) => (city as { country_id?: string }).country_id === countryId,
       async () => {
         const { data, error } = await supabase
           .from('cities')
@@ -414,29 +356,345 @@ class SupabaseApiClient {
           .eq('country_id', countryId)
           .order('name', { ascending: true });
         return { data, error };
-      },
-      (item: unknown) => {
-        const city = item as { country_id?: string };
-        return city.country_id === countryId;
       }
-    );
-
-    // Fallback to hardcoded data if Supabase fails
-    if (result.error && !result.fromCache) {
-      const hardcoded = getCitiesByCountry(countryId);
-      if (hardcoded && hardcoded.length > 0) {
-        console.info('[getCitiesByCountry] Using hardcoded data fallback');
-        return hardcoded as Tables<'cities'>[];
-      }
-    }
-
-    if (result.error && !result.fromCache) {
-      throw handleSupabaseError(result.error);
-    }
-
-    return (result.data as Tables<'cities'>[]) || [];
+    ).then(result => result.data as Tables<'cities'>[]);
   }
 
+  // Offices - hardcoded first, then backup, then Supabase
+  async getOfficesByCity(cityId: string) {
+    return withHardcodedFirst(
+      'offices',
+      () => getHardcodedOffices(),
+      (filter) => getOfficesByCity(cityId),
+      (office) => (office as { city_id?: string }).city_id === cityId,
+      async () => {
+        const { data, error } = await supabase
+          .from('offices')
+          .select('*')
+          .eq('city_id', cityId)
+          .order('name', { ascending: true });
+        return { data, error };
+      }
+    ).then(result => result.data as Tables<'offices'>[]);
+  }
+
+  async getAllOffices() {
+    return withHardcodedFirst(
+      'offices',
+      () => getHardcodedOffices(),
+      undefined,
+      undefined,
+      async () => {
+        const { data, error } = await supabase
+          .from('offices')
+          .select('*')
+          .order('name', { ascending: true });
+        return { data, error };
+      }
+    ).then(result => result.data as Tables<'offices'>[]);
+  }
+
+  async getAllOfficesFull() {
+    const offices = await this.getAllOffices();
+    // Enrich with city and country data
+    const enriched = await Promise.all(offices.map(async (office) => {
+      const cities = await this.getCitiesByCountry(''); // Get all cities
+      const city = cities.find(c => c.id === office.city_id);
+      const countries = await this.getCountries();
+      const country = city ? countries.find(co => co.id === city.country_id) : null;
+      
+      return {
+        ...office,
+        city: city ? { ...city, country } : null,
+      };
+    }));
+    return enriched;
+  }
+
+  async getOfficeFull(officeId: string) {
+    const offices = await this.getAllOfficesFull();
+    return offices.find(o => o.id === officeId) || null;
+  }
+
+  // Teams - hardcoded first, then backup, then Supabase
+  async getTeamsByOffice(officeId: string) {
+    return withHardcodedFirst(
+      'teams',
+      () => getHardcodedTeams(),
+      (filter) => getTeamsByOffice(officeId),
+      (team) => (team as { office_id?: string }).office_id === officeId,
+      async () => {
+        const { data, error } = await supabase
+          .from('teams')
+          .select('*')
+          .eq('office_id', officeId)
+          .order('name', { ascending: true });
+        return { data, error };
+      }
+    ).then(result => result.data as Tables<'teams'>[]);
+  }
+
+  // Realtors - hardcoded first, then backup, then Supabase
+  async getRealtorsByTeam(teamId: string) {
+    return withHardcodedFirst(
+      'realtors',
+      () => getHardcodedRealtors(),
+      (filter) => getRealtorsByTeam(teamId),
+      (realtor) => (realtor as { team_id?: string }).team_id === teamId,
+      async () => {
+        const { data, error } = await supabase
+          .from('realtors')
+          .select('*')
+          .eq('team_id', teamId)
+          .order('level', { ascending: false });
+        return { data, error };
+      }
+    ).then(result => result.data as Tables<'realtors'>[]);
+  }
+
+  async getAllTeamLeaders() {
+    const teams = await withHardcodedFirst(
+      'teams',
+      () => getHardcodedTeams(),
+      undefined,
+      undefined,
+      async () => {
+        const { data, error } = await supabase
+          .from('teams')
+          .select('*');
+        return { data, error };
+      }
+    ).then(result => result.data);
+
+    const leaderIds = teams
+      .map(t => (t as { leader_id?: string }).leader_id)
+      .filter((id): id is string => !!id);
+    
+    const profiles = getHardcodedProfiles();
+    return profiles.filter(p => leaderIds.includes(p.id));
+  }
+
+  async getAvailableProfilesForTeam(teamId: string) {
+    const teamRealtors = await this.getRealtorsByTeam(teamId);
+    const allProfiles = getHardcodedProfiles();
+    const assignedIds = new Set(teamRealtors.map(r => (r as { user_id?: string }).user_id));
+    return allProfiles.filter(p => !assignedIds.has(p.id));
+  }
+
+  async getCurrentRealtor(userId: string) {
+    const realtors = getHardcodedRealtors();
+    const realtor = realtors.find(r => (r as { user_id?: string }).user_id === userId);
+    if (realtor) {
+      return realtor as Tables<'realtors'>;
+    }
+    
+    // Try Supabase
+    const { data, error } = await supabase
+      .from('realtors')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+
+  // Deals - hardcoded first, then backup, then Supabase
+  async getMyDeals(userId: string) {
+    const realtor = await this.getCurrentRealtor(userId);
+    if (!realtor) return [];
+    
+    return withHardcodedFirst(
+      'deals',
+      () => getHardcodedDeals(),
+      (filter) => getDealsByRealtor(realtor.id),
+      (deal) => (deal as { realtor_id?: string }).realtor_id === realtor.id,
+      async () => {
+        const { data, error } = await supabase
+          .from('deals')
+          .select('*')
+          .eq('realtor_id', realtor.id)
+          .order('deal_date', { ascending: false });
+        return { data, error };
+      }
+    ).then(result => result.data as Tables<'deals'>[]);
+  }
+
+  // Diagnoses - hardcoded first, then backup, then Supabase
+  async getMyDiagnoses(userId: string) {
+    const realtor = await this.getCurrentRealtor(userId);
+    if (!realtor) return [];
+    
+    return withHardcodedFirst(
+      'diagnoses',
+      () => getHardcodedDiagnoses(),
+      (filter) => getDiagnosesByRealtor(realtor.id),
+      (diagnosis) => (diagnosis as { realtor_id?: string }).realtor_id === realtor.id,
+      async () => {
+        const { data, error } = await supabase
+          .from('diagnoses')
+          .select('*')
+          .eq('realtor_id', realtor.id)
+          .order('diagnosis_date', { ascending: false });
+        return { data, error };
+      }
+    ).then(result => result.data as Tables<'diagnoses'>[]);
+  }
+
+  // Training Progress - hardcoded first, then backup, then Supabase
+  async getTrainingProgress(userId: string) {
+    const realtor = await this.getCurrentRealtor(userId);
+    if (!realtor) return [];
+    
+    return withHardcodedFirst(
+      'training_progress',
+      () => getHardcodedTrainingProgress(),
+      (filter) => getTrainingProgressByRealtor(realtor.id),
+      (progress) => (progress as { realtor_id?: string }).realtor_id === realtor.id,
+      async () => {
+        const { data, error } = await supabase
+          .from('training_progress')
+          .select('*')
+          .eq('realtor_id', realtor.id);
+        return { data, error };
+      }
+    ).then(result => result.data as Tables<'training_progress'>[]);
+  }
+
+  // Realtor Goals - hardcoded first, then backup, then Supabase
+  async getRealtorKPI(userId: string) {
+    const realtor = await this.getCurrentRealtor(userId);
+    if (!realtor) {
+      return {
+        deals: 0,
+        keys: 0,
+        exclusives: 0,
+        revenue: 0,
+      };
+    }
+
+    const deals = await this.getMyDeals(userId);
+    const goals = await withHardcodedFirst(
+      'realtor_goals',
+      () => getHardcodedRealtorGoals(),
+      (filter) => getRealtorGoalsByRealtor(realtor.id),
+      (goal) => (goal as { realtor_id?: string }).realtor_id === realtor.id,
+      async () => {
+        const { data, error } = await supabase
+          .from('realtor_goals')
+          .select('*')
+          .eq('realtor_id', realtor.id);
+        return { data, error };
+      }
+    ).then(result => result.data);
+
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+    const currentGoal = goals.find((g: unknown) => {
+      const goal = g as { month?: number; year?: number };
+      return goal.month === currentMonth && goal.year === currentYear;
+    });
+
+    const totalDeals = deals.length;
+    const keys = deals.filter((d: unknown) => (d as { is_key?: boolean }).is_key).length;
+    const exclusives = deals.filter((d: unknown) => (d as { is_exclusive?: boolean }).is_exclusive).length;
+    const revenue = deals.reduce((sum: number, d: unknown) => {
+      const deal = d as { deal_value?: string };
+      return sum + (parseFloat(deal.deal_value || '0'));
+    }, 0);
+
+    return {
+      deals: totalDeals,
+      keys,
+      exclusives,
+      revenue,
+      goal: currentGoal ? {
+        deals: (currentGoal as { deals_goal?: number }).deals_goal || 0,
+        keys: (currentGoal as { keys_goal?: number }).keys_goal || 0,
+        exclusives: (currentGoal as { exclusives_goal?: number }).exclusives_goal || 0,
+      } : null,
+    };
+  }
+
+  async getTeamKPI(teamId: string) {
+    const realtors = await this.getRealtorsByTeam(teamId);
+    const kpis = await Promise.all(realtors.map(r => this.getRealtorKPI((r as { user_id?: string }).user_id || '')));
+    
+    return {
+      deals: kpis.reduce((sum, kpi) => sum + kpi.deals, 0),
+      keys: kpis.reduce((sum, kpi) => sum + kpi.keys, 0),
+      exclusives: kpis.reduce((sum, kpi) => sum + kpi.exclusives, 0),
+      revenue: kpis.reduce((sum, kpi) => sum + kpi.revenue, 0),
+    };
+  }
+
+  async getOfficeKPI(officeId: string) {
+    const teams = await this.getTeamsByOffice(officeId);
+    const kpis = await Promise.all(teams.map(t => this.getTeamKPI(t.id)));
+    
+    return {
+      deals: kpis.reduce((sum, kpi) => sum + kpi.deals, 0),
+      keys: kpis.reduce((sum, kpi) => sum + kpi.keys, 0),
+      exclusives: kpis.reduce((sum, kpi) => sum + kpi.exclusives, 0),
+      revenue: kpis.reduce((sum, kpi) => sum + kpi.revenue, 0),
+    };
+  }
+
+  async getCityKPI(cityId: string) {
+    const offices = await this.getOfficesByCity(cityId);
+    const kpis = await Promise.all(offices.map(o => this.getOfficeKPI(o.id)));
+    
+    return {
+      deals: kpis.reduce((sum, kpi) => sum + kpi.deals, 0),
+      keys: kpis.reduce((sum, kpi) => sum + kpi.keys, 0),
+      exclusives: kpis.reduce((sum, kpi) => sum + kpi.exclusives, 0),
+      revenue: kpis.reduce((sum, kpi) => sum + kpi.revenue, 0),
+    };
+  }
+
+  // Buyer Schedule - hardcoded first, then backup, then Supabase
+  async getBuyerSchedule(userId: string) {
+    const realtor = await this.getCurrentRealtor(userId);
+    if (!realtor) return [];
+    
+    return withHardcodedFirst(
+      'buyer_schedule',
+      () => getHardcodedBuyerSchedule(),
+      (filter) => getBuyerScheduleByRealtor(realtor.id),
+      (schedule) => (schedule as { realtor_id?: string }).realtor_id === realtor.id,
+      async () => {
+        const { data, error } = await supabase
+          .from('buyer_schedule')
+          .select('*')
+          .eq('realtor_id', realtor.id)
+          .order('schedule_date', { ascending: true });
+        return { data, error };
+      }
+    ).then(result => result.data as Tables<'buyer_schedule'>[]);
+  }
+
+  // Messages - hardcoded first, then backup, then Supabase
+  async getMessages(userId: string) {
+    return withHardcodedFirst(
+      'messages',
+      () => getHardcodedMessages(),
+      undefined,
+      (msg) => {
+        const message = msg as { sender_id?: string; receiver_id?: string };
+        return message.sender_id === userId || message.receiver_id === userId;
+      },
+      async () => {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+          .order('created_at', { ascending: false });
+        return { data, error };
+      }
+    ).then(result => result.data as Tables<'messages'>[]);
+  }
+
+  // Write operations always go to Supabase (can't hardcode writes)
   async createCity(data: { name: string; countryId: string }) {
     const { data: city, error } = await supabase
       .from('cities')
@@ -470,149 +728,6 @@ class SupabaseApiClient {
     return { success: true };
   }
 
-  // Offices by city - uses local backup first
-  async getOfficesByCity(cityId: string) {
-    const result = await withLocalBackupFirst(
-      'offices',
-      async () => {
-        const { data, error } = await supabase
-          .from('offices')
-          .select('*')
-          .eq('city_id', cityId)
-          .order('name', { ascending: true });
-        return { data, error };
-      },
-      (item: unknown) => {
-        const office = item as { city_id?: string };
-        return office.city_id === cityId;
-      }
-    );
-
-    if (result.error && !result.fromCache) {
-      throw handleSupabaseError(result.error);
-    }
-
-    // Sort by name if from cache
-    const offices = (result.data as Tables<'offices'>[]) || [];
-    return offices.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }
-
-  // Offices - uses local backup first, then hardcoded data
-  async getAllOffices() {
-    const result = await withLocalBackupFirst(
-      'offices',
-      async () => {
-        const { data, error } = await supabase
-          .from('offices')
-          .select('*')
-          .order('name', { ascending: true });
-        return { data, error };
-      }
-    );
-
-    if (result.error && !result.fromCache) {
-      // Fallback to hardcoded data
-      const hardcoded = getHardcodedOffices();
-      if (hardcoded && hardcoded.length > 0) {
-        console.info('[getAllOffices] Using hardcoded data fallback');
-        return hardcoded as Tables<'offices'>[];
-      }
-      throw handleSupabaseError(result.error);
-    }
-
-    return (result.data as Tables<'offices'>[]) || [];
-  }
-
-  async getAllOfficesFull() {
-    const { data: offices, error: officesError } = await supabase
-      .from('offices')
-      .select(`
-        *,
-        city:cities (
-          *,
-          country:countries (*)
-        )
-      `)
-      .order('name', { ascending: true });
-
-    if (officesError) throw officesError;
-
-    // Get teams for all offices
-    const { data: allTeams, error: teamsError } = await supabase
-      .from('teams')
-      .select(`
-        *,
-        leader:profiles!teams_leader_id_fkey (
-          *,
-          realtor:realtors (*)
-        ),
-        realtors:realtors (
-          *,
-          profile:profiles!realtors_user_id_fkey (*),
-          deals:deals (*),
-          diagnoses:diagnoses (*)
-        )
-      `);
-
-    if (teamsError) throw teamsError;
-
-    // Group teams by office_id
-    const teamsByOffice = (allTeams || []).reduce((acc: Record<string, Array<Record<string, unknown>>>, team: Record<string, unknown>) => {
-      const officeId = team.office_id as string;
-      if (!acc[officeId]) {
-        acc[officeId] = [];
-      }
-      acc[officeId].push(team);
-      return acc;
-    }, {} as Record<string, Array<Record<string, unknown>>>);
-
-    // Attach teams to offices
-    return (offices || []).map((office: Record<string, unknown>) => ({
-      ...office,
-      teams: teamsByOffice[office.id] || [],
-    }));
-  }
-
-  async getOfficeFull(officeId: string) {
-    const { data: office, error: officeError } = await supabase
-      .from('offices')
-      .select(`
-        *,
-        city:cities (
-          *,
-          country:countries (*)
-        )
-      `)
-      .eq('id', officeId)
-      .single();
-
-    if (officeError) throw officeError;
-
-    const { data: teams, error: teamsError } = await supabase
-      .from('teams')
-      .select(`
-        *,
-        leader:profiles!teams_leader_id_fkey (
-          *,
-          realtor:realtors (*)
-        ),
-        realtors:realtors (
-          *,
-          profile:profiles!realtors_user_id_fkey (*),
-          deals:deals (*),
-          diagnoses:diagnoses (*)
-        )
-      `)
-      .eq('office_id', officeId);
-
-    if (teamsError) throw teamsError;
-
-    return {
-      ...office,
-      teams: teams || [],
-    };
-  }
-
   async createOffice(data: { name: string; cityId: string; address?: string }) {
     const { data: office, error } = await supabase
       .from('offices')
@@ -624,10 +739,10 @@ class SupabaseApiClient {
     return office;
   }
 
-  async updateOffice(id: string, data: { name: string; address?: string }) {
+  async updateOffice(id: string, data: { name?: string; address?: string }) {
     const { data: office, error } = await supabase
       .from('offices')
-      .update({ name: data.name, address: data.address })
+      .update(data)
       .eq('id', id)
       .select()
       .single();
@@ -646,60 +761,6 @@ class SupabaseApiClient {
     return { success: true };
   }
 
-  // Teams - uses local backup first, then hardcoded data
-  async getTeamsByOffice(officeId: string) {
-    const result = await withLocalBackupFirst(
-      'teams',
-      async () => {
-        const { data, error } = await supabase
-          .from('teams')
-          .select(`
-            *,
-            leader:profiles!teams_leader_id_fkey (
-              id,
-              full_name,
-              email
-            )
-          `)
-          .eq('office_id', officeId)
-          .order('name', { ascending: true });
-        return { data, error };
-      },
-      (item: unknown) => {
-        const team = item as { office_id?: string };
-        return team.office_id === officeId;
-      }
-    );
-
-    if (result.error && !result.fromCache) {
-      // Fallback to hardcoded data
-      const hardcoded = getTeamsByOffice(officeId);
-      if (hardcoded && hardcoded.length > 0) {
-        console.info('[getTeamsByOffice] Using hardcoded data fallback');
-        return hardcoded as Tables<'teams'>[];
-      }
-      throw handleSupabaseError(result.error);
-    }
-
-    // If from cache, enrich with leader data
-    if (result.fromCache && result.data) {
-      const teams = result.data as Tables<'teams'>[];
-      const profiles = await localBackup.loadTable('profiles');
-      if (profiles) {
-        const enrichedTeams = teams.map(team => ({
-          ...team,
-          leader: team.leader_id ? profiles.find((p: unknown) => {
-            const profile = p as { id?: string };
-            return profile.id === team.leader_id;
-          }) : null,
-        }));
-        return enrichedTeams.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-      }
-    }
-
-    return (result.data as Tables<'teams'>[]) || [];
-  }
-
   async createTeam(data: { name: string; officeId: string; leaderId?: string }) {
     const { data: team, error } = await supabase
       .from('teams')
@@ -711,7 +772,7 @@ class SupabaseApiClient {
     return team;
   }
 
-  async updateTeam(id: string, data: { name: string; leaderId?: string }) {
+  async updateTeam(id: string, data: { name?: string; leaderId?: string }) {
     const { data: team, error } = await supabase
       .from('teams')
       .update({ name: data.name, leader_id: data.leaderId })
@@ -733,446 +794,62 @@ class SupabaseApiClient {
     return { success: true };
   }
 
-  // Get all team leaders - with hardcoded fallback
-  async getAllTeamLeaders() {
-    try {
-      const { data: teams, error } = await supabase
-        .from('teams')
-        .select(`
-          leader_id,
-          leader:profiles!teams_leader_id_fkey (
-            id,
-            full_name,
-            email
-          )
-        `)
-        .not('leader_id', 'is', null);
-
-      if (error) {
-        throw error;
-      }
-
-      if (teams && teams.length > 0) {
-        // Extract unique leaders
-        const leadersMap = new Map<string, { id: string; fullName: string; email: string }>();
-        (teams || []).forEach((team: { leader?: { id?: string; full_name?: string; email?: string } }) => {
-          if (team.leader && team.leader.id) {
-            leadersMap.set(team.leader.id, {
-              id: team.leader.id,
-              fullName: team.leader.full_name || 'Неизвестен',
-              email: team.leader.email || '',
-            });
-          }
-        });
-
-        const leaders = Array.from(leadersMap.values()).sort((a, b) => 
-          a.fullName.localeCompare(b.fullName)
-        );
-
-        console.log('Fetched team leaders:', leaders);
-        return leaders;
-      }
-    } catch (error) {
-      console.warn('[getAllTeamLeaders] Supabase failed, using hardcoded fallback');
-    }
-
-    // Fallback to hardcoded data
-    const teams = getHardcodedTeams();
-    const profiles = getHardcodedProfiles();
-    const leadersMap = new Map<string, { id: string; fullName: string; email: string }>();
-    
-    teams.forEach(team => {
-      if (team.leader_id) {
-        const leader = getHardcodedRealtors().find(r => r.id === team.leader_id);
-        if (leader) {
-          const profile = profiles.find(p => p.id === leader.user_id);
-          if (profile && !leadersMap.has(profile.id)) {
-            leadersMap.set(profile.id, {
-              id: profile.id,
-              fullName: profile.full_name || 'Неизвестен',
-              email: profile.email || '',
-            });
-          }
-        }
-      }
-    });
-    
-    const leaders = Array.from(leadersMap.values()).sort((a, b) => 
-      a.fullName.localeCompare(b.fullName)
-    );
-    
-    console.log('[getAllTeamLeaders] Using hardcoded data fallback:', leaders.length, 'leaders');
-    return leaders;
-  }
-
-  // Realtors
-  // Realtors - uses local backup first
-  async getRealtorsByTeam(teamId: string) {
-    const result = await withLocalBackupFirst(
-      'realtors',
-      async () => {
-        const { data, error } = await supabase
-          .from('realtors')
-          .select(`
-            *,
-            profile:profiles!realtors_user_id_fkey (
-              full_name,
-              email
-            )
-          `)
-          .eq('team_id', teamId);
-        return { data, error };
-      },
-      (item: unknown) => {
-        const realtor = item as { team_id?: string };
-        return realtor.team_id === teamId;
-      }
-    );
-
-    if (result.error && !result.fromCache) {
-      throw handleSupabaseError(result.error);
-    }
-
-    // If from cache, enrich with profile data
-    if (result.fromCache && result.data) {
-      const realtors = result.data as Tables<'realtors'>[];
-      const profiles = await localBackup.loadTable('profiles');
-      if (profiles) {
-        return realtors.map(realtor => ({
-          ...realtor,
-          profile: profiles.find((p: unknown) => {
-            const profile = p as { id?: string };
-            return profile.id === realtor.user_id;
-          }) || null,
-        }));
-      }
-    }
-
-    // Sort by level descending if we have data
-    const realtors = (result.data as Tables<'realtors'>[]) || [];
-    return realtors.sort((a, b) => (b.level || 0) - (a.level || 0));
-  }
-
-  // Get all profiles that can be added to a team (not realtors or realtors without team)
-  async getAvailableProfilesForTeam() {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    // Get all profiles
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select(`
-        id,
-        full_name,
-        email,
-        realtors (id, team_id)
-      `)
-      .order('full_name', { ascending: true });
-
-    if (profilesError) throw profilesError;
-
-    // Filter to get profiles that are not realtors or realtors without a team
-    return (profiles || []).filter((profile: { realtors?: Array<{ team_id?: string | null }> }) => {
-      const realtor = profile.realtors?.[0];
-      return !realtor || !realtor.team_id;
-    }).map((profile: { id: string; full_name: string; email: string }) => ({
-      id: profile.id,
-      fullName: profile.full_name,
-      email: profile.email,
-      isRealtor: !!profile.realtors?.[0],
-      realtorId: profile.realtors?.[0]?.id || null,
-    }));
-  }
-
-  // Add person to team (create realtor if needed, or update existing realtor)
-  async addPersonToTeam(userId: string, teamId: string, level: number = 1) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    // Check if realtor already exists
-    const { data: existingRealtor, error: checkError } = await supabase
-      .from('realtors')
-      .select('id')
-      .eq('user_id', userId)
-      .single();
-
-    if (checkError && checkError.code !== 'PGRST116') {
-      throw checkError;
-    }
-
-    if (existingRealtor) {
-      // Update existing realtor
-      const { data: updatedRealtor, error: updateError } = await supabase
-        .from('realtors')
-        .update({ team_id: teamId, level })
-        .eq('id', existingRealtor.id)
-        .select(`
-          *,
-          profile:profiles!realtors_user_id_fkey (
-            full_name,
-            email
-          )
-        `)
-        .single();
-
-      if (updateError) throw updateError;
-      return updatedRealtor;
-    } else {
-      // Create new realtor
-      const { data: newRealtor, error: createError } = await supabase
-        .from('realtors')
-        .insert({
-          user_id: userId,
-          team_id: teamId,
-          level,
-        })
-        .select(`
-          *,
-          profile:profiles!realtors_user_id_fkey (
-            full_name,
-            email
-          )
-        `)
-        .single();
-
-      if (createError) throw createError;
-      return newRealtor;
-    }
-  }
-
-  // Create account and add to team
-  async createAccountAndAddToTeam(
-    fullName: string,
-    email: string,
-    password: string,
-    teamId: string,
-    level: number = 1
-  ): Promise<string> {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    // Check if user with this email already exists
-    const { data: existingProfile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', email)
-      .single();
-
-    if (existingProfile) {
-      throw new Error('Потребител с този имейл вече съществува');
-    }
-
-    // Create user in Supabase Auth (requires admin client, but we'll use signUp)
-    // Note: This might require server-side implementation for admin user creation
-    // For now, we'll use the regular signUp which requires email confirmation
-    const { data: authData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-        },
-        emailRedirectTo: window.location.origin,
-      },
-    });
-
-    if (signUpError) {
-      throw new Error(`Грешка при създаване на акаунт: ${signUpError.message}`);
-    }
-
-    if (!authData.user) {
-      throw new Error('Неуспешно създаване на акаунт');
-    }
-
-    // Wait a bit for the profile trigger to create the profile
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // Verify profile was created
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', authData.user.id)
-      .single();
-
-    if (profileError || !profile) {
-      // If profile wasn't created by trigger, create it manually
-      const { error: createProfileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
-          full_name: fullName,
-          email: email,
-        });
-
-      if (createProfileError) {
-        throw new Error(`Грешка при създаване на профил: ${createProfileError.message}`);
-      }
-    }
-
-    // Create realtor entry
-    const { data: newRealtor, error: realtorError } = await supabase
+  async createRealtor(data: { userId: string; teamId?: string; level?: number }) {
+    const { data: realtor, error } = await supabase
       .from('realtors')
       .insert({
-        user_id: authData.user.id,
-        team_id: teamId,
-        level,
+        user_id: data.userId,
+        team_id: data.teamId,
+        level: data.level || 1,
       })
-      .select('id')
-      .single();
-
-    if (realtorError) {
-      throw new Error(`Грешка при добавяне към екип: ${realtorError.message}`);
-    }
-
-    return authData.user.id;
-  }
-
-  // Remove person from team
-  async removePersonFromTeam(realtorId: string) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    const { data, error } = await supabase
-      .from('realtors')
-      .update({ team_id: null })
-      .eq('id', realtorId)
       .select()
       .single();
 
     if (error) throw error;
-    return data;
-  }
-
-  async getCurrentRealtor() {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    // Use the get_realtor_id function if available, otherwise query directly
-    try {
-      const { data: realtorId, error: functionError } = await supabase
-        .rpc('get_realtor_id', { _user_id: user.id });
-
-      if (!functionError && realtorId) {
-        // Get full realtor data with profile
-        const { data: realtor, error: realtorError } = await supabase
-          .from('realtors')
-          .select(`
-            *,
-            profile:profiles!realtors_user_id_fkey (
-              id,
-              full_name,
-              email
-            )
-          `)
-          .eq('id', realtorId)
-          .single();
-
-        if (realtorError) throw realtorError;
-        return realtor;
-      }
-    } catch (e) {
-      // Function might not exist, fall back to direct query
-    }
-
-    // Fallback: query directly
-    const { data: realtor, error: realtorError } = await supabase
-      .from('realtors')
-      .select(`
-        *,
-        profile:profiles!realtors_user_id_fkey (
-          id,
-          full_name,
-          email
-        )
-      `)
-      .eq('user_id', user.id)
-      .single();
-
-    if (realtorError) {
-      if (realtorError.code === 'PGRST116') {
-        throw new Error('Realtor not found');
-      }
-      throw realtorError;
-    }
-
     return realtor;
   }
 
-  // Deals
-  async getMyDeals() {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    // Get realtor ID
-    const { data: realtor, error: realtorError } = await supabase
+  async updateRealtor(id: string, data: { teamId?: string; level?: number }) {
+    const { data: realtor, error } = await supabase
       .from('realtors')
-      .select('id')
-      .eq('user_id', user.id)
+      .update(data)
+      .eq('id', id)
+      .select()
       .single();
 
-    if (realtorError || !realtor) {
-      throw new Error('Realtor not found');
-    }
+    if (error) throw error;
+    return realtor;
+  }
 
-    const { data: deals, error } = await supabase
-      .from('deals')
-      .select('*')
-      .eq('realtor_id', realtor.id)
-      .order('deal_date', { ascending: false });
+  async deleteRealtor(id: string) {
+    const { error } = await supabase
+      .from('realtors')
+      .delete()
+      .eq('id', id);
 
     if (error) throw error;
-    return deals || [];
+    return { success: true };
   }
 
   async createDeal(data: {
+    realtorId: string;
     clientName: string;
     dealValue: number;
     commission?: number;
     dealDate?: string;
+    isKey?: boolean;
+    isExclusive?: boolean;
   }) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    // Get realtor ID
-    const { data: realtor, error: realtorError } = await supabase
-      .from('realtors')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (realtorError || !realtor) {
-      throw new Error('Realtor not found');
-    }
-
     const { data: deal, error } = await supabase
       .from('deals')
       .insert({
-        realtor_id: realtor.id,
+        realtor_id: data.realtorId,
         client_name: data.clientName,
         deal_value: data.dealValue,
-        commission: data.commission || null,
-        deal_date: data.dealDate || new Date().toISOString().split('T')[0],
+        commission: data.commission,
+        deal_date: data.dealDate,
+        is_key: data.isKey,
+        is_exclusive: data.isExclusive,
       })
       .select()
       .single();
@@ -1181,66 +858,57 @@ class SupabaseApiClient {
     return deal;
   }
 
-  // Diagnoses
-  async getMyDiagnoses() {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    // Get realtor ID
-    const { data: realtor, error: realtorError } = await supabase
-      .from('realtors')
-      .select('id')
-      .eq('user_id', user.id)
+  async updateDeal(id: string, data: {
+    clientName?: string;
+    dealValue?: number;
+    commission?: number;
+    dealDate?: string;
+    isKey?: boolean;
+    isExclusive?: boolean;
+  }) {
+    const { data: deal, error } = await supabase
+      .from('deals')
+      .update({
+        client_name: data.clientName,
+        deal_value: data.dealValue,
+        commission: data.commission,
+        deal_date: data.dealDate,
+        is_key: data.isKey,
+        is_exclusive: data.isExclusive,
+      })
+      .eq('id', id)
+      .select()
       .single();
 
-    if (realtorError || !realtor) {
-      throw new Error('Realtor not found');
-    }
+    if (error) throw error;
+    return deal;
+  }
 
-    const { data: diagnoses, error } = await supabase
-      .from('diagnoses')
-      .select('*')
-      .eq('realtor_id', realtor.id)
-      .order('diagnosis_date', { ascending: false });
+  async deleteDeal(id: string) {
+    const { error } = await supabase
+      .from('deals')
+      .delete()
+      .eq('id', id);
 
     if (error) throw error;
-    return diagnoses || [];
+    return { success: true };
   }
 
   async createDiagnosis(data: {
+    realtorId: string;
     clientName: string;
+    diagnosisDate?: string;
     status?: string;
     notes?: string;
-    diagnosisDate?: string;
   }) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    // Get realtor ID
-    const { data: realtor, error: realtorError } = await supabase
-      .from('realtors')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (realtorError || !realtor) {
-      throw new Error('Realtor not found');
-    }
-
     const { data: diagnosis, error } = await supabase
       .from('diagnoses')
       .insert({
-        realtor_id: realtor.id,
+        realtor_id: data.realtorId,
         client_name: data.clientName,
+        diagnosis_date: data.diagnosisDate,
         status: data.status || 'active',
-        notes: data.notes || null,
-        diagnosis_date: data.diagnosisDate || new Date().toISOString().split('T')[0],
+        notes: data.notes,
       })
       .select()
       .single();
@@ -1249,107 +917,55 @@ class SupabaseApiClient {
     return diagnosis;
   }
 
-  // Training
-  async getTrainingProgress(realtorId?: string) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    // Get realtor ID - either from parameter (for team leaders/managers) or from current user
-    let targetRealtorId: string;
-    
-    if (realtorId) {
-      // Team leader or office manager viewing another realtor's progress
-      targetRealtorId = realtorId;
-    } else {
-      // Regular realtor viewing their own progress
-      const { data: realtor, error: realtorError } = await supabase
-        .from('realtors')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (realtorError || !realtor) {
-        throw new Error('Realtor not found');
-      }
-      targetRealtorId = realtor.id;
-    }
-
-    const { data: progress, error } = await supabase
-      .from('training_progress')
-      .select('*')
-      .eq('realtor_id', targetRealtorId)
-      .order('section', { ascending: true })
-      .order('subsection', { ascending: true });
+  async updateDiagnosis(id: string, data: {
+    clientName?: string;
+    diagnosisDate?: string;
+    status?: string;
+    notes?: string;
+  }) {
+    const { data: diagnosis, error } = await supabase
+      .from('diagnoses')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
 
     if (error) throw error;
-    return progress || [];
+    return diagnosis;
+  }
+
+  async deleteDiagnosis(id: string) {
+    const { error } = await supabase
+      .from('diagnoses')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return { success: true };
   }
 
   async updateTrainingProgress(data: {
+    realtorId: string;
     section: string;
     subsection: string;
-    lecture_completed?: boolean;
-    video_completed?: boolean;
-    practical_completed?: boolean;
-    handover_completed?: boolean;
-    exam_completed?: boolean;
-    realtorId?: string; // Optional: for team leaders/office managers to update other realtors
+    lectureCompleted?: boolean;
+    videoCompleted?: boolean;
+    practicalCompleted?: boolean;
+    handoverCompleted?: boolean;
+    examCompleted?: boolean;
   }) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    // Get realtor ID - either from parameter (for team leaders/managers) or from current user
-    let realtorId: string;
-    
-    if (data.realtorId) {
-      // Team leader or office manager updating another realtor's progress
-      realtorId = data.realtorId;
-    } else {
-      // Regular realtor updating their own progress
-      const { data: realtor, error: realtorError } = await supabase
-        .from('realtors')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (realtorError || !realtor) {
-        throw new Error('Realtor not found');
-      }
-      realtorId = realtor.id;
-    }
-
-    // Get current progress first
-    const { data: existingProgress } = await supabase
-      .from('training_progress')
-      .select('*')
-      .eq('realtor_id', realtorId)
-      .eq('section', data.section)
-      .eq('subsection', data.subsection)
-      .maybeSingle();
-
-    // Merge with existing progress
-    const progressData = {
-      realtor_id: realtorId,
-      section: data.section,
-      subsection: data.subsection,
-      lecture_completed: data.lecture_completed ?? existingProgress?.lecture_completed ?? false,
-      video_completed: data.video_completed ?? existingProgress?.video_completed ?? false,
-      practical_completed: data.practical_completed ?? existingProgress?.practical_completed ?? false,
-      handover_completed: data.handover_completed ?? existingProgress?.handover_completed ?? false,
-      exam_completed: data.exam_completed ?? existingProgress?.exam_completed ?? false,
-    };
-
-    // Upsert training progress
     const { data: progress, error } = await supabase
       .from('training_progress')
-      .upsert(progressData, {
-        onConflict: 'realtor_id,section,subsection',
+      .upsert({
+        realtor_id: data.realtorId,
+        section: data.section,
+        subsection: data.subsection,
+        lecture_completed: data.lectureCompleted,
+        video_completed: data.videoCompleted,
+        practical_completed: data.practicalCompleted,
+        handover_completed: data.handoverCompleted,
+        exam_completed: data.examCompleted,
+        updated_at: new Date().toISOString(),
       })
       .select()
       .single();
@@ -1358,348 +974,34 @@ class SupabaseApiClient {
     return progress;
   }
 
-  // KPI endpoints - direct calculation (RPC functions removed for simplicity)
-  async getRealtorKPI(realtorId: string) {
-    return this.calculateRealtorKPIDirectly(realtorId);
-  }
-
-  private async calculateRealtorKPIDirectly(realtorId: string) {
-    const currentMonth = new Date();
-    currentMonth.setDate(1);
-    currentMonth.setHours(0, 0, 0, 0);
-
-    const { data: deals, error: dealsError } = await supabase
-      .from('deals')
-      .select('deal_value, deal_date')
-      .eq('realtor_id', realtorId)
-      .gte('deal_date', currentMonth.toISOString().split('T')[0]);
-
-    const { data: diagnoses, error: diagnosesError } = await supabase
-      .from('diagnoses')
-      .select('diagnosis_date')
-      .eq('realtor_id', realtorId)
-      .gte('diagnosis_date', currentMonth.toISOString().split('T')[0]);
-
-    if (dealsError || diagnosesError) {
-      throw dealsError || diagnosesError;
-    }
-
-    const dealsCount = deals?.length || 0;
-    const diagnosesCount = diagnoses?.length || 0;
-    const totalDealValue = deals?.reduce((sum, deal) => sum + Number(deal.deal_value), 0) || 0;
-    const successRate = diagnosesCount > 0 ? Math.round((dealsCount / diagnosesCount) * 100) : 0;
-
-    return {
-      realtors: 1,
-      deals: dealsCount,
-      diagnoses: diagnosesCount,
-      successRate,
-      totalDealValue,
-      levelDistribution: {},
-    };
-  }
-
-  async getTeamKPI(teamId: string) {
-    return this.calculateTeamKPIDirectly(teamId);
-  }
-
-  private async calculateTeamKPIDirectly(teamId: string) {
-    const realtors = await this.getRealtorsByTeam(teamId);
-    const currentMonth = new Date();
-    currentMonth.setDate(1);
-    currentMonth.setHours(0, 0, 0, 0);
-
-    let totalDeals = 0;
-    let totalDiagnoses = 0;
-    let totalDealValue = 0;
-    const levelDistribution: Record<number, number> = {};
-
-    for (const realtor of realtors) {
-      const { data: deals } = await supabase
-        .from('deals')
-        .select('deal_value, deal_date')
-        .eq('realtor_id', realtor.id)
-        .gte('deal_date', currentMonth.toISOString().split('T')[0]);
-
-      const { data: diagnoses } = await supabase
-        .from('diagnoses')
-        .select('diagnosis_date')
-        .eq('realtor_id', realtor.id)
-        .gte('diagnosis_date', currentMonth.toISOString().split('T')[0]);
-
-      totalDeals += deals?.length || 0;
-      totalDiagnoses += diagnoses?.length || 0;
-      totalDealValue += deals?.reduce((sum, deal) => sum + Number(deal.deal_value), 0) || 0;
-
-      const level = (realtor as { level?: number }).level || 1;
-      levelDistribution[level] = (levelDistribution[level] || 0) + 1;
-    }
-
-    const successRate = totalDiagnoses > 0 ? Math.round((totalDeals / totalDiagnoses) * 100) : 0;
-
-    return {
-      realtors: realtors.length,
-      deals: totalDeals,
-      diagnoses: totalDiagnoses,
-      successRate,
-      totalDealValue,
-      levelDistribution,
-    };
-  }
-
-  async getOfficeKPI(officeId: string) {
-    return this.calculateOfficeKPIDirectly(officeId);
-  }
-
-  private async calculateOfficeKPIDirectly(officeId: string) {
-    const teams = await this.getTeamsByOffice(officeId);
-    let totalRealtors = 0;
-    let totalDeals = 0;
-    let totalDiagnoses = 0;
-    let totalDealValue = 0;
-    const levelDistribution: Record<number, number> = {};
-    const currentMonth = new Date();
-    currentMonth.setDate(1);
-    currentMonth.setHours(0, 0, 0, 0);
-
-    for (const team of teams) {
-      const teamKPI = await this.calculateTeamKPIDirectly(team.id);
-      totalRealtors += teamKPI.realtors;
-      totalDeals += teamKPI.deals;
-      totalDiagnoses += teamKPI.diagnoses;
-      totalDealValue += teamKPI.totalDealValue;
-      Object.keys(teamKPI.levelDistribution).forEach(level => {
-        levelDistribution[Number(level)] = (levelDistribution[Number(level)] || 0) + teamKPI.levelDistribution[Number(level)];
-      });
-    }
-
-    const successRate = totalDiagnoses > 0 ? Math.round((totalDeals / totalDiagnoses) * 100) : 0;
-
-    return {
-      realtors: totalRealtors,
-      deals: totalDeals,
-      diagnoses: totalDiagnoses,
-      successRate,
-      totalDealValue,
-      levelDistribution,
-    };
-  }
-
-  async getCityKPI(cityId: string) {
-    return this.calculateCityKPIDirectly(cityId);
-  }
-
-  private async calculateCityKPIDirectly(cityId: string) {
-    const offices = await this.getOfficesByCity(cityId);
-    let totalRealtors = 0;
-    let totalDeals = 0;
-    let totalDiagnoses = 0;
-    let totalDealValue = 0;
-    const levelDistribution: Record<number, number> = {};
-
-    for (const office of offices) {
-      const officeKPI = await this.calculateOfficeKPIDirectly(office.id);
-      totalRealtors += officeKPI.realtors;
-      totalDeals += officeKPI.deals;
-      totalDiagnoses += officeKPI.diagnoses;
-      totalDealValue += officeKPI.totalDealValue;
-      Object.keys(officeKPI.levelDistribution).forEach(level => {
-        levelDistribution[Number(level)] = (levelDistribution[Number(level)] || 0) + officeKPI.levelDistribution[Number(level)];
-      });
-    }
-
-    const successRate = totalDiagnoses > 0 ? Math.round((totalDeals / totalDiagnoses) * 100) : 0;
-
-    return {
-      realtors: totalRealtors,
-      deals: totalDeals,
-      diagnoses: totalDiagnoses,
-      successRate,
-      totalDealValue,
-      levelDistribution,
-    };
-  }
-
-  async getCountryKPI(countryId: string) {
-    return this.calculateCountryKPIDirectly(countryId);
-  }
-
-  private async calculateCountryKPIDirectly(countryId: string) {
-    const cities = await this.getCitiesByCountry(countryId);
-    let totalRealtors = 0;
-    let totalDeals = 0;
-    let totalDiagnoses = 0;
-    let totalDealValue = 0;
-    const levelDistribution: Record<number, number> = {};
-
-    for (const city of cities) {
-      const cityKPI = await this.calculateCityKPIDirectly(city.id);
-      totalRealtors += cityKPI.realtors;
-      totalDeals += cityKPI.deals;
-      totalDiagnoses += cityKPI.diagnoses;
-      totalDealValue += cityKPI.totalDealValue;
-      Object.keys(cityKPI.levelDistribution).forEach(level => {
-        levelDistribution[Number(level)] = (levelDistribution[Number(level)] || 0) + cityKPI.levelDistribution[Number(level)];
-      });
-    }
-
-    const successRate = totalDiagnoses > 0 ? Math.round((totalDeals / totalDiagnoses) * 100) : 0;
-
-    return {
-      realtors: totalRealtors,
-      deals: totalDeals,
-      diagnoses: totalDiagnoses,
-      successRate,
-      totalDealValue,
-      levelDistribution,
-    };
-  }
-
-  // Profile methods
-  async updateProfile(fullName: string) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ full_name: fullName })
-      .eq('id', user.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return { user: data };
-  }
-
-  async updatePassword(currentPassword: string, newPassword: string) {
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
-
-    if (error) throw error;
-    return { success: true };
-  }
-
-  // Goals
-  async getMyGoals(month?: number, year?: number) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    const { data: realtor, error: realtorError } = await supabase
-      .from('realtors')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (realtorError || !realtor) {
-      return null;
-    }
-
-    const now = new Date();
-    const targetMonth = month ?? now.getMonth() + 1;
-    const targetYear = year ?? now.getFullYear();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
-      .from('realtor_goals')
-      .select('*')
-      .eq('realtor_id', realtor.id)
-      .eq('month', targetMonth)
-      .eq('year', targetYear)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data ? {
-      dealsGoal: data.deals_goal,
-      keysGoal: data.keys_goal,
-      exclusivesGoal: data.exclusives_goal,
-      ...data
-    } : null;
-  }
-
-  async setMyGoals(month: number, year: number, dealsGoal: number, keysGoal: number, exclusivesGoal: number) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    const { data: realtor, error: realtorError } = await supabase
-      .from('realtors')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (realtorError || !realtor) {
-      throw new Error('Realtor not found');
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
+  async updateRealtorGoals(data: {
+    realtorId: string;
+    month: number;
+    year: number;
+    dealsGoal?: number;
+    keysGoal?: number;
+    exclusivesGoal?: number;
+  }) {
+    const { data: goal, error } = await supabase
       .from('realtor_goals')
       .upsert({
-        realtor_id: realtor.id,
-        month,
-        year,
-        deals_goal: dealsGoal,
-        keys_goal: keysGoal,
-        exclusives_goal: exclusivesGoal,
-      }, {
-        onConflict: 'realtor_id,month,year',
+        realtor_id: data.realtorId,
+        month: data.month,
+        year: data.year,
+        deals_goal: data.dealsGoal,
+        keys_goal: data.keysGoal,
+        exclusives_goal: data.exclusivesGoal,
+        updated_at: new Date().toISOString(),
       })
       .select()
       .single();
 
     if (error) throw error;
-    return data;
+    return goal;
   }
 
-  // Schedule
-  async getMySchedule(date?: string) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    const { data: realtor, error: realtorError } = await supabase
-      .from('realtors')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (realtorError || !realtor) {
-      return [];
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
-      .from('buyer_schedule')
-      .select('*')
-      .eq('realtor_id', realtor.id)
-      .order('schedule_date', { ascending: true });
-
-    if (error) throw error;
-    return (data || []).map((item: Record<string, unknown>) => ({
-      ...item,
-      scheduleDate: item.schedule_date,
-      timeSlot: item.time_slot,
-      buyer1Name: item.buyer1_name,
-      buyer1Phone: item.buyer1_phone,
-      buyer1Notes: item.buyer1_notes,
-      buyer2Name: item.buyer2_name,
-      buyer2Phone: item.buyer2_phone,
-      buyer2Notes: item.buyer2_notes,
-    }));
-  }
-
-  async createScheduleEntry(entryData: {
+  async createBuyerSchedule(data: {
+    realtorId: string;
     scheduleDate: string;
     timeSlot: string;
     buyer1Name?: string;
@@ -1708,63 +1010,60 @@ class SupabaseApiClient {
     buyer2Name?: string;
     buyer2Phone?: string;
     buyer2Notes?: string;
-    id?: string;
   }) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    const { data: realtor, error: realtorError } = await supabase
-      .from('realtors')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (realtorError || !realtor) {
-      throw new Error('Realtor not found');
-    }
-
-    const insertData = {
-      realtor_id: realtor.id,
-      schedule_date: entryData.scheduleDate,
-      time_slot: entryData.timeSlot,
-      buyer1_name: entryData.buyer1Name || null,
-      buyer1_phone: entryData.buyer1Phone || null,
-      buyer1_notes: entryData.buyer1Notes || null,
-      buyer2_name: entryData.buyer2Name || null,
-      buyer2_phone: entryData.buyer2Phone || null,
-      buyer2_notes: entryData.buyer2Notes || null,
-    };
-
-    if (entryData.id) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from('buyer_schedule')
-        .update(insertData)
-        .eq('id', entryData.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
+    const { data: schedule, error } = await supabase
       .from('buyer_schedule')
-      .insert(insertData)
+      .insert({
+        realtor_id: data.realtorId,
+        schedule_date: data.scheduleDate,
+        time_slot: data.timeSlot,
+        buyer1_name: data.buyer1Name,
+        buyer1_phone: data.buyer1Phone,
+        buyer1_notes: data.buyer1Notes,
+        buyer2_name: data.buyer2Name,
+        buyer2_phone: data.buyer2Phone,
+        buyer2_notes: data.buyer2Notes,
+      })
       .select()
       .single();
 
     if (error) throw error;
-    return data;
+    return schedule;
   }
 
-  async deleteScheduleEntry(id: string) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any)
+  async updateBuyerSchedule(id: string, data: {
+    scheduleDate?: string;
+    timeSlot?: string;
+    buyer1Name?: string;
+    buyer1Phone?: string;
+    buyer1Notes?: string;
+    buyer2Name?: string;
+    buyer2Phone?: string;
+    buyer2Notes?: string;
+  }) {
+    const { data: schedule, error } = await supabase
+      .from('buyer_schedule')
+      .update({
+        schedule_date: data.scheduleDate,
+        time_slot: data.timeSlot,
+        buyer1_name: data.buyer1Name,
+        buyer1_phone: data.buyer1Phone,
+        buyer1_notes: data.buyer1Notes,
+        buyer2_name: data.buyer2Name,
+        buyer2_phone: data.buyer2Phone,
+        buyer2_notes: data.buyer2Notes,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return schedule;
+  }
+
+  async deleteBuyerSchedule(id: string) {
+    const { error } = await supabase
       .from('buyer_schedule')
       .delete()
       .eq('id', id);
@@ -1773,70 +1072,67 @@ class SupabaseApiClient {
     return { success: true };
   }
 
-  // Messages
-  async getConversation(userId: string) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+  async sendMessage(data: {
+    receiverId: string;
+    content: string;
+  }) {
+    const user = await this.getCurrentUser();
+    if (!user.user) {
       throw new Error('Not authenticated');
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
-      .from('messages')
-      .select('*')
-      .or(`and(sender_id.eq.${user.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${user.id})`)
-      .order('created_at', { ascending: true });
-
-    if (error) throw error;
-    return (data || []).map((msg: Record<string, unknown>) => ({
-      ...msg,
-      senderId: msg.sender_id,
-      receiverId: msg.receiver_id,
-      createdAt: msg.created_at,
-    }));
-  }
-
-  async sendMessage(receiverId: string, content: string) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Not authenticated');
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
+    const { data: message, error } = await supabase
       .from('messages')
       .insert({
-        sender_id: user.id,
-        receiver_id: receiverId,
-        content,
+        sender_id: user.user.id,
+        receiver_id: data.receiverId,
+        content: data.content,
       })
       .select()
       .single();
 
     if (error) throw error;
-    return {
-      ...data,
-      senderId: data.sender_id,
-      receiverId: data.receiver_id,
-      createdAt: data.created_at,
-    };
+    return message;
   }
 
-  async markMessagesAsRead(userId: string) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+  async markMessageAsRead(messageId: string) {
+    const { data: message, error } = await supabase
+      .from('messages')
+      .update({ read: true })
+      .eq('id', messageId)
+      .select()
+      .single();
 
-    if (authError || !user) {
+    if (error) throw error;
+    return message;
+  }
+
+  async updateProfile(fullName: string) {
+    const user = await this.getCurrentUser();
+    if (!user.user) {
       throw new Error('Not authenticated');
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any)
-      .from('messages')
-      .update({ read: true })
-      .eq('sender_id', userId)
-      .eq('receiver_id', user.id);
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .update({ full_name: fullName })
+      .eq('id', user.user.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return profile;
+  }
+
+  async updatePassword(currentPassword: string, newPassword: string) {
+    const user = await this.getCurrentUser();
+    if (!user.user) {
+      throw new Error('Not authenticated');
+    }
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
 
     if (error) throw error;
     return { success: true };
@@ -1844,4 +1140,3 @@ class SupabaseApiClient {
 }
 
 export const supabaseApi = new SupabaseApiClient();
-

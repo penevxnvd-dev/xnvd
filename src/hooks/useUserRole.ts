@@ -31,11 +31,16 @@ export const useUserRole = () => {
                     setRole(priorityRole as UserRole);
                     setUserId(session.user.id);
                     setLoading(false);
-                    return;
+                    return; // Exit early - don't check Supabase
                   }
                 }
               } else {
                 console.warn('[useUserRole] No roles found for hardcoded user:', session.user.id);
+                // Even if no roles found, set userId so dashboard can show error
+                setUserId(session.user.id);
+                setRole(null);
+                setLoading(false);
+                return; // Exit early - don't check Supabase
               }
             }
           } catch (e) {
@@ -45,7 +50,7 @@ export const useUserRole = () => {
           }
         }
 
-        // Get current user from Supabase auth
+        // Get current user from Supabase auth (only if no hardcoded session)
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         
         if (authError || !user) {

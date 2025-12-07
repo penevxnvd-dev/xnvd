@@ -1,0 +1,32 @@
+[
+  {
+    "id": "3bef875a-1de2-47c3-8e69-a1adc813c0ed",
+    "user_id": "dbde39c2-e12b-493a-9ad2-baaa0242d75f",
+    "role": "office_manager",
+    "created_at": "2025-12-06T12:02:46.132233+00:00"
+  },
+  {
+    "id": "4a377e1e-2d82-4ebd-abac-e6db5ffc89ac",
+    "user_id": "ef311940-662a-4f2e-9745-fd8012da9687",
+    "role": "team_leader",
+    "created_at": "2025-12-06T12:02:47.087521+00:00"
+  },
+  {
+    "id": "f031c6aa-3c47-46ce-9ae3-eeb98fbb3310",
+    "user_id": "98eaa586-746a-458c-9243-19eb12154062",
+    "role": "team_leader",
+    "created_at": "2025-12-06T12:02:48.11453+00:00"
+  },
+  {
+    "id": "d795a8c9-2cc3-4425-a50f-e74004ac6714",
+    "user_id": "8762a1aa-5278-4213-ba06-d7da2a689d2d",
+    "role": "regional_manager",
+    "created_at": "2025-12-06T12:02:49.110766+00:00"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000002",
+    "user_id": "00000000-0000-0000-0000-000000000001",
+    "role": "admin",
+    "created_at": "2025-12-07T21:12:29.086Z"
+  }
+]
