@@ -36,6 +36,12 @@ export const supabase = (() => {
       throw new Error('Cannot use local Supabase. Please set VITE_SUPABASE_URL to remote Supabase URL.');
     }
     
+    // Verify we're using the correct project (not the old one)
+    if (SUPABASE_URL && SUPABASE_URL.includes('ufpeftuanzmkiryohesd')) {
+      console.error('❌ ERROR: Old Supabase project detected! Please update VITE_SUPABASE_URL in .env');
+      throw new Error('Old Supabase project URL detected. Please update environment variables.');
+    }
+
     supabaseInstance = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
       auth: {
         persistSession: true, // Enable session persistence

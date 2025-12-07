@@ -50,22 +50,20 @@ if (typeof window !== 'undefined') {
       return;
     }
     // Filter out WebSocket/Realtime connection errors (not critical if Realtime isn't used)
+    // Also filter old project WebSocket attempts
     if (message.includes('websocket') || 
         message.includes('WebSocket') || 
         message.includes('realtime') ||
         message.includes('Realtime') ||
         message.includes('NS_ERROR_WEBSOCKET') ||
+        message.includes('ufpeftuanzmkiryohesd') ||
         allArgsStr.includes('websocket') ||
         allArgsStr.includes('realtime/v1/websocket') ||
         allArgsStr.includes('ns_error_websocket') ||
-        allArgsStr.includes('connection_refused')) {
-      // These are non-critical - Realtime is optional
-      if (!import.meta.env.DEV) {
-        return; // Filter in production
-      }
-      // In dev, show as debug but don't clutter console
-      console.debug('WebSocket connection attempt (Realtime):', args[0]);
-      return;
+        allArgsStr.includes('connection_refused') ||
+        allArgsStr.includes('ufpeftuanzmkiryohesd')) {
+      // These are non-critical - Realtime is disabled and old project is cached
+      return; // Always filter these - they're from cached old project data
     }
     // Filter out cookie domain warnings (browser security, not app errors)
     if (message.includes('Cookie') && message.includes('rejected') && message.includes('domain')) {

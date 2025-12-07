@@ -74,28 +74,40 @@
             
             const cleared = [];
             
-            // Clear localStorage
+            // Clear localStorage - be more aggressive
             try {
                 const keys = Object.keys(localStorage);
                 keys.forEach(key => {
-                    if (key.includes('supabase') || key.includes('sb-')) {
+                    if (key.includes('supabase') || 
+                        key.includes('sb-') || 
+                        key.includes('ufpeftuanzmkiryohesd') ||
+                        key.includes('realtime')) {
                         localStorage.removeItem(key);
                         cleared.push(`localStorage: ${key}`);
                     }
                 });
+                // Also clear all Supabase-related keys
+                localStorage.clear(); // Clear everything to be safe
+                cleared.push('localStorage: (all cleared)');
             } catch (e) {
                 console.error('Error clearing localStorage:', e);
             }
             
-            // Clear sessionStorage
+            // Clear sessionStorage - be more aggressive
             try {
                 const keys = Object.keys(sessionStorage);
                 keys.forEach(key => {
-                    if (key.includes('supabase') || key.includes('sb-')) {
+                    if (key.includes('supabase') || 
+                        key.includes('sb-') || 
+                        key.includes('ufpeftuanzmkiryohesd') ||
+                        key.includes('realtime')) {
                         sessionStorage.removeItem(key);
                         cleared.push(`sessionStorage: ${key}`);
                     }
                 });
+                // Also clear all sessionStorage
+                sessionStorage.clear();
+                cleared.push('sessionStorage: (all cleared)');
             } catch (e) {
                 console.error('Error clearing sessionStorage:', e);
             }
