@@ -17,22 +17,29 @@ export const useUserRole = () => {
           try {
             const session = JSON.parse(hardcodedSession);
             if (session.user && session.hardcoded) {
+              console.log('[useUserRole] Found hardcoded session for user:', session.user.id);
               const { getHardcodedUserRoles } = await import('@/lib/hardcodedData');
               const userRoles = getHardcodedUserRoles().filter(ur => ur.user_id === session.user.id);
+              
+              console.log('[useUserRole] Hardcoded user roles:', userRoles);
               
               if (userRoles && userRoles.length > 0) {
                 const rolePriority = ['admin', 'regional_manager', 'office_manager', 'team_leader', 'realtor'];
                 for (const priorityRole of rolePriority) {
                   if (userRoles.some(r => r.role === priorityRole)) {
+                    console.log('[useUserRole] Setting role from hardcoded data:', priorityRole);
                     setRole(priorityRole as UserRole);
                     setUserId(session.user.id);
                     setLoading(false);
                     return;
                   }
                 }
+              } else {
+                console.warn('[useUserRole] No roles found for hardcoded user:', session.user.id);
               }
             }
           } catch (e) {
+            console.error('[useUserRole] Error processing hardcoded session:', e);
             // Invalid hardcoded session, clear it
             localStorage.removeItem('hardcoded-session');
           }
@@ -115,20 +122,26 @@ export const useUserRole = () => {
 
     fetchUserRole();
 
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        setRole(null);
-        setUserId(null);
-        setLoading(false);
-      } else {
-        fetchUserRole();
-      }
-    });
+    // Listen for auth state changes (only if not using hardcoded session)
+    const hardcodedSession = localStorage.getItem('hardcoded-session');
+    if (!hardcodedSession) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (!session) {
+          setRole(null);
+          setUserId(null);
+          setLoading(false);
+        } else {
+          fetchUserRole();
+        }
+      });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
+    
+    // If using hardcoded session, don't subscribe to auth changes
+    return () => {};
   }, []);
 
   return { role, loading, userId };

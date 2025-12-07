@@ -261,18 +261,26 @@ class SupabaseApiClient {
       try {
         const session = JSON.parse(hardcodedSession);
         if (session.user && session.hardcoded) {
+          console.log('[getCurrentUser] Using hardcoded session for user:', session.user.id);
           const profile = getHardcodedProfiles().find(p => p.id === session.user.id);
           const userRoles = getHardcodedUserRoles().filter(ur => ur.user_id === session.user.id);
           
+          if (!profile) {
+            console.warn('[getCurrentUser] No profile found for hardcoded user:', session.user.id);
+          }
+          
           return {
             user: {
-              ...session.user,
+              id: session.user.id,
+              email: session.user.email,
+              full_name: session.user.user_metadata?.full_name || profile?.full_name || session.user.email,
               ...profile,
               roles: userRoles.map(ur => ur.role),
             },
           };
         }
       } catch (e) {
+        console.error('[getCurrentUser] Error processing hardcoded session:', e);
         // Invalid hardcoded session, clear it
         localStorage.removeItem('hardcoded-session');
       }
