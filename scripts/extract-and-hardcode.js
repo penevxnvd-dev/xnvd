@@ -337,6 +337,22 @@ export function getTeamLeader(teamId: string) {
   const jsonPath = join(rootDir, 'hardcoded-data.json');
   writeFileSync(jsonPath, JSON.stringify(hardcodedData, null, 2), 'utf8');
   console.log(`✅ JSON backup saved: ${jsonPath}`);
+  
+  // Update metadata to indicate hardcoded data was generated
+  try {
+    const metadataPath = join(rootDir, 'public/local-backup/metadata.json');
+    let metadata = { last_sync: new Date().toISOString(), last_hardcode: new Date().toISOString() };
+    try {
+      const existing = JSON.parse(readFileSync(metadataPath, 'utf8'));
+      metadata = { ...existing, last_hardcode: new Date().toISOString() };
+    } catch (e) {
+      // Metadata file doesn't exist, use new one
+    }
+    writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), 'utf8');
+    console.log(`✅ Metadata updated: ${metadataPath}`);
+  } catch (e) {
+    console.warn('⚠️  Could not update metadata:', e);
+  }
 }
 
 // Run
