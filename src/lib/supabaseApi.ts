@@ -256,13 +256,10 @@ class SupabaseApiClient {
     return (result.data as Tables<'cities'>[]) || [];
   }
 
-  // Offices - hardcoded first, then backup, then Supabase
+  // Offices - Supabase first, then local backup
   async getOfficesByCity(cityId: string) {
-    return withLocalBackupFirst(
+    const result = await withLocalBackupFirst(
       'offices',
-      () => [],
-      ,
-      (office) => (office as { city_id?: string }).city_id === cityId,
       async () => {
         const { data, error } = await supabase
           .from('offices')
@@ -270,8 +267,13 @@ class SupabaseApiClient {
           .eq('city_id', cityId)
           .order('name', { ascending: true });
         return { data, error };
-      }
-    ).then(result => result.data as Tables<'offices'>[]);
+      },
+      (office) => (office as { city_id?: string }).city_id === cityId
+    );
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+    return (result.data as Tables<'offices'>[]) || [];
   }
 
   async getAllOffices() {
