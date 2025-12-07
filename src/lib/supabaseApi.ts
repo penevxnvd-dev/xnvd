@@ -491,23 +491,52 @@ class SupabaseApiClient {
     return { success: true };
   }
 
-  // Teams
+  // Teams - uses local backup first
   async getTeamsByOffice(officeId: string) {
-    const { data, error } = await supabase
-      .from('teams')
-      .select(`
-        *,
-        leader:profiles!teams_leader_id_fkey (
-          id,
-          full_name,
-          email
-        )
-      `)
-      .eq('office_id', officeId)
-      .order('name', { ascending: true });
+    const result = await withLocalBackupFirst(
+      'teams',
+      async () => {
+        const { data, error } = await supabase
+          .from('teams')
+          .select(`
+            *,
+            leader:profiles!teams_leader_id_fkey (
+              id,
+              full_name,
+              email
+            )
+          `)
+          .eq('office_id', officeId)
+          .order('name', { ascending: true });
+        return { data, error };
+      },
+      (item: unknown) => {
+        const team = item as { office_id?: string };
+        return team.office_id === officeId;
+      }
+    );
 
-    if (error) throw error;
-    return data || [];
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+
+    // If from cache, enrich with leader data
+    if (result.fromCache && result.data) {
+      const teams = result.data as Tables<'teams'>[];
+      const profiles = await localBackup.loadTable('profiles');
+      if (profiles) {
+        const enrichedTeams = teams.map(team => ({
+          ...team,
+          leader: team.leader_id ? profiles.find((p: unknown) => {
+            const profile = p as { id?: string };
+            return profile.id === team.leader_id;
+          }) : null,
+        }));
+        return enrichedTeams.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      }
+    }
+
+    return (result.data as Tables<'teams'>[]) || [];
   }
 
   async createTeam(data: { name: string; officeId: string; leaderId?: string }) {
