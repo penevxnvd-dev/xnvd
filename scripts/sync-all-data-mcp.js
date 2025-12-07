@@ -264,6 +264,89 @@ export function getBuyerScheduleByRealtor(realtorId: string) {
   const tsPath = join(rootDir, 'src/lib/hardcodedData.ts');
   writeFileSync(tsPath, tsContent, 'utf8');
   console.log(`   ✅ hardcodedData.ts generated\n`);
+
+  // Also create readable snapshot files
+  const snapshotsDir = join(rootDir, 'snapshots');
+  if (!existsSync(snapshotsDir)) {
+    mkdirSync(snapshotsDir, { recursive: true });
+  }
+
+  console.log('📸 Creating readable snapshots...\n');
+
+  // Save full data snapshot (readable JSON)
+  const fullSnapshotPath = join(snapshotsDir, 'full-data-snapshot.json');
+  writeFileSync(fullSnapshotPath, JSON.stringify(hardcodedData, null, 2), 'utf8');
+  console.log(`   ✅ full-data-snapshot.json`);
+
+  // Save accounts snapshot (readable)
+  const accountsSnapshot = {
+    generated_at: hardcodedData.generated_at,
+    total_accounts: Object.keys(hardcodedData.accounts).length,
+    accounts: hardcodedData.accounts,
+  };
+  const accountsSnapshotPath = join(snapshotsDir, 'accounts-snapshot.json');
+  writeFileSync(accountsSnapshotPath, JSON.stringify(accountsSnapshot, null, 2), 'utf8');
+  console.log(`   ✅ accounts-snapshot.json`);
+
+  // Save structure snapshot (readable)
+  const structureSnapshotPath = join(snapshotsDir, 'structure-snapshot.json');
+  writeFileSync(structureSnapshotPath, JSON.stringify(hardcodedData.structure, null, 2), 'utf8');
+  console.log(`   ✅ structure-snapshot.json`);
+
+  // Save summary snapshot (human-readable)
+  const summarySnapshot = {
+    generated_at: hardcodedData.generated_at,
+    version: hardcodedData.version,
+    summary: {
+      accounts: Object.keys(hardcodedData.accounts).length,
+      countries: hardcodedData.countries.length,
+      cities: hardcodedData.cities.length,
+      offices: hardcodedData.offices.length,
+      teams: hardcodedData.teams.length,
+      profiles: hardcodedData.profiles.length,
+      user_roles: hardcodedData.user_roles.length,
+      realtors: hardcodedData.realtors.length,
+      deals: hardcodedData.deals.length,
+      diagnoses: hardcodedData.diagnoses.length,
+      training_progress: hardcodedData.training_progress.length,
+      realtor_goals: hardcodedData.realtor_goals.length,
+      buyer_schedule: hardcodedData.buyer_schedule.length,
+      messages: hardcodedData.messages.length,
+    },
+    accounts_list: Object.entries(hardcodedData.accounts).map(([email, acc]) => ({
+      email,
+      full_name: acc.full_name,
+      roles: acc.roles,
+      password: acc.password, // Include password in snapshot for reference
+    })),
+    countries_list: hardcodedData.countries.map(c => ({
+      id: c.id,
+      name: c.name,
+      code: c.code,
+    })),
+    cities_list: hardcodedData.cities.map(c => ({
+      id: c.id,
+      name: c.name,
+      country_id: c.country_id,
+      manager_id: c.manager_id,
+    })),
+    offices_list: hardcodedData.offices.map(o => ({
+      id: o.id,
+      name: o.name,
+      city_id: o.city_id,
+      address: o.address,
+      manager_id: o.manager_id,
+    })),
+    teams_list: hardcodedData.teams.map(t => ({
+      id: t.id,
+      name: t.name,
+      office_id: t.office_id,
+      leader_id: t.leader_id,
+    })),
+  };
+  const summarySnapshotPath = join(snapshotsDir, 'summary-snapshot.json');
+  writeFileSync(summarySnapshotPath, JSON.stringify(summarySnapshot, null, 2), 'utf8');
+  console.log(`   ✅ summary-snapshot.json\n`);
 }
 
 async function saveToLocalBackup(data) {

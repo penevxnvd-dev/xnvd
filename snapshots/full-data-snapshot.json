@@ -1,0 +1,350 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2025-12-07T21:38:43.729Z",
+  "accounts": {
+    "krasi.katev@xnvd.com": {
+      "id": "dbde39c2-e12b-493a-9ad2-baaa0242d75f",
+      "email": "krasi.katev@xnvd.com",
+      "password": "Default123!",
+      "full_name": "Краси Кътев",
+      "roles": [
+        "office_manager"
+      ]
+    },
+    "lazar.bundev@xnvd.com": {
+      "id": "ef311940-662a-4f2e-9745-fd8012da9687",
+      "email": "lazar.bundev@xnvd.com",
+      "password": "Default123!",
+      "full_name": "Лазар Бундев",
+      "roles": [
+        "team_leader"
+      ]
+    },
+    "georgi.penev@xnvd.com": {
+      "id": "98eaa586-746a-458c-9243-19eb12154062",
+      "email": "georgi.penev@xnvd.com",
+      "password": "Default123!",
+      "full_name": "Георги Пенев",
+      "roles": [
+        "team_leader"
+      ]
+    },
+    "kamen.georgiev@xnvd.com": {
+      "id": "8762a1aa-5278-4213-ba06-d7da2a689d2d",
+      "email": "kamen.georgiev@xnvd.com",
+      "password": "Default123!",
+      "full_name": "Камен Георгиев",
+      "roles": [
+        "regional_manager"
+      ]
+    },
+    "admin@xnvd.com": {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "email": "admin@xnvd.com",
+      "password": "Default123!",
+      "full_name": "Администратор",
+      "roles": [
+        "admin"
+      ]
+    }
+  },
+  "structure": [
+    {
+      "country": {
+        "id": "51d55b27-505c-487b-99b2-907f5162d814",
+        "name": "България",
+        "code": "BG",
+        "created_at": "2025-12-06T11:43:34.193162+00:00"
+      },
+      "cities": [
+        {
+          "city": {
+            "id": "02a0c1d2-f731-424c-9e1a-26ba963a7754",
+            "name": "Варна",
+            "country_id": "51d55b27-505c-487b-99b2-907f5162d814",
+            "created_at": "2025-12-07T19:37:59.465036+00:00",
+            "manager_id": null
+          },
+          "offices": []
+        },
+        {
+          "city": {
+            "id": "e811a5a1-468f-4251-97a3-cf9849e20879",
+            "name": "София",
+            "country_id": "51d55b27-505c-487b-99b2-907f5162d814",
+            "created_at": "2025-12-07T19:37:59.465036+00:00",
+            "manager_id": null
+          },
+          "offices": [
+            {
+              "office": {
+                "id": "d259b16f-e8fa-4e3d-aa99-5dcf48a1d486",
+                "name": "Офис София",
+                "city_id": "e811a5a1-468f-4251-97a3-cf9849e20879",
+                "address": "Сребърна 14",
+                "created_at": "2025-12-07T19:38:01.318286+00:00",
+                "manager_id": null
+              },
+              "teams": []
+            }
+          ]
+        },
+        {
+          "city": {
+            "id": "9e64a379-406f-4724-b3e5-b005c37969df",
+            "name": "Бургас",
+            "country_id": "51d55b27-505c-487b-99b2-907f5162d814",
+            "created_at": "2025-12-06T11:43:34.193162+00:00",
+            "manager_id": "8762a1aa-5278-4213-ba06-d7da2a689d2d"
+          },
+          "offices": [
+            {
+              "office": {
+                "id": "b8722aa0-9560-424a-a1fa-72d9cd439637",
+                "name": "Офис Бургас",
+                "city_id": "9e64a379-406f-4724-b3e5-b005c37969df",
+                "address": "ул. Хан Крум 6",
+                "created_at": "2025-12-06T11:43:34.193162+00:00",
+                "manager_id": "dbde39c2-e12b-493a-9ad2-baaa0242d75f"
+              },
+              "teams": [
+                {
+                  "team": {
+                    "id": "74cd7ea7-02e1-461a-9a6a-f675e7020375",
+                    "name": "Лазар Бундев",
+                    "office_id": "b8722aa0-9560-424a-a1fa-72d9cd439637",
+                    "leader_id": "ef311940-662a-4f2e-9745-fd8012da9687",
+                    "created_at": "2025-12-06T12:02:47.645695+00:00"
+                  },
+                  "realtors": []
+                },
+                {
+                  "team": {
+                    "id": "88e70354-44fa-4b32-b9ee-f91ff89c353d",
+                    "name": "Георги Пенев",
+                    "office_id": "b8722aa0-9560-424a-a1fa-72d9cd439637",
+                    "leader_id": "98eaa586-746a-458c-9243-19eb12154062",
+                    "created_at": "2025-12-06T12:02:48.638334+00:00"
+                  },
+                  "realtors": []
+                },
+                {
+                  "team": {
+                    "id": "e08a8d46-5578-4871-a3a1-925e0460377c",
+                    "name": "Екип Георги Пенев",
+                    "office_id": "b8722aa0-9560-424a-a1fa-72d9cd439637",
+                    "leader_id": "98eaa586-746a-458c-9243-19eb12154062",
+                    "created_at": "2025-12-07T19:38:17.62925+00:00"
+                  },
+                  "realtors": []
+                },
+                {
+                  "team": {
+                    "id": "2f45b940-235f-4bac-a93e-00d97eb29aef",
+                    "name": "Екип Лазар Бундев",
+                    "office_id": "b8722aa0-9560-424a-a1fa-72d9cd439637",
+                    "leader_id": "ef311940-662a-4f2e-9745-fd8012da9687",
+                    "created_at": "2025-12-07T19:38:19.589995+00:00"
+                  },
+                  "realtors": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "city": {
+            "id": "04f065f5-68d8-4111-bd97-bbc65fc9dafd",
+            "name": "Пловдив",
+            "country_id": "51d55b27-505c-487b-99b2-907f5162d814",
+            "created_at": "2025-12-06T11:43:34.193162+00:00",
+            "manager_id": "8762a1aa-5278-4213-ba06-d7da2a689d2d"
+          },
+          "offices": [
+            {
+              "office": {
+                "id": "b87c65f4-f393-4601-bbd7-2d0e296b6c4f",
+                "name": "Офис Пловдив",
+                "city_id": "04f065f5-68d8-4111-bd97-bbc65fc9dafd",
+                "address": "Мария Луиза 43",
+                "created_at": "2025-12-07T19:38:01.318286+00:00",
+                "manager_id": null
+              },
+              "teams": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "countries": [
+    {
+      "id": "51d55b27-505c-487b-99b2-907f5162d814",
+      "name": "България",
+      "code": "BG",
+      "created_at": "2025-12-06T11:43:34.193162+00:00"
+    }
+  ],
+  "cities": [
+    {
+      "id": "02a0c1d2-f731-424c-9e1a-26ba963a7754",
+      "name": "Варна",
+      "country_id": "51d55b27-505c-487b-99b2-907f5162d814",
+      "created_at": "2025-12-07T19:37:59.465036+00:00",
+      "manager_id": null
+    },
+    {
+      "id": "e811a5a1-468f-4251-97a3-cf9849e20879",
+      "name": "София",
+      "country_id": "51d55b27-505c-487b-99b2-907f5162d814",
+      "created_at": "2025-12-07T19:37:59.465036+00:00",
+      "manager_id": null
+    },
+    {
+      "id": "9e64a379-406f-4724-b3e5-b005c37969df",
+      "name": "Бургас",
+      "country_id": "51d55b27-505c-487b-99b2-907f5162d814",
+      "created_at": "2025-12-06T11:43:34.193162+00:00",
+      "manager_id": "8762a1aa-5278-4213-ba06-d7da2a689d2d"
+    },
+    {
+      "id": "04f065f5-68d8-4111-bd97-bbc65fc9dafd",
+      "name": "Пловдив",
+      "country_id": "51d55b27-505c-487b-99b2-907f5162d814",
+      "created_at": "2025-12-06T11:43:34.193162+00:00",
+      "manager_id": "8762a1aa-5278-4213-ba06-d7da2a689d2d"
+    }
+  ],
+  "offices": [
+    {
+      "id": "b87c65f4-f393-4601-bbd7-2d0e296b6c4f",
+      "name": "Офис Пловдив",
+      "city_id": "04f065f5-68d8-4111-bd97-bbc65fc9dafd",
+      "address": "Мария Луиза 43",
+      "created_at": "2025-12-07T19:38:01.318286+00:00",
+      "manager_id": null
+    },
+    {
+      "id": "d259b16f-e8fa-4e3d-aa99-5dcf48a1d486",
+      "name": "Офис София",
+      "city_id": "e811a5a1-468f-4251-97a3-cf9849e20879",
+      "address": "Сребърна 14",
+      "created_at": "2025-12-07T19:38:01.318286+00:00",
+      "manager_id": null
+    },
+    {
+      "id": "b8722aa0-9560-424a-a1fa-72d9cd439637",
+      "name": "Офис Бургас",
+      "city_id": "9e64a379-406f-4724-b3e5-b005c37969df",
+      "address": "ул. Хан Крум 6",
+      "created_at": "2025-12-06T11:43:34.193162+00:00",
+      "manager_id": "dbde39c2-e12b-493a-9ad2-baaa0242d75f"
+    }
+  ],
+  "teams": [
+    {
+      "id": "74cd7ea7-02e1-461a-9a6a-f675e7020375",
+      "name": "Лазар Бундев",
+      "office_id": "b8722aa0-9560-424a-a1fa-72d9cd439637",
+      "leader_id": "ef311940-662a-4f2e-9745-fd8012da9687",
+      "created_at": "2025-12-06T12:02:47.645695+00:00"
+    },
+    {
+      "id": "88e70354-44fa-4b32-b9ee-f91ff89c353d",
+      "name": "Георги Пенев",
+      "office_id": "b8722aa0-9560-424a-a1fa-72d9cd439637",
+      "leader_id": "98eaa586-746a-458c-9243-19eb12154062",
+      "created_at": "2025-12-06T12:02:48.638334+00:00"
+    },
+    {
+      "id": "e08a8d46-5578-4871-a3a1-925e0460377c",
+      "name": "Екип Георги Пенев",
+      "office_id": "b8722aa0-9560-424a-a1fa-72d9cd439637",
+      "leader_id": "98eaa586-746a-458c-9243-19eb12154062",
+      "created_at": "2025-12-07T19:38:17.62925+00:00"
+    },
+    {
+      "id": "2f45b940-235f-4bac-a93e-00d97eb29aef",
+      "name": "Екип Лазар Бундев",
+      "office_id": "b8722aa0-9560-424a-a1fa-72d9cd439637",
+      "leader_id": "ef311940-662a-4f2e-9745-fd8012da9687",
+      "created_at": "2025-12-07T19:38:19.589995+00:00"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "dbde39c2-e12b-493a-9ad2-baaa0242d75f",
+      "full_name": "Краси Кътев",
+      "email": "krasi.katev@xnvd.com",
+      "created_at": "2025-12-06T12:02:45.342566+00:00",
+      "updated_at": "2025-12-06T12:02:45.917787+00:00"
+    },
+    {
+      "id": "ef311940-662a-4f2e-9745-fd8012da9687",
+      "full_name": "Лазар Бундев",
+      "email": "lazar.bundev@xnvd.com",
+      "created_at": "2025-12-06T12:02:46.79934+00:00",
+      "updated_at": "2025-12-06T12:02:46.993283+00:00"
+    },
+    {
+      "id": "98eaa586-746a-458c-9243-19eb12154062",
+      "full_name": "Георги Пенев",
+      "email": "georgi.penev@xnvd.com",
+      "created_at": "2025-12-06T12:02:47.823+00:00",
+      "updated_at": "2025-12-06T12:02:48.01589+00:00"
+    },
+    {
+      "id": "8762a1aa-5278-4213-ba06-d7da2a689d2d",
+      "full_name": "Камен Георгиев",
+      "email": "kamen.georgiev@xnvd.com",
+      "created_at": "2025-12-06T12:02:48.817557+00:00",
+      "updated_at": "2025-12-06T12:02:49.021688+00:00"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "full_name": "Администратор",
+      "email": "admin@xnvd.com",
+      "created_at": "2025-12-07T21:38:43.722Z",
+      "updated_at": "2025-12-07T21:38:43.722Z"
+    }
+  ],
+  "user_roles": [
+    {
+      "id": "3bef875a-1de2-47c3-8e69-a1adc813c0ed",
+      "user_id": "dbde39c2-e12b-493a-9ad2-baaa0242d75f",
+      "role": "office_manager",
+      "created_at": "2025-12-06T12:02:46.132233+00:00"
+    },
+    {
+      "id": "4a377e1e-2d82-4ebd-abac-e6db5ffc89ac",
+      "user_id": "ef311940-662a-4f2e-9745-fd8012da9687",
+      "role": "team_leader",
+      "created_at": "2025-12-06T12:02:47.087521+00:00"
+    },
+    {
+      "id": "f031c6aa-3c47-46ce-9ae3-eeb98fbb3310",
+      "user_id": "98eaa586-746a-458c-9243-19eb12154062",
+      "role": "team_leader",
+      "created_at": "2025-12-06T12:02:48.11453+00:00"
+    },
+    {
+      "id": "d795a8c9-2cc3-4425-a50f-e74004ac6714",
+      "user_id": "8762a1aa-5278-4213-ba06-d7da2a689d2d",
+      "role": "regional_manager",
+      "created_at": "2025-12-06T12:02:49.110766+00:00"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000002",
+      "user_id": "00000000-0000-0000-0000-000000000001",
+      "role": "admin",
+      "created_at": "2025-12-07T21:38:43.722Z"
+    }
+  ],
+  "realtors": [],
+  "deals": [],
+  "diagnoses": [],
+  "training_progress": [],
+  "realtor_goals": [],
+  "buyer_schedule": [],
+  "messages": []
+}
