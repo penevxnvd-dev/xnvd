@@ -2,7 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { handleSupabaseError } from './errorHandler';
-import { withFallback, localBackup } from './localBackup';
+import { withLocalBackupFirst, localBackup } from './localBackup';
 
 type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
 type TablesInsert<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert'];
@@ -202,17 +202,17 @@ class SupabaseApiClient {
     if (error) throw error;
   }
 
-  // Countries
+  // Countries - uses local backup first
   async getCountries() {
-    const result = await withFallback(
+    const result = await withLocalBackupFirst(
+      'countries',
       async () => {
         const { data, error } = await supabase
           .from('countries')
           .select('*')
           .order('name', { ascending: true });
         return { data, error };
-      },
-      'countries'
+      }
     );
 
     if (result.error && !result.fromCache) {
@@ -225,10 +225,6 @@ class SupabaseApiClient {
         });
       }
       throw handleSupabaseError(result.error);
-    }
-
-    if (result.fromCache) {
-      console.info('[getCountries] Using local backup data');
     }
 
     return (result.data as Tables<'countries'>[]) || [];
@@ -267,9 +263,10 @@ class SupabaseApiClient {
     return { success: true };
   }
 
-  // Cities
+  // Cities - uses local backup first
   async getCitiesByCountry(countryId: string) {
-    const result = await withFallback(
+    const result = await withLocalBackupFirst(
+      'cities',
       async () => {
         const { data, error } = await supabase
           .from('cities')
@@ -278,7 +275,6 @@ class SupabaseApiClient {
           .order('name', { ascending: true });
         return { data, error };
       },
-      'cities',
       (item: unknown) => {
         const city = item as { country_id?: string };
         return city.country_id === countryId;
@@ -287,10 +283,6 @@ class SupabaseApiClient {
 
     if (result.error && !result.fromCache) {
       throw handleSupabaseError(result.error);
-    }
-
-    if (result.fromCache) {
-      console.info('[getCitiesByCountry] Using local backup data');
     }
 
     return (result.data as Tables<'cities'>[]) || [];
@@ -341,24 +333,21 @@ class SupabaseApiClient {
     return data || [];
   }
 
+  // Offices - uses local backup first
   async getAllOffices() {
-    const result = await withFallback(
+    const result = await withLocalBackupFirst(
+      'offices',
       async () => {
         const { data, error } = await supabase
           .from('offices')
           .select('*')
           .order('name', { ascending: true });
         return { data, error };
-      },
-      'offices'
+      }
     );
 
     if (result.error && !result.fromCache) {
       throw handleSupabaseError(result.error);
-    }
-
-    if (result.fromCache) {
-      console.info('[getAllOffices] Using local backup data');
     }
 
     return (result.data as Tables<'offices'>[]) || [];
@@ -579,17 +568,49 @@ class SupabaseApiClient {
   }
 
   // Realtors
+  // Realtors - uses local backup first
   async getRealtorsByTeam(teamId: string) {
-    const { data, error } = await supabase
-      .from('realtors')
-      .select(`
-        *,
-        profile:profiles!realtors_user_id_fkey (
-          full_name,
-          email
-        )
-      `)
-      .eq('team_id', teamId)
+    const result = await withLocalBackupFirst(
+      'realtors',
+      async () => {
+        const { data, error } = await supabase
+          .from('realtors')
+          .select(`
+            *,
+            profile:profiles!realtors_user_id_fkey (
+              full_name,
+              email
+            )
+          `)
+          .eq('team_id', teamId);
+        return { data, error };
+      },
+      (item: unknown) => {
+        const realtor = item as { team_id?: string };
+        return realtor.team_id === teamId;
+      }
+    );
+
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+
+    // If from cache, enrich with profile data
+    if (result.fromCache && result.data) {
+      const realtors = result.data as Tables<'realtors'>[];
+      const profiles = await localBackup.loadTable('profiles');
+      if (profiles) {
+        return realtors.map(realtor => ({
+          ...realtor,
+          profile: profiles.find((p: unknown) => {
+            const profile = p as { id?: string };
+            return profile.id === realtor.user_id;
+          }) || null,
+        }));
+      }
+    }
+
+    return (result.data as Tables<'realtors'>[]) || [];
       .order('level', { ascending: false });
 
     if (error) throw error;

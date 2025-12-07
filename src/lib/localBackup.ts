@@ -162,51 +162,61 @@ class LocalBackup {
 export const localBackup = new LocalBackup();
 
 /**
- * Helper function to try Supabase first, fallback to local backup
+ * Helper function to use local backup first, then Supabase as fallback
+ * This makes local backup the primary data source
  */
-export async function withFallback<T>(
-  supabaseCall: () => Promise<{ data: T | null; error: unknown }>,
+export async function withLocalBackupFirst<T>(
   tableName: string,
-  fallbackFilter?: (item: unknown) => boolean
+  supabaseCall: () => Promise<{ data: T | null; error: unknown }>,
+  filter?: (item: unknown) => boolean
 ): Promise<{ data: T | null; error: unknown; fromCache: boolean }> {
   try {
-    // Try Supabase first
+    // Try local backup first (primary source)
+    const backupData = await localBackup.queryTable(tableName, filter);
+    
+    if (backupData && backupData.length > 0) {
+      console.info(`[withLocalBackupFirst] Using local backup for ${tableName} (${backupData.length} records)`);
+      return {
+        data: backupData as T,
+        error: null,
+        fromCache: true,
+      };
+    }
+
+    // If backup is empty or not available, try Supabase
+    console.info(`[withLocalBackupFirst] Local backup empty for ${tableName}, trying Supabase...`);
     const result = await supabaseCall();
+    
     if (!result.error && result.data !== null) {
+      console.info(`[withLocalBackupFirst] Using Supabase for ${tableName} (${Array.isArray(result.data) ? result.data.length : 1} records)`);
       return { ...result, fromCache: false };
     }
 
-    // If Supabase fails, try local backup
-    console.warn(`[withFallback] Supabase failed for ${tableName}, trying local backup...`);
-    const backupData = await localBackup.queryTable(tableName, fallbackFilter);
-    
-    if (backupData) {
-      console.info(`[withFallback] Using local backup for ${tableName} (${backupData.length} records)`);
+    // Both failed or empty
+    if (backupData && backupData.length === 0) {
+      // Backup exists but is empty - return empty array
       return {
-        data: backupData as T,
+        data: [] as T,
         error: null,
         fromCache: true,
       };
     }
 
-    // Both failed
     return {
       data: null,
-      error: new Error(`Failed to fetch ${tableName} from Supabase and local backup`),
+      error: result.error || new Error(`Failed to fetch ${tableName} from local backup and Supabase`),
       fromCache: false,
     };
   } catch (error) {
-    // Try local backup on error
-    console.warn(`[withFallback] Error fetching ${tableName}, trying local backup...`, error);
-    const backupData = await localBackup.queryTable(tableName, fallbackFilter);
-    
-    if (backupData) {
-      console.info(`[withFallback] Using local backup for ${tableName} (${backupData.length} records)`);
-      return {
-        data: backupData as T,
-        error: null,
-        fromCache: true,
-      };
+    // Try Supabase on error
+    console.warn(`[withLocalBackupFirst] Error with local backup for ${tableName}, trying Supabase...`, error);
+    try {
+      const result = await supabaseCall();
+      if (!result.error && result.data !== null) {
+        return { ...result, fromCache: false };
+      }
+    } catch (supabaseError) {
+      console.error(`[withLocalBackupFirst] Both local backup and Supabase failed for ${tableName}`);
     }
 
     return {
@@ -215,5 +225,17 @@ export async function withFallback<T>(
       fromCache: false,
     };
   }
+}
+
+/**
+ * Legacy function - kept for backward compatibility
+ * Now uses local backup first instead of Supabase first
+ */
+export async function withFallback<T>(
+  supabaseCall: () => Promise<{ data: T | null; error: unknown }>,
+  tableName: string,
+  fallbackFilter?: (item: unknown) => boolean
+): Promise<{ data: T | null; error: unknown; fromCache: boolean }> {
+  return withLocalBackupFirst(tableName, supabaseCall, fallbackFilter);
 }
 
