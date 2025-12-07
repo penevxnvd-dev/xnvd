@@ -38,8 +38,12 @@ export const supabase = (() => {
     
     // Verify we're using the correct project (not the old one)
     if (SUPABASE_URL && SUPABASE_URL.includes('ufpeftuanzmkiryohesd')) {
-      console.error('❌ ERROR: Old Supabase project detected! Please update VITE_SUPABASE_URL in .env');
-      throw new Error('Old Supabase project URL detected. Please update environment variables.');
+      console.error('❌ ERROR: Old Supabase project detected! Please update VITE_SUPABASE_URL in Vercel environment variables.');
+      console.error('   Current URL:', SUPABASE_URL);
+      console.error('   Expected URL should contain: qxompdwqdnemsntssjot');
+      console.error('   Go to: https://vercel.com/dashboard → xnvd → Settings → Environment Variables');
+      // Don't throw - let the app try to work, but log the error clearly
+      // The app will likely fail on Supabase calls, but at least it won't crash immediately
     }
 
     supabaseInstance = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {

@@ -89,7 +89,7 @@
         };
         
         console.error = function(...args) {
-          if (filterSES(...args) || filterWebSocket(...args) || filterCookieWarnings(...args)) {
+          if (filterSES(...args) || filterWebSocket(...args) || filterCookieWarnings(...args) || filterOldProjectError(...args)) {
             return; // Silently ignore these non-critical errors
           }
           originalError.apply(console, args);

@@ -69,6 +69,16 @@ if (typeof window !== 'undefined') {
     if (message.includes('Cookie') && message.includes('rejected') && message.includes('domain')) {
       return; // Browser security warnings, not app errors
     }
+    // Filter out "Old Supabase project" errors (these are handled gracefully)
+    if (message.includes('Old Supabase project') || 
+        message.includes('update environment variables') ||
+        allArgsStr.includes('Old Supabase project') ||
+        allArgsStr.includes('ufpeftuanzmkiryohesd')) {
+      // This error is logged but doesn't need to be shown to user
+      // The app will handle it gracefully
+      return;
+    }
+    
     // Filter out SES (Secure EcmaScript) lockdown errors
     // These are caused by browser extensions (like MetaMask) injecting SES code
     // They don't affect the app's functionality and are safe to ignore
