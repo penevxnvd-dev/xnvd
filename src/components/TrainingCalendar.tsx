@@ -119,11 +119,13 @@ export const TrainingCalendar = ({
   const isTeamLeader = currentUserRole === 'team_leader';
   const isRegionalManager = currentUserRole === 'regional_manager';
   const isOfficeManager = currentUserRole === 'office_manager';
+  const isRealtor = currentUserRole === 'realtor';
 
   // State for user's managed cities/office/team
   const [userManagedCities, setUserManagedCities] = useState<string[]>([]); // city IDs
   const [userManagedOffice, setUserManagedOffice] = useState<{ id: string; city_id: string } | null>(null);
   const [userTeam, setUserTeam] = useState<{ id: string; office_id: string } | null>(null);
+  const [realtorOffice, setRealtorOffice] = useState<string | null>(null); // office ID for realtors
   const [leaderCityMap, setLeaderCityMap] = useState<Map<string, { cityId: string; cityName: string; officeId: string; officeName: string }>>(new Map());
 
   // Fetch user's managed cities/office/team
@@ -145,6 +147,12 @@ export const TrainingCalendar = ({
           if (team) {
             setUserTeam({ id: team.id, office_id: team.office_id });
           }
+        } else if (isRealtor) {
+          // For realtors, get their office through their team
+          const officeId = await supabaseApi.getRealtorOffice(currentUserId);
+          if (officeId) {
+            setRealtorOffice(officeId);
+          }
         }
       } catch (error) {
         console.error('Error fetching user permissions:', error);
@@ -152,7 +160,7 @@ export const TrainingCalendar = ({
     };
 
     fetchUserPermissions();
-  }, [currentUserRole, isRegionalManager, isOfficeManager, isTeamLeader, currentUserId]);
+  }, [currentUserRole, isRegionalManager, isOfficeManager, isTeamLeader, isRealtor, currentUserId]);
 
   // Fetch city/office for each leader
   useEffect(() => {
@@ -335,12 +343,17 @@ export const TrainingCalendar = ({
       return cityOffice.officeId === teamOffice;
     }
 
+    // Realtor - вижда групите за офиса на техния team
+    if (isRealtor && realtorOffice) {
+      return cityOffice.officeId === realtorOffice;
+    }
+
     // Admin - вижда всичко
     return true;
   };
 
   // Filter groups based on view permissions
-  const visibleGroups = useMemo(() => groups.filter(g => canViewGroup(g)), [groups, availableLeaders, leaderCityMap, userManagedCities, userManagedOffice, userTeam, isKrasi, isKamen, isRegionalManager, isOfficeManager, isTeamLeader]);
+  const visibleGroups = useMemo(() => groups.filter(g => canViewGroup(g)), [groups, availableLeaders, leaderCityMap, userManagedCities, userManagedOffice, userTeam, realtorOffice, isKrasi, isKamen, isRegionalManager, isOfficeManager, isTeamLeader, isRealtor]);
   const activeGroups = useMemo(() => visibleGroups.filter(g => g.status === 'активна'), [visibleGroups]);
   const completedGroups = useMemo(() => visibleGroups.filter(g => g.status === 'завършена'), [visibleGroups]);
   

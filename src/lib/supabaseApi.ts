@@ -396,6 +396,40 @@ class SupabaseApiClient {
     return result.data as { id: string; name: string; office_id: string; leader_id: string } | null;
   }
 
+  // Get office ID for a realtor by their user_id
+  async getRealtorOffice(userId: string): Promise<string | null> {
+    try {
+      // Get realtor by user_id
+      const { data: realtor, error: realtorError } = await supabase
+        .from('realtors')
+        .select('team_id')
+        .eq('user_id', userId)
+        .limit(1)
+        .single();
+
+      if (realtorError || !realtor || !realtor.team_id) {
+        return null;
+      }
+
+      // Get team to get office_id
+      const { data: team, error: teamError } = await supabase
+        .from('teams')
+        .select('office_id')
+        .eq('id', realtor.team_id)
+        .limit(1)
+        .single();
+
+      if (teamError || !team) {
+        return null;
+      }
+
+      return team.office_id;
+    } catch (error) {
+      console.error('Error fetching realtor office:', error);
+      return null;
+    }
+  }
+
   // Get city and office for a team leader by leaderId
   async getLeaderCityAndOffice(leaderId: string) {
     try {
