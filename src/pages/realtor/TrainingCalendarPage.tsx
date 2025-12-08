@@ -179,6 +179,7 @@ const TrainingCalendarPage = () => {
             currentUserId={currentUserId || undefined}
             currentUserName={currentUserName}
             currentUserRole={role || undefined}
+            selectedCityId={null}
           />
         )}
       </main>

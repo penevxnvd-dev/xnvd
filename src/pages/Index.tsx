@@ -154,6 +154,7 @@ const Index = () => {
   };
   const [currentView, setCurrentView] = useState<ViewType>('offices');
   const [selectedOffice, setSelectedOffice] = useState<Office | null>(null);
+  const [selectedCity, setSelectedCity] = useState<{ id: string; name: string } | null>(null);
   const [selectedLeader, setSelectedLeader] = useState<TeamLeader | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [selectedTrainingGroup, setSelectedTrainingGroup] = useState<TrainingGroup | null>(null);
@@ -167,6 +168,8 @@ const Index = () => {
   const handleOfficeClick = (office: Office) => {
     setSelectedOffice(office);
     setCurrentView('leaders');
+    // For non-regional managers, we don't need to set selectedCity
+    // The office itself is enough for filtering
   };
   const handleLeaderClick = (leader: TeamLeader) => {
     setSelectedLeader(leader);
@@ -187,6 +190,7 @@ const Index = () => {
     } else if (currentView === 'leaders') {
       setCurrentView('offices');
       setSelectedOffice(null);
+      setSelectedCity(null);
     } else if (currentView === 'training') {
       setCurrentView('offices');
     }
@@ -195,6 +199,7 @@ const Index = () => {
     setCurrentView('offices');
     setSelectedOffice(null);
     setSelectedLeader(null);
+    setSelectedCity(null);
   };
 
   const handleLogout = async () => {
@@ -252,10 +257,12 @@ const Index = () => {
                   <GraduationCap className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   <span className="hidden sm:inline">Обучения</span>
                 </Button>
-                <Button onClick={() => navigate('/training-calendar')} variant="outline" size="sm" className="text-xs sm:text-sm">
-                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Календар</span>
-                </Button>
+                {(role === 'regional_manager' ? selectedCity : selectedOffice) && (
+                  <Button onClick={() => navigate('/training-calendar')} variant="outline" size="sm" className="text-xs sm:text-sm">
+                    <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Календар</span>
+                  </Button>
+                )}
                 <Button onClick={() => navigate('/interviews')} variant="outline" size="sm" className="text-xs sm:text-sm">
                   <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   <span className="hidden sm:inline">Интервюта</span>

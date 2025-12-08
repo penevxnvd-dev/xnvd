@@ -55,6 +55,7 @@ interface TrainingCalendarProps {
   currentUserName?: string;
   currentUserRole?: UserRole;
   currentUserId?: string; // ID of current user for permission checks
+  selectedCityId?: string | null; // Selected city ID for regional managers
 }
 
 const getTrainingDayLabel = (day: number) => {
@@ -78,6 +79,7 @@ export const TrainingCalendar = ({
   currentUserName,
   currentUserRole,
   currentUserId,
+  selectedCityId,
 }: TrainingCalendarProps) => {
   const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -327,8 +329,16 @@ export const TrainingCalendar = ({
     }
 
     // Regional manager - вижда градовете в техния регион
-    if (isRegionalManager && userManagedCities.length > 0) {
-      return userManagedCities.includes(cityOffice.cityId);
+    // Ако има избран град, показва само групите от този град
+    if (isRegionalManager) {
+      if (selectedCityId) {
+        // Ако има избран град, показва само групите от този град
+        return cityOffice.cityId === selectedCityId;
+      }
+      // Ако няма избран град, показва всички градове в техния регион
+      if (userManagedCities.length > 0) {
+        return userManagedCities.includes(cityOffice.cityId);
+      }
     }
 
     // Office manager - вижда само своя офис
@@ -353,7 +363,7 @@ export const TrainingCalendar = ({
   };
 
   // Filter groups based on view permissions
-  const visibleGroups = useMemo(() => groups.filter(g => canViewGroup(g)), [groups, availableLeaders, leaderCityMap, userManagedCities, userManagedOffice, userTeam, realtorOffice, isKrasi, isKamen, isRegionalManager, isOfficeManager, isTeamLeader, isRealtor]);
+  const visibleGroups = useMemo(() => groups.filter(g => canViewGroup(g)), [groups, availableLeaders, leaderCityMap, userManagedCities, userManagedOffice, userTeam, realtorOffice, selectedCityId, isKrasi, isKamen, isRegionalManager, isOfficeManager, isTeamLeader, isRealtor]);
   const activeGroups = useMemo(() => visibleGroups.filter(g => g.status === 'активна'), [visibleGroups]);
   const completedGroups = useMemo(() => visibleGroups.filter(g => g.status === 'завършена'), [visibleGroups]);
   
