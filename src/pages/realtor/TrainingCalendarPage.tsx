@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { LogOut, ChevronLeft } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
@@ -12,6 +12,7 @@ import { supabaseApi } from '@/lib/supabaseApi';
 
 const TrainingCalendarPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { role } = useUserRole();
   const [trainingGroups, setTrainingGroups] = useState<TrainingGroup[]>([]);
   const [loadingTrainingGroups, setLoadingTrainingGroups] = useState(true);
@@ -19,6 +20,7 @@ const TrainingCalendarPage = () => {
   const [trainingDialogOpen, setTrainingDialogOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserName, setCurrentUserName] = useState<string | undefined>(undefined);
+  const selectedCityId = searchParams.get('cityId');
 
   // Fetch current user ID and name
   useEffect(() => {
@@ -179,7 +181,7 @@ const TrainingCalendarPage = () => {
             currentUserId={currentUserId || undefined}
             currentUserName={currentUserName}
             currentUserRole={role || undefined}
-            selectedCityId={null}
+            selectedCityId={selectedCityId || null}
           />
         )}
       </main>

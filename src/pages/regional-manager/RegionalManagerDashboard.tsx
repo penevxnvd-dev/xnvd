@@ -648,7 +648,7 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
             </div>
             <div className="flex gap-2">
               {selectedCity && (
-                <Button onClick={() => navigate('/training-calendar')} variant="outline" size="sm" className="text-xs sm:text-sm">
+                <Button onClick={() => navigate(`/training-calendar?cityId=${selectedCity.id}`)} variant="outline" size="sm" className="text-xs sm:text-sm">
                   <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   <span className="hidden sm:inline">Календар</span>
                 </Button>
