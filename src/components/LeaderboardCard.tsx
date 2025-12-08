@@ -1,5 +1,5 @@
 import { Card } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+// Avatar removed - using modern design with initials badges instead
 import { Badge } from '@/components/ui/badge';
 import { Agent } from '@/types';
 import { Trophy, Award, Medal } from 'lucide-react';
@@ -44,12 +44,9 @@ export const LeaderboardCard = ({ agents, title, sortBy, limit = 5 }: Leaderboar
               <div className="flex items-center justify-center w-8 h-8">
                 {getRankIcon(index)}
               </div>
-              <Avatar className="h-10 w-10 border border-border">
-                <AvatarImage src={agent.avatar} alt={agent.name} />
-                <AvatarFallback className="text-xs">
-                  {agent.name.split(' ').map(n => n[0]).join('')}
-                </AvatarFallback>
-              </Avatar>
+              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-xs border border-primary/30 flex-shrink-0">
+                {agent.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+              </div>
               <div className="flex-1">
                 <p className="font-medium text-foreground break-words">{formatNameWithEmoji(agent.name)}</p>
                 <p className="text-xs text-muted-foreground break-words">{agent.department}</p>

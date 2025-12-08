@@ -1,37 +1,44 @@
 [
   {
-    "id": "dbde39c2-e12b-493a-9ad2-baaa0242d75f",
-    "full_name": "Краси Кътев",
-    "email": "krasi.katev@xnvd.com",
-    "created_at": "2025-12-06T12:02:45.342566+00:00",
-    "updated_at": "2025-12-06T12:02:45.917787+00:00"
-  },
-  {
-    "id": "ef311940-662a-4f2e-9745-fd8012da9687",
-    "full_name": "Лазар Бундев",
-    "email": "lazar.bundev@xnvd.com",
-    "created_at": "2025-12-06T12:02:46.79934+00:00",
-    "updated_at": "2025-12-06T12:02:46.993283+00:00"
-  },
-  {
     "id": "98eaa586-746a-458c-9243-19eb12154062",
     "full_name": "Георги Пенев",
-    "email": "georgi.penev@xnvd.com",
+    "email": "g.penev@xnvd.bg",
     "created_at": "2025-12-06T12:02:47.823+00:00",
-    "updated_at": "2025-12-06T12:02:48.01589+00:00"
+    "updated_at": "2025-12-07T23:30:00.903284+00:00"
   },
   {
     "id": "8762a1aa-5278-4213-ba06-d7da2a689d2d",
     "full_name": "Камен Георгиев",
-    "email": "kamen.georgiev@xnvd.com",
+    "email": "k.georgiev@xnvd.bg",
     "created_at": "2025-12-06T12:02:48.817557+00:00",
-    "updated_at": "2025-12-06T12:02:49.021688+00:00"
+    "updated_at": "2025-12-07T23:30:14.032282+00:00"
   },
   {
     "id": "00000000-0000-0000-0000-000000000001",
     "full_name": "Администратор",
-    "email": "admin@xnvd.com",
+    "email": "admin@xnvd.bg",
     "created_at": "2025-12-07T22:34:37.511581+00:00",
-    "updated_at": "2025-12-07T22:34:37.511581+00:00"
+    "updated_at": "2025-12-07T23:30:19.293328+00:00"
+  },
+  {
+    "id": "dbde39c2-e12b-493a-9ad2-baaa0242d75f",
+    "full_name": "Краси Кътев",
+    "email": "k.kutev@xnvd.bg",
+    "created_at": "2025-12-06T12:02:45.342566+00:00",
+    "updated_at": "2025-12-07T23:30:32.941115+00:00"
+  },
+  {
+    "id": "ef311940-662a-4f2e-9745-fd8012da9687",
+    "full_name": "Лазар Бундев",
+    "email": "l.bundev@xnvd.com",
+    "created_at": "2025-12-06T12:02:46.79934+00:00",
+    "updated_at": "2025-12-07T23:30:41.99593+00:00"
+  },
+  {
+    "id": "8eb5422b-780c-4610-b557-50df32a395f0",
+    "full_name": "иван иванов",
+    "email": "test@xnvd.bg",
+    "created_at": "2025-12-08T15:27:37.628384+00:00",
+    "updated_at": "2025-12-08T15:27:37.628384+00:00"
   }
 ]

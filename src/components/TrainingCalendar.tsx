@@ -4,22 +4,26 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from '@/components/ui/context-menu';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { Calendar as CalendarIcon, Users, Award, BookOpen, UserPlus, Clock, Edit, Trash2, Plus, ChevronLeft, ChevronRight, PlayCircle, CheckCircle2, Search, Filter, Download, Printer, Copy, Grid3x3, List, Calendar, BarChart3, Bell, X, MoreVertical, LayoutGrid, LayoutList, GripVertical } from 'lucide-react';
 import { TrainingGroup, Agent } from '@/types';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { UserRole } from '@/hooks/useUserRole';
+// Avatar removed - using modern design with initials badges instead
 import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { formatNameWithEmoji } from '@/utils/nameEmojis';
 import { toast } from '@/hooks/use-toast';
 import { supabaseApi } from '@/lib/supabaseApi';
+import { trainingStructure, TrainingSection, calculateTrainingProgress } from '@/data/trainingStructure';
+import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
 import { format, addDays, nextMonday, nextDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, startOfWeek, endOfWeek, addMonths, subMonths, parse, differenceInDays, isPast, isFuture } from 'date-fns';
 import { bg } from 'date-fns/locale';
 import {
@@ -46,13 +50,17 @@ import { CSS } from '@dnd-kit/utilities';
 interface TrainingCalendarProps {
   groups: TrainingGroup[];
   onGroupClick: (group: TrainingGroup) => void;
-  onUpdateGroups?: (groups: TrainingGroup[]) => void;
+  onUpdateGroups?: (groups: TrainingGroup[]) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
+  canEdit?: boolean; // Allow managers/leaders/admin to add trainees
+  currentUserName?: string;
+  currentUserRole?: UserRole;
+  currentUserId?: string; // ID of current user for permission checks
 }
 
 const getTrainingDayLabel = (day: number) => {
   switch (day) {
     case 1:
-      return 'Ден 1: Въвъдително обучение';
+      return 'Ден 1: Встъпително обучение';
     case 2:
       return 'Ден 2: Разговор с купувач';
     case 3:
@@ -62,10 +70,16 @@ const getTrainingDayLabel = (day: number) => {
   }
 };
 
-export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: TrainingCalendarProps) => {
-  const activeGroups = groups.filter(g => g.status === 'активна');
-  const completedGroups = groups.filter(g => g.status === 'завършена');
-  
+export const TrainingCalendar = ({
+  groups,
+  onGroupClick,
+  onUpdateGroups,
+  canEdit = false,
+  currentUserName,
+  currentUserRole,
+  currentUserId,
+}: TrainingCalendarProps) => {
+  const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isDateDialogOpen, setIsDateDialogOpen] = useState(false);
@@ -98,6 +112,237 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
   });
   const [selectedLeader, setSelectedLeader] = useState<string>('');
   const [availableLeaders, setAvailableLeaders] = useState<Array<{ id: string; fullName: string; email: string }>>([]);
+
+  const normalize = (name?: string): string => (name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const isKrasi = normalize(currentUserName).includes('краси') && normalize(currentUserName).includes('кътев');
+  const isKamen = normalize(currentUserName).includes('камен') && normalize(currentUserName).includes('георг');
+  const isTeamLeader = currentUserRole === 'team_leader';
+  const isRegionalManager = currentUserRole === 'regional_manager';
+  const isOfficeManager = currentUserRole === 'office_manager';
+
+  // State for user's managed cities/office/team
+  const [userManagedCities, setUserManagedCities] = useState<string[]>([]); // city IDs
+  const [userManagedOffice, setUserManagedOffice] = useState<{ id: string; city_id: string } | null>(null);
+  const [userTeam, setUserTeam] = useState<{ id: string; office_id: string } | null>(null);
+  const [leaderCityMap, setLeaderCityMap] = useState<Map<string, { cityId: string; cityName: string; officeId: string; officeName: string }>>(new Map());
+
+  // Fetch user's managed cities/office/team
+  useEffect(() => {
+    const fetchUserPermissions = async () => {
+      if (!currentUserId) return;
+      
+      try {
+        if (isRegionalManager) {
+          const cities = await supabaseApi.getUserManagedCities(currentUserId);
+          setUserManagedCities(cities.map(c => c.id));
+        } else if (isOfficeManager) {
+          const office = await supabaseApi.getUserManagedOffice(currentUserId);
+          if (office) {
+            setUserManagedOffice({ id: office.id, city_id: office.city_id });
+          }
+        } else if (isTeamLeader) {
+          const team = await supabaseApi.getUserTeam(currentUserId);
+          if (team) {
+            setUserTeam({ id: team.id, office_id: team.office_id });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user permissions:', error);
+      }
+    };
+
+    fetchUserPermissions();
+  }, [currentUserRole, isRegionalManager, isOfficeManager, isTeamLeader, currentUserId]);
+
+  // Fetch city/office for each leader
+  useEffect(() => {
+    const fetchLeaderCities = async () => {
+      if (!availableLeaders.length) return;
+      
+      const map = new Map<string, { cityId: string; cityName: string; officeId: string; officeName: string }>();
+      
+      for (const leader of availableLeaders) {
+        try {
+          const cityOffice = await supabaseApi.getLeaderCityAndOffice(leader.id);
+          if (cityOffice) {
+            map.set(leader.id, cityOffice);
+          }
+        } catch (error) {
+          console.error(`Error fetching city/office for leader ${leader.fullName}:`, error);
+        }
+      }
+      
+      setLeaderCityMap(map);
+    };
+
+    fetchLeaderCities();
+  }, [availableLeaders]);
+
+  // Determine allowed cities for viewing/creating groups
+  const getAllowedCities = (): string[] | null => {
+    if (isKrasi) {
+      // Краси Кътев - вижда само Бургас
+      return ['Бургас']; // Will match by city name
+    } else if (isKamen) {
+      // Камен Георгиев - вижда Бургас и Пловдив
+      return ['Бургас', 'Пловдив'];
+    } else if (isRegionalManager && userManagedCities.length > 0) {
+      // Regional manager - вижда градовете в техния регион
+      return null; // Will check by city IDs
+    } else if (isOfficeManager && userManagedOffice) {
+      // Office manager - вижда само своя офис
+      return null; // Will check by office ID
+    } else if (isTeamLeader && userTeam) {
+      // Team leader - вижда групите за офиса
+      return null; // Will check by office ID
+    }
+    return null; // Admin or no restrictions
+  };
+
+  const allowedCities = getAllowedCities();
+
+  // Determine if user can create groups for a leader
+  const canCreateForLeader = (leaderId?: string, leaderName?: string): boolean => {
+    if (!derivedCanEdit) return false;
+    
+    // If no leaderId, try to find it by name
+    let actualLeaderId = leaderId;
+    if (!actualLeaderId && leaderName) {
+      const leader = availableLeaders.find(l => normalize(l.fullName) === normalize(leaderName));
+      actualLeaderId = leader?.id;
+    }
+    
+    if (!actualLeaderId) {
+      // For team leaders, check by name match
+      if (isTeamLeader && currentUserName && leaderName) {
+        return normalize(leaderName) === normalize(currentUserName);
+      }
+      return false;
+    }
+
+    const cityOffice = leaderCityMap.get(actualLeaderId);
+    if (!cityOffice) {
+      // If city/office not found, fallback to name-based check for team leaders
+      if (isTeamLeader && currentUserName && leaderName) {
+        return normalize(leaderName) === normalize(currentUserName);
+      }
+      return false;
+    }
+
+    // Краси Кътев - може да записва само в Бургас
+    if (isKrasi) {
+      return cityOffice.cityName === 'Бургас';
+    }
+
+    // Камен Георгиев - може да записва само в Пловдив
+    if (isKamen) {
+      return cityOffice.cityName === 'Пловдив';
+    }
+
+    // Regional manager - може да записва в градовете в техния регион
+    if (isRegionalManager && userManagedCities.length > 0) {
+      return userManagedCities.includes(cityOffice.cityId);
+    }
+
+    // Office manager - може да записва само в своя офис
+    if (isOfficeManager && userManagedOffice) {
+      return cityOffice.officeId === userManagedOffice.id;
+    }
+
+    // Team leader - може да записва само в своя екип
+    if (isTeamLeader && userTeam && currentUserName) {
+      return normalize(leaderName) === normalize(currentUserName);
+    }
+
+    // Admin - може да записва навсякъде
+    if (!currentUserRole || currentUserRole === 'admin') {
+      return true;
+    }
+
+    return false;
+  };
+
+
+  const derivedCanEdit = currentUserRole === 'realtor' ? false : canEdit;
+
+  // Check if user can manage (edit/delete) a group
+  const canManageGroup = useCallback((group: TrainingGroup): boolean => {
+    if (!currentUserRole) return false;
+    
+    // Admin has full access
+    if (currentUserRole === 'admin') return true;
+    
+    // Regional manager and office manager have full access
+    if (currentUserRole === 'regional_manager' || currentUserRole === 'office_manager') return true;
+    
+    // Specific users with management rights: Краси Кътев, Камен Георгиев, Георги Пенев, Лазар Бундев
+    if (currentUserName) {
+      const normalizedName = normalize(currentUserName);
+      const hasManagementRights = 
+        normalizedName.includes('краси') && normalizedName.includes('кътев') ||
+        normalizedName.includes('камен') && normalizedName.includes('георг') ||
+        normalizedName.includes('георги') && normalizedName.includes('пенев') ||
+        normalizedName.includes('лазар') && normalizedName.includes('бундев');
+      
+      if (hasManagementRights) return true;
+    }
+    
+    // Creator can manage their own groups (if currentUserId is available)
+    if (currentUserId && group.createdBy && group.createdBy === currentUserId) return true;
+    
+    return false;
+  }, [currentUserRole, currentUserId, currentUserName]);
+
+  // Determine if user can view a group
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const canViewGroup: (group: TrainingGroup) => boolean = (group: TrainingGroup): boolean => {
+    // If we don't have leader data yet, allow viewing (fallback)
+    if (availableLeaders.length === 0 || leaderCityMap.size === 0) {
+      return true;
+    }
+
+    // Find leader's city/office
+    const leader = availableLeaders.find(l => l.id === group.leaderId || normalize(l.fullName) === normalize(group.leader));
+    if (!leader) return true; // If leader not found, allow viewing (fallback)
+
+    const cityOffice = leaderCityMap.get(leader.id);
+    if (!cityOffice) return true; // If city/office not found, allow viewing (fallback)
+
+    // Краси Кътев - вижда само Бургас
+    if (isKrasi) {
+      return cityOffice.cityName === 'Бургас';
+    }
+
+    // Камен Георгиев - вижда Бургас и Пловдив
+    if (isKamen) {
+      return cityOffice.cityName === 'Бургас' || cityOffice.cityName === 'Пловдив';
+    }
+
+    // Regional manager - вижда градовете в техния регион
+    if (isRegionalManager && userManagedCities.length > 0) {
+      return userManagedCities.includes(cityOffice.cityId);
+    }
+
+    // Office manager - вижда само своя офис
+    if (isOfficeManager && userManagedOffice) {
+      return cityOffice.officeId === userManagedOffice.id;
+    }
+
+    // Team leader - вижда групите за офиса
+    if (isTeamLeader && userTeam) {
+      // Get office for team
+      const teamOffice = userTeam.office_id;
+      return cityOffice.officeId === teamOffice;
+    }
+
+    // Admin - вижда всичко
+    return true;
+  };
+
+  // Filter groups based on view permissions
+  const visibleGroups = useMemo(() => groups.filter(g => canViewGroup(g)), [groups, availableLeaders, leaderCityMap, userManagedCities, userManagedOffice, userTeam, isKrasi, isKamen, isRegionalManager, isOfficeManager, isTeamLeader]);
+  const activeGroups = useMemo(() => visibleGroups.filter(g => g.status === 'активна'), [visibleGroups]);
+  const completedGroups = useMemo(() => visibleGroups.filter(g => g.status === 'завършена'), [visibleGroups]);
   
   // Load team leaders from database
   useEffect(() => {
@@ -106,44 +351,78 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
         console.log('Fetching team leaders from database...');
         const leaders = await supabaseApi.getAllTeamLeaders();
         console.log('Fetched leaders:', leaders);
+
+        // Filter leaders based on permissions
+        let filtered = leaders || [];
         
-        if (leaders && leaders.length > 0) {
-          setAvailableLeaders(leaders);
-          if (!selectedLeader) {
-            setSelectedLeader(leaders[0].fullName);
+        if (isKrasi) {
+          // Краси Кътев - вижда само ръководители от Бургас
+          // Will filter after we have city info
+        } else if (isKamen) {
+          // Камен Георгиев - вижда ръководители от Бургас и Пловдив
+          // Will filter after we have city info
+        } else if (isTeamLeader && currentUserName) {
+          // Team leader - вижда само себе си
+          filtered = leaders.filter((l) => normalize(l.fullName) === normalize(currentUserName));
+        }
+
+        if (filtered && filtered.length > 0) {
+          setAvailableLeaders(filtered);
+          if (!selectedLeader && filtered.length > 0) {
+            setSelectedLeader(filtered[0].fullName);
           }
         } else {
-          console.log('No leaders from DB, trying fallback from groups');
-          // Fallback to leaders from existing groups
-          const leadersFromGroups = [...new Set(groups.map(g => g.leader).filter(Boolean))];
-          console.log('Leaders from groups:', leadersFromGroups);
-          if (leadersFromGroups.length > 0) {
-            setAvailableLeaders(leadersFromGroups.map(name => ({ id: `leader-${name}`, fullName: name, email: '' })));
-            if (!selectedLeader) {
-              setSelectedLeader(leadersFromGroups[0]);
-            }
-          } else {
-            console.log('No leaders found anywhere');
-            setAvailableLeaders([]);
-          }
+          console.log('No leaders matching permissions');
+          setAvailableLeaders([]);
         }
       } catch (error) {
         console.error('Error fetching team leaders:', error);
-        // Fallback to leaders from existing groups
-        const leadersFromGroups = [...new Set(groups.map(g => g.leader).filter(Boolean))];
-        if (leadersFromGroups.length > 0) {
-          setAvailableLeaders(leadersFromGroups.map(name => ({ id: `leader-${name}`, fullName: name, email: '' })));
-          if (!selectedLeader) {
-            setSelectedLeader(leadersFromGroups[0]);
-          }
-        } else {
-          setAvailableLeaders([]);
-        }
+        setAvailableLeaders([]);
       }
     };
     
     fetchLeaders();
-  }, [groups, selectedLeader]);
+  }, [groups, selectedLeader, currentUserRole, currentUserName, isTeamLeader, isKrasi, isKamen]);
+
+  // Filter leaders based on city permissions after we have city info
+  useEffect(() => {
+    if (leaderCityMap.size === 0 || availableLeaders.length === 0) return;
+
+    let filtered = availableLeaders;
+
+    if (isKrasi) {
+      // Краси Кътев - вижда само ръководители от Бургас
+      filtered = availableLeaders.filter(leader => {
+        const cityOffice = leaderCityMap.get(leader.id);
+        return cityOffice && cityOffice.cityName === 'Бургас';
+      });
+    } else if (isKamen) {
+      // Камен Георгиев - вижда ръководители от Бургас и Пловдив
+      filtered = availableLeaders.filter(leader => {
+        const cityOffice = leaderCityMap.get(leader.id);
+        return cityOffice && (cityOffice.cityName === 'Бургас' || cityOffice.cityName === 'Пловдив');
+      });
+    } else if (isRegionalManager && userManagedCities.length > 0) {
+      // Regional manager - вижда ръководители от градовете в техния регион
+      filtered = availableLeaders.filter(leader => {
+        const cityOffice = leaderCityMap.get(leader.id);
+        return cityOffice && userManagedCities.includes(cityOffice.cityId);
+      });
+    } else if (isOfficeManager && userManagedOffice) {
+      // Office manager - вижда ръководители от своя офис
+      filtered = availableLeaders.filter(leader => {
+        const cityOffice = leaderCityMap.get(leader.id);
+        return cityOffice && cityOffice.officeId === userManagedOffice.id;
+      });
+    }
+
+    if (filtered.length !== availableLeaders.length) {
+      setAvailableLeaders(filtered);
+      if (!selectedLeader && filtered.length > 0) {
+        setSelectedLeader(filtered[0].fullName);
+      }
+    }
+  }, [leaderCityMap, userManagedCities, userManagedOffice, isKrasi, isKamen, isRegionalManager, isOfficeManager]);
 
   const [registeredTrainees, setRegisteredTrainees] = useState<Array<{
     id: string;
@@ -180,6 +459,360 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
     position: '',
     email: ''
   });
+  const [selectedTraineeForTraining, setSelectedTraineeForTraining] = useState<Agent | null>(null);
+  const [traineeTrainingData, setTraineeTrainingData] = useState<TrainingSection[]>([]);
+  const [traineeUserId, setTraineeUserId] = useState<string | null>(null);
+  const [traineeRealtorId, setTraineeRealtorId] = useState<string | null>(null);
+  const [isCreateAccountDialogOpen, setIsCreateAccountDialogOpen] = useState(false);
+  const [traineeForAccountCreation, setTraineeForAccountCreation] = useState<Agent | null>(null);
+  const [accountData, setAccountData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
+  // Map to store training progress for each trainee (key: trainee email or id)
+  const [traineeProgressMap, setTraineeProgressMap] = useState<Map<string, number>>(new Map());
+
+  // Load training progress for all trainees in a group
+  const loadTraineesProgress = useCallback(async (trainees: Agent[]) => {
+    const progressMap = new Map<string, number>();
+    
+    for (const trainee of trainees) {
+      if (!trainee.email) continue;
+      
+      try {
+        // Find profile by email
+        const { data: profile } = await supabaseApi.supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', trainee.email)
+          .single();
+
+        if (!profile) continue;
+
+        // Get realtor by user_id
+        const { data: realtor } = await supabaseApi.supabase
+          .from('realtors')
+          .select('id')
+          .eq('user_id', profile.id)
+          .single();
+
+        if (!realtor) continue;
+
+        // Get training progress
+        const progressData = await supabaseApi.getTrainingProgress(profile.id);
+
+        if (progressData && progressData.length > 0) {
+          // Map progress data to training structure
+          const updatedData = trainingStructure.map((section) => ({
+            ...section,
+            subsections: section.subsections.map((subsection) => {
+              const progressItem = progressData.find(
+                (p: { section?: string; subsection?: string }) => 
+                  p.section === section.id && p.subsection === subsection.id
+              );
+              return {
+                ...subsection,
+                progress: progressItem
+                  ? {
+                      lecture: (progressItem as { lecture_completed?: boolean }).lecture_completed || false,
+                      video: (progressItem as { video_completed?: boolean }).video_completed || false,
+                      practical: (progressItem as { practical_completed?: boolean }).practical_completed || false,
+                      handover: (progressItem as { handover_completed?: boolean }).handover_completed || false,
+                      exam: (progressItem as { exam_completed?: boolean }).exam_completed || false,
+                    }
+                  : subsection.progress,
+              };
+            }),
+          }));
+
+          // Calculate progress percentage
+          const progress = calculateTrainingProgress(updatedData);
+          progressMap.set(trainee.email, progress);
+        } else {
+          progressMap.set(trainee.email, 0);
+        }
+      } catch (error) {
+        console.error(`Error loading progress for trainee ${trainee.email}:`, error);
+        progressMap.set(trainee.email, 0);
+      }
+    }
+
+    setTraineeProgressMap(prev => {
+      const newMap = new Map(prev);
+      progressMap.forEach((value, key) => newMap.set(key, value));
+      return newMap;
+    });
+  }, []);
+
+  // Load trainees progress when group details dialog opens
+  useEffect(() => {
+    if (selectedGroupForDetails && isGroupDetailsDialogOpen && selectedGroupForDetails.trainees) {
+      loadTraineesProgress(selectedGroupForDetails.trainees);
+    }
+  }, [selectedGroupForDetails, isGroupDetailsDialogOpen, loadTraineesProgress]);
+
+  // Load progress for all trainees in active groups on initial load
+  useEffect(() => {
+    if (activeGroups.length > 0) {
+      const allTrainees = activeGroups.flatMap(g => g.trainees || []);
+      if (allTrainees.length > 0) {
+        loadTraineesProgress(allTrainees);
+      }
+    }
+  }, [activeGroups.length, loadTraineesProgress]); // Only run when number of active groups changes
+
+  // Load training progress for a trainee
+  const loadTraineeTrainingProgress = useCallback(async (trainee: Agent) => {
+    try {
+      // Find profile by email
+      if (!trainee.email) {
+        toast({
+          title: 'Грешка',
+          description: 'Курсистът няма имейл адрес.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const { data: profile } = await supabaseApi.supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', trainee.email)
+        .single();
+
+      if (!profile) {
+        toast({
+          title: 'Грешка',
+          description: 'Профилът на курсиста не е намерен.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setTraineeUserId(profile.id);
+
+      // Get realtor by user_id
+      const { data: realtor } = await supabaseApi.supabase
+        .from('realtors')
+        .select('id')
+        .eq('user_id', profile.id)
+        .single();
+
+      if (!realtor) {
+        toast({
+          title: 'Грешка',
+          description: 'Курсистът все още няма профил като реализатор.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setTraineeRealtorId(realtor.id);
+
+      // Get training progress
+      const progressData = await supabaseApi.getTrainingProgress(profile.id);
+
+      // Update training structure with progress
+      const updatedData = trainingStructure.map((section) => ({
+        ...section,
+        subsections: section.subsections.map((subsection) => {
+          const progressItem = progressData.find(
+            (p: { section?: string; subsection?: string }) => p.section === section.id && p.subsection === subsection.id
+          );
+          return {
+            ...subsection,
+            progress: progressItem
+              ? {
+                  lecture: (progressItem as { lecture_completed?: boolean }).lecture_completed || false,
+                  video: (progressItem as { video_completed?: boolean }).video_completed || false,
+                  practical: (progressItem as { practical_completed?: boolean }).practical_completed || false,
+                  handover: (progressItem as { handover_completed?: boolean }).handover_completed || false,
+                  exam: (progressItem as { exam_completed?: boolean }).exam_completed || false,
+                }
+              : subsection.progress,
+          };
+        }),
+      }));
+
+      setTraineeTrainingData(updatedData);
+      setSelectedTraineeForTraining(trainee);
+    } catch (error) {
+      console.error('Error loading trainee training progress:', error);
+      toast({
+        title: 'Грешка',
+        description: 'Неуспешно зареждане на данни за обучение.',
+        variant: 'destructive',
+      });
+    }
+  }, []);
+
+  // Handle training progress update
+  const handleTraineeTrainingProgressUpdate = useCallback(async (
+    sectionId: string,
+    subsectionId: string,
+    field: 'lecture' | 'video' | 'practical' | 'handover' | 'exam',
+    checked: boolean
+  ) => {
+    if (!traineeRealtorId) return;
+
+    // Save current state for potential revert
+    const previousData = traineeTrainingData;
+
+    // Update local state
+    setTraineeTrainingData((currentData) => {
+      return currentData.map((section) => {
+        if (section.id === sectionId) {
+          return {
+            ...section,
+            subsections: section.subsections.map((subsection) => {
+              if (subsection.id === subsectionId) {
+                const newProgress = {
+                  ...subsection.progress,
+                  [field]: checked,
+                };
+                
+                // If exam is completed, automatically mark all other steps as completed
+                if (field === 'exam' && checked) {
+                  return {
+                    ...subsection,
+                    progress: {
+                      lecture: true,
+                      video: true,
+                      practical: true,
+                      handover: true,
+                      exam: true,
+                    },
+                  };
+                }
+                
+                return {
+                  ...subsection,
+                  progress: newProgress,
+                };
+              }
+              return subsection;
+            }),
+          };
+        }
+        return section;
+      });
+    });
+
+    // Save to database
+    try {
+      await supabaseApi.updateTrainingProgress({
+        realtorId: traineeRealtorId,
+        section: sectionId,
+        subsection: subsectionId,
+        lectureCompleted: field === 'lecture' ? checked : undefined,
+        videoCompleted: field === 'video' ? checked : undefined,
+        practicalCompleted: field === 'practical' ? checked : undefined,
+        handoverCompleted: field === 'handover' ? checked : undefined,
+        examCompleted: field === 'exam' ? checked : undefined,
+      });
+
+      // Update progress in the map
+      if (selectedTraineeForTraining?.email) {
+        const updatedProgress = calculateTrainingProgress(traineeTrainingData);
+        setTraineeProgressMap(prev => {
+          const newMap = new Map(prev);
+          newMap.set(selectedTraineeForTraining.email!, updatedProgress);
+          return newMap;
+        });
+      }
+
+      toast({
+        title: 'Прогресът е обновен',
+        description: 'Промените са запазени успешно.',
+      });
+    } catch (error) {
+      console.error('Error updating training progress:', error);
+      toast({
+        title: 'Грешка',
+        description: 'Неуспешно запазване на промените.',
+        variant: 'destructive',
+      });
+      // Revert local state on error
+      setTraineeTrainingData(previousData);
+    }
+  }, [traineeRealtorId, selectedTraineeForTraining]);
+
+  const handleAdvanceGroupDay = async (group: TrainingGroup) => {
+    if (!onUpdateGroups) return;
+    const newDay = Math.min((group.currentDay || 0) + 1, 3);
+    const leader = availableLeaders.find(l => l.id === group.leaderId || normalize(l.fullName) === normalize(group.leader));
+    if (!canCreateForLeader(leader?.id, group.leader)) {
+      toast({
+        title: 'Нямате права за този ръководител',
+        description: 'Можете да маркирате само групи на вашия екип/правомощия.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      // Update group in database
+      await supabaseApi.updateTrainingGroup(group.id, {
+        currentDay: newDay,
+        status: newDay >= 3 ? 'завършена' : 'активна',
+      });
+
+      // Update all trainees in the group
+      await Promise.all(
+        group.trainees.map((trainee) =>
+          supabaseApi.updateTrainee(trainee.id, {
+            trainingStage: Math.min(newDay, 5),
+            level: 'Чирак',
+            position: 'Етап обучение',
+          })
+        )
+      );
+
+      const updatedGroups = groups.map((g) =>
+        g.id === group.id
+          ? {
+              ...g,
+              status: newDay >= 3 ? 'завършена' : 'активна',
+              currentDay: newDay,
+              trainees: g.trainees.map((t) => ({
+                ...t,
+                trainingStage: Math.min(newDay, 5),
+                level: t.level || 'Чирак',
+                position: 'Етап обучение',
+              })),
+            }
+          : g
+      );
+      onUpdateGroups(updatedGroups);
+      setSelectedGroupForDetails((prev) =>
+        prev && prev.id === group.id
+          ? {
+              ...prev,
+              status: newDay >= 3 ? 'завършена' : 'активна',
+              currentDay: newDay,
+              trainees: prev.trainees.map((t) => ({
+                ...t,
+                trainingStage: Math.min(newDay, 5),
+                level: t.level || 'Чирак',
+                position: 'Етап обучение',
+              })),
+            }
+          : prev
+      );
+      toast({
+        title: 'Обучението е маркирано',
+        description: `Групата е преминала към ден ${newDay}.`,
+      });
+    } catch (error) {
+      console.error('Error advancing group day:', error);
+      toast({
+        title: 'Грешка',
+        description: 'Неуспешно обновяване на групата.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Изчисляване на следващия понеделник и четвъртък
   const getNextMonday = () => {
@@ -242,66 +875,124 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
     setIsEditDialogOpen(true);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingTrainee) return;
 
-    if (editingTrainee.groupId) {
-      // Редактиране на курсист от активна група
-      const updatedGroups = groups.map(group => {
-        if (group.id === editingTrainee.groupId) {
-          return {
-            ...group,
-            trainees: group.trainees.map(t => 
-              t.id === editingTrainee.id 
-                ? { ...t, name: editingTrainee.name, phone: editingTrainee.phone, position: editingTrainee.position }
-                : t
-            )
-          };
-        }
-        return group;
-      });
-      onUpdateGroups?.(updatedGroups);
-    } else {
-      // Редактиране на курсист от предстоящи групи
-      setRegisteredTrainees(prev => 
-        prev.map(t => 
-          t.id === editingTrainee.id 
-            ? { ...t, name: editingTrainee.name, phone: editingTrainee.phone, position: editingTrainee.position, selectedDate: editingTrainee.selectedDate || t.selectedDate }
-            : t
-        )
-      );
-    }
+    try {
+      if (editingTrainee.groupId) {
+        // Update trainee in database
+        await supabaseApi.updateTrainee(editingTrainee.id, {
+          name: editingTrainee.name,
+          phone: editingTrainee.phone,
+          position: editingTrainee.position,
+        });
 
-    toast({
-      title: "Информацията е актуализирана!",
-      description: `Данните за ${editingTrainee.name} са запазени.`,
-    });
-    setIsEditDialogOpen(false);
-    setEditingTrainee(null);
+        // Update local state
+        const updatedGroups = groups.map(group => {
+          if (group.id === editingTrainee.groupId) {
+            return {
+              ...group,
+              trainees: group.trainees.map(t => 
+                t.id === editingTrainee.id 
+                  ? { ...t, name: editingTrainee.name, phone: editingTrainee.phone, position: editingTrainee.position }
+                  : t
+              )
+            };
+          }
+          return group;
+        });
+        onUpdateGroups?.(updatedGroups);
+      } else {
+        // Редактиране на курсист от предстоящи групи (not in database yet)
+        setRegisteredTrainees(prev => 
+          prev.map(t => 
+            t.id === editingTrainee.id 
+              ? { ...t, name: editingTrainee.name, phone: editingTrainee.phone, position: editingTrainee.position, selectedDate: editingTrainee.selectedDate || t.selectedDate }
+              : t
+          )
+        );
+      }
+
+      toast({
+        title: "Информацията е актуализирана!",
+        description: `Данните за ${editingTrainee.name} са запазени.`,
+      });
+      setIsEditDialogOpen(false);
+      setEditingTrainee(null);
+    } catch (error) {
+      console.error('Error updating trainee:', error);
+      toast({
+        title: 'Грешка',
+        description: 'Неуспешно обновяване на курсиста.',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleDeleteTrainee = (traineeId: string, groupId?: string) => {
-    if (groupId) {
-      // Изтриване от активна група
-      const updatedGroups = groups.map(group => {
-        if (group.id === groupId) {
-          return {
-            ...group,
-            trainees: group.trainees.filter(t => t.id !== traineeId)
-          };
-        }
-        return group;
-      });
-      onUpdateGroups?.(updatedGroups);
-    } else {
-      // Изтриване от предстоящи групи
-      setRegisteredTrainees(prev => prev.filter(t => t.id !== traineeId));
+  const handleDeleteGroup = async (groupId: string) => {
+    if (!window.confirm('Сигурни ли сте, че искате да изтриете тази група? Това действие не може да бъде отменено.')) {
+      return;
     }
 
-    toast({
-      title: "Курсистът е премахнат",
-      description: "Курсистът беше успешно изтрит.",
-    });
+    try {
+      // Delete from database
+      await supabaseApi.deleteTrainingGroup(groupId);
+      
+      // Update local state
+      const updatedGroups = groups.filter(g => g.id !== groupId);
+      onUpdateGroups?.(updatedGroups);
+      
+      toast({
+        title: "Група изтрита!",
+        description: "Групата е успешно изтрита.",
+      });
+      
+      setIsGroupDetailsDialogOpen(false);
+      setSelectedGroupForDetails(null);
+    } catch (error) {
+      console.error('Error deleting group:', error);
+      toast({
+        title: 'Грешка',
+        description: 'Неуспешно изтриване на групата.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteTrainee = async (traineeId: string, groupId?: string) => {
+    try {
+      if (groupId) {
+        // Delete from database
+        await supabaseApi.deleteTrainee(traineeId);
+        
+        // Update local state
+        const updatedGroups = groups.map(group => {
+          if (group.id === groupId) {
+            return {
+              ...group,
+              trainees: group.trainees.filter(t => t.id !== traineeId)
+            };
+          }
+          return group;
+        });
+        onUpdateGroups?.(updatedGroups);
+      } else {
+        // Изтриване от предстоящи групи (not in database yet)
+        setRegisteredTrainees(prev => prev.filter(t => t.id !== traineeId));
+      }
+
+      toast({
+        title: "Курсистът е премахнат",
+        description: "Курсистът беше успешно изтрит.",
+      });
+    } catch (error) {
+      console.error('Error deleting trainee:', error);
+      toast({
+        title: 'Грешка',
+        description: 'Неуспешно изтриване на курсиста.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleAddToGroup = (groupId: string) => {
@@ -309,60 +1000,110 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
     setIsAddDialogOpen(true);
   };
 
-  const handleSaveNewGroupTrainee = () => {
+  const handleSaveNewGroupTrainee = async () => {
     if (!addToGroupId || !newGroupTrainee.name || !newGroupTrainee.phone || !newGroupTrainee.position) return;
 
-    const updatedGroups = groups.map(group => {
-      if (group.id === addToGroupId) {
-        return {
-          ...group,
-          trainees: [...group.trainees, {
-            id: `trainee-${Date.now()}`,
-            name: newGroupTrainee.name,
-            phone: newGroupTrainee.phone,
-            position: newGroupTrainee.position,
-            level: 'Чирак' as const,
-            trainingStage: 1 as const,
-            dateOfHiring: new Date().toISOString().split('T')[0],
-            email: '',
-            department: '',
-            skills: [],
-            deals: [],
-            levelHistory: []
-          }]
-        };
-      }
-      return group;
-    });
-    
-    onUpdateGroups?.(updatedGroups);
-    toast({
-      title: "Курсист добавен!",
-      description: `${newGroupTrainee.name} е добавен/а към групата.`,
-    });
-    setIsAddDialogOpen(false);
-    setNewGroupTrainee({ name: '', phone: '', position: '' });
-    setAddToGroupId(null);
+    try {
+      // Add trainee to database
+      const trainee = await supabaseApi.addTraineeToGroup(addToGroupId, {
+        name: newGroupTrainee.name,
+        phone: newGroupTrainee.phone,
+        email: '',
+        position: newGroupTrainee.position,
+      });
+
+      // Update local state
+      const updatedGroups = groups.map(group => {
+        if (group.id === addToGroupId) {
+          return {
+            ...group,
+            trainees: [...group.trainees, {
+              id: trainee.id,
+              name: trainee.name,
+              phone: trainee.phone || '',
+              position: trainee.position || '',
+              level: (trainee.level || 'Чирак') as const,
+              trainingStage: (trainee.training_stage || 1) as const,
+              dateOfHiring: new Date().toISOString().split('T')[0],
+              email: trainee.email || '',
+              department: '',
+              skills: [],
+              deals: [],
+              levelHistory: []
+            }]
+          };
+        }
+        return group;
+      });
+      
+      onUpdateGroups?.(updatedGroups);
+      toast({
+        title: "Курсист добавен!",
+        description: `${newGroupTrainee.name} е добавен/а към групата.`,
+      });
+      setIsAddDialogOpen(false);
+      setNewGroupTrainee({ name: '', phone: '', position: '' });
+      setAddToGroupId(null);
+    } catch (error) {
+      console.error('Error adding trainee:', error);
+      toast({
+        title: 'Грешка',
+        description: 'Неуспешно добавяне на курсиста.',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleCopyGroup = (group: TrainingGroup) => {
-    const newGroup: TrainingGroup = {
-      ...group,
-      id: `group-${Date.now()}`,
-      startDate: format(addDays(parse(group.startDate, 'yyyy-MM-dd', new Date()), 7), 'yyyy-MM-dd'),
-      status: 'предстояща' as 'активна' | 'завършена' | 'предстояща',
-      currentDay: 0,
-      trainees: group.trainees.map(t => ({
-        ...t,
-        id: `trainee-${Date.now()}-${Math.random()}`
-      }))
-    };
-    
-    onUpdateGroups?.([...groups, newGroup]);
-    toast({
-      title: "Група копирана!",
-      description: `Групата е копирана за ${newGroup.startDate}.`,
-    });
+  const handleCopyGroup = async (group: TrainingGroup) => {
+    try {
+      const newStartDate = format(addDays(parse(group.startDate, 'yyyy-MM-dd', new Date()), 7), 'yyyy-MM-dd');
+      
+      // Create new group in database
+      const newGroupData = await supabaseApi.createTrainingGroup({
+        startDate: newStartDate,
+        leaderId: group.leaderId,
+        currentDay: 0,
+        status: 'предстояща',
+      });
+
+      // Copy all trainees to the new group
+      const newTrainees = await Promise.all(
+        group.trainees.map(trainee =>
+          supabaseApi.addTraineeToGroup(newGroupData.id, {
+            name: trainee.name,
+            phone: trainee.phone,
+            email: trainee.email,
+            position: trainee.position,
+          })
+        )
+      );
+
+      const newGroup: TrainingGroup = {
+        id: newGroupData.id,
+        startDate: newStartDate,
+        leader: group.leader,
+        leaderId: group.leaderId,
+        currentDay: 0,
+        status: 'предстояща',
+        trainees: newTrainees.map((t, idx) => ({
+          ...group.trainees[idx],
+          id: t.id,
+        })),
+      };
+      
+      onUpdateGroups?.([...groups, newGroup]);
+      toast({
+        title: "Група копирана!",
+        description: `Групата е копирана за ${newStartDate}.`,
+      });
+    } catch (error) {
+      console.error('Error copying group:', error);
+      toast({
+        title: 'Грешка',
+        description: 'Неуспешно копиране на групата.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -380,7 +1121,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
     }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
     setDraggedTrainee(null);
@@ -402,30 +1143,42 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
       return;
     }
 
-    // Remove from source group
-    const updatedSourceGroup = {
-      ...sourceGroup,
-      trainees: sourceGroup.trainees.filter(t => t.id !== traineeId)
-    };
+    try {
+      // Update trainee's group_id in database
+      await supabaseApi.updateTrainee(traineeId, {
+        groupId: targetGroupId,
+      });
 
-    // Add to target group
-    const updatedTargetGroup = {
-      ...targetGroup,
-      trainees: [...targetGroup.trainees, draggedTrainee.trainee]
-    };
+      // Update local state
+      const updatedGroups = groups.map(g => {
+        if (g.id === sourceGroup.id) {
+          return {
+            ...g,
+            trainees: g.trainees.filter(t => t.id !== traineeId)
+          };
+        }
+        if (g.id === targetGroup.id) {
+          return {
+            ...g,
+            trainees: [...g.trainees, draggedTrainee.trainee]
+          };
+        }
+        return g;
+      });
 
-    // Update groups
-    const updatedGroups = groups.map(g => {
-      if (g.id === sourceGroup.id) return updatedSourceGroup;
-      if (g.id === targetGroup.id) return updatedTargetGroup;
-      return g;
-    });
-
-    onUpdateGroups?.(updatedGroups);
-    toast({
-      title: "Курсист преместен!",
-      description: `${draggedTrainee.trainee.name} е преместен/а от ${sourceGroup.leader} към ${targetGroup.leader}.`,
-    });
+      onUpdateGroups?.(updatedGroups);
+      toast({
+        title: "Курсист преместен!",
+        description: `${draggedTrainee.trainee.name} е преместен/а от ${sourceGroup.leader} към ${targetGroup.leader}.`,
+      });
+    } catch (error) {
+      console.error('Error moving trainee:', error);
+      toast({
+        title: 'Грешка',
+        description: 'Неуспешно преместване на курсиста.',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Sortable Trainee Item Component
@@ -503,6 +1256,9 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Редактиране на курсист</DialogTitle>
+            <DialogDescription>
+              Редактирайте информацията за курсиста.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -920,9 +1676,9 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                 
                 return (
                   <TooltipProvider key={dayIdx}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <ContextMenu>
+                    <ContextMenu>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
                           <ContextMenuTrigger asChild>
                             <div
                               className={`
@@ -983,6 +1739,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                                     const isCompleted = group.status === 'завършена';
                                     const isUpcoming = !group.status || group.status === 'предстояща' || !('status' in group);
                                     const traineeCount = group.trainees?.length || 0;
+                                    const formattedLeader = formatNameWithEmoji(group.leader || '');
                                     const hasContent = group.leader || traineeCount > 0;
                                     
                                     // Don't render empty badges
@@ -997,7 +1754,9 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           // If completed, show details. Otherwise, allow adding trainee
-                                          if (isCompleted) {
+                                    const leader = availableLeaders.find(l => l.id === group.leaderId || normalize(l.fullName) === normalize(group.leader));
+                                    // Always show details dialog for active groups
+                                    if (isActive || isCompleted || !canCreateForLeader(leader?.id, group.leader)) {
                                             setSelectedGroupForDetails(group);
                                             setIsGroupDetailsDialogOpen(true);
                                           } else {
@@ -1019,12 +1778,27 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                                         {isCompleted && <CheckCircle2 className="h-2.5 w-2.5 flex-shrink-0" />}
                                         {isUpcoming && <Clock className="h-2.5 w-2.5 flex-shrink-0" />}
                                         <span className="truncate flex-1">
-                                          {group.leader || (traineeCount > 0 ? `${traineeCount} курсисти` : '')}
+                                        {formattedLeader || (traineeCount > 0 ? `${traineeCount} курсисти` : '')}
                                         </span>
                                         {traineeCount > 0 && (
                                           <span className="flex-shrink-0 font-bold">
                                             {traineeCount}
                                           </span>
+                                        )}
+                                        {canManageGroup(group) && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-4 w-4 p-0 opacity-0 group-hover/item:opacity-100 hover:opacity-100 hover:bg-destructive/20 hover:text-destructive ml-1 flex-shrink-0"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedGroupForDetails(group);
+                                              setIsGroupDetailsDialogOpen(true);
+                                            }}
+                                            title="Управление на група"
+                                          >
+                                            <MoreVertical className="h-3 w-3" />
+                                          </Button>
                                         )}
                                         {isActive && (
                                           <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-600/50 rounded-b-md">
@@ -1040,45 +1814,75 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                               </div>
                             </div>
                           </ContextMenuTrigger>
-                          <ContextMenuContent>
+                        </TooltipTrigger>
+                        <ContextMenuContent>
+                          <ContextMenuItem onClick={() => {
+                            setSelectedDate(day);
+                            setIsDateDialogOpen(true);
+                          }}>
+                            <CalendarIcon className="h-4 w-4 mr-2" />
+                            Виж детайли
+                          </ContextMenuItem>
+                          {(isMonday || isThursday) && (
                             <ContextMenuItem onClick={() => {
                               setSelectedDate(day);
+                              setShowQuickAdd(format(day, 'yyyy-MM-dd'));
                               setIsDateDialogOpen(true);
                             }}>
-                              <CalendarIcon className="h-4 w-4 mr-2" />
-                              Виж детайли
+                              <UserPlus className="h-4 w-4 mr-2" />
+                              Добави курсист
                             </ContextMenuItem>
-                            {(isMonday || isThursday) && (
-                              <ContextMenuItem onClick={() => {
-                                setSelectedDate(day);
-                                setShowQuickAdd(format(day, 'yyyy-MM-dd'));
-                                setIsDateDialogOpen(true);
-                              }}>
-                                <UserPlus className="h-4 w-4 mr-2" />
-                                Добави курсист
-                              </ContextMenuItem>
-                            )}
-                            <ContextMenuItem onClick={() => {
-                              const csv = [
-                                ['Име', 'Телефон', 'Позиция'].join(','),
-                                ...dayGroups.flatMap(g => g.trainees.map(t => 
-                                  [t.name, t.phone, t.position].join(',')
-                                ))
-                              ].join('\n');
-                              const blob = new Blob([csv], { type: 'text/csv' });
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = `trainees-${format(day, 'yyyy-MM-dd')}.csv`;
-                              a.click();
-                            }}>
-                              <Download className="h-4 w-4 mr-2" />
-                              Експорт курсисти
-                            </ContextMenuItem>
-                          </ContextMenuContent>
-                        </ContextMenu>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-xs">
+                          )}
+                          {dayGroups.length > 0 && dayGroups.some(g => canManageGroup(g)) && (
+                            <>
+                              <ContextMenuSeparator />
+                              {dayGroups.filter(g => canManageGroup(g)).map((group) => (
+                                <div key={group.id}>
+                                  <ContextMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedGroupForDetails(group);
+                                      setIsGroupDetailsDialogOpen(true);
+                                    }}
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Редактирай: {formatNameWithEmoji(group.leader)}
+                                  </ContextMenuItem>
+                                  <ContextMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (window.confirm(`Сигурни ли сте, че искате да изтриете групата на ${group.leader}?`)) {
+                                        handleDeleteGroup(group.id);
+                                      }
+                                    }}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Изтрий: {formatNameWithEmoji(group.leader)}
+                                  </ContextMenuItem>
+                                </div>
+                              ))}
+                            </>
+                          )}
+                          <ContextMenuItem onClick={() => {
+                            const csv = [
+                              ['Име', 'Телефон', 'Позиция'].join(','),
+                              ...dayGroups.flatMap(g => g.trainees.map(t => 
+                                [t.name, t.phone, t.position].join(',')
+                              ))
+                            ].join('\n');
+                            const blob = new Blob([csv], { type: 'text/csv' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `trainees-${format(day, 'yyyy-MM-dd')}.csv`;
+                            a.click();
+                          }}>
+                            <Download className="h-4 w-4 mr-2" />
+                            Експорт курсисти
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                        <TooltipContent side="top" className="max-w-xs">
                         <div className="space-y-2">
                           <p className="font-semibold">{format(day, 'EEEE, d MMMM yyyy', { locale: bg })}</p>
                           {dayGroups.length > 0 ? (
@@ -1087,7 +1891,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                               <p className="text-sm">Курсисти: {totalTrainees}</p>
                               {dayGroups.map((g, i) => (
                                 <div key={i} className="text-xs">
-                                  {g.leader && <p>{g.leader}</p>}
+                                  {g.leader && <p>{formatNameWithEmoji(g.leader)}</p>}
                                   <p className="text-muted-foreground">
                                     {g.status === 'активна' && `Ден ${g.currentDay}/3`}
                                     {g.status === 'завършена' && 'Завършена'}
@@ -1104,6 +1908,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                         </div>
                       </TooltipContent>
                     </Tooltip>
+                    </ContextMenu>
                   </TooltipProvider>
                 );
                 });
@@ -1143,9 +1948,9 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                   <Card key={idx} className="p-3 min-h-[200px]">
                     <div className="font-semibold mb-2">{format(day, 'EEEE d', { locale: bg })}</div>
                     <div className="space-y-2">
-                      {dayGroups.map(g => (
+                          {dayGroups.map(g => (
                         <div key={g.id} className="text-xs p-2 bg-accent rounded">
-                          {g.leader} - {g.trainees.length} курсисти
+                          {formatNameWithEmoji(g.leader)} - {g.trainees.length} курсисти
                         </div>
                       ))}
                     </div>
@@ -1183,7 +1988,7 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                   dayGroups.map(g => (
                     <Card key={g.id} className="p-4">
                       <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-semibold">{g.leader}</h4>
+                        <h4 className="font-semibold">{formatNameWithEmoji(g.leader)}</h4>
                         <Badge>{g.status}</Badge>
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">{g.trainees.length} курсисти</p>
@@ -1221,12 +2026,11 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${group.leader}`} />
-                            <AvatarFallback>{group.leader[0]}</AvatarFallback>
-                          </Avatar>
+                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-sm border-2 border-primary/30">
+                            {group.leader.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                          </div>
                           <div>
-                            <p className="font-semibold">{group.leader}</p>
+                            <p className="font-semibold">{formatNameWithEmoji(group.leader)}</p>
                             <p className="text-sm text-muted-foreground">{format(parse(group.startDate, 'yyyy-MM-dd', new Date()), 'dd.MM.yyyy')}</p>
                           </div>
                         </div>
@@ -1238,6 +2042,22 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                           {group.status === 'активна' && (
                             <span>Ден {group.currentDay}/3</span>
                           )}
+                          {group.trainees.length > 0 && (
+                            <div className="flex items-center gap-2">
+                              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">
+                                Среден прогрес: {(() => {
+                                  const traineesWithEmail = group.trainees.filter(t => t.email);
+                                  if (traineesWithEmail.length === 0) return '0%';
+                                  const totalProgress = traineesWithEmail.reduce((sum, t) => {
+                                    const progress = t.email ? (traineeProgressMap.get(t.email) || 0) : 0;
+                                    return sum + progress;
+                                  }, 0);
+                                  return Math.round(totalProgress / traineesWithEmail.length) + '%';
+                                })()}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -1247,6 +2067,49 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                         <Button size="sm" variant="outline" onClick={() => onGroupClick(group)}>
                           Преглед
                         </Button>
+                        {canManageGroup(group) && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedGroupForDetails(group);
+                                setIsGroupDetailsDialogOpen(true);
+                              }}
+                              title="Редактирай група"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  title="Изтрий група"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Сигурни ли сте?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Това действие не може да бъде отменено. Групата и всички курсисти в нея ще бъдат изтрити.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Отказ</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteGroup(group.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Изтрий
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </>
+                        )}
                       </div>
                     </div>
                   </Card>
@@ -1263,6 +2126,9 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
             <DialogTitle>
               Групи за {selectedDate && format(selectedDate, 'dd.MM.yyyy')}
             </DialogTitle>
+            <DialogDescription>
+              Преглед и управление на групите за обучение за избраната дата.
+            </DialogDescription>
           </DialogHeader>
           {selectedDate && (() => {
             const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -1355,37 +2221,108 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                         };
                         
                         if (existingGroup) {
-                          // Add to existing group
-                          const updatedGroups = groups.map(g => 
-                            g.id === existingGroup.id
-                              ? { ...g, trainees: [...g.trainees, newTraineeData] }
-                              : g
-                          );
-                          onUpdateGroups?.(updatedGroups);
-                          toast({
-                            title: "Курсист добавен!",
-                            description: `${newTrainee.name} е добавен/а към групата на ${existingGroup.leader}.`,
-                          });
+                          // Add to existing group in database
+                          (async () => {
+                            try {
+                              const leader = availableLeaders.find(l => normalize(l.fullName) === normalize(selectedLeader));
+                              if (!leader) {
+                                toast({
+                                  title: 'Грешка',
+                                  description: 'Ръководителят не е намерен.',
+                                  variant: 'destructive',
+                                });
+                                return;
+                              }
+
+                              const trainee = await supabaseApi.addTraineeToGroup(existingGroup.id, {
+                                name: newTrainee.name,
+                                phone: newTrainee.phone,
+                                email: newTrainee.email || '',
+                                position: newTrainee.position,
+                              });
+
+                              const updatedGroups = groups.map(g => 
+                                g.id === existingGroup.id
+                                  ? { ...g, trainees: [...g.trainees, {
+                                    ...newTraineeData,
+                                    id: trainee.id,
+                                  }] }
+                                  : g
+                              );
+                              onUpdateGroups?.(updatedGroups);
+                              setNewTrainee({ name: '', phone: '', position: '', selectedDate: '', email: '' });
+                              setIsDateDialogOpen(false);
+                              toast({
+                                title: "Курсист добавен!",
+                                description: `${newTrainee.name} е добавен/а към групата на ${existingGroup.leader}.`,
+                              });
+                            } catch (error) {
+                              console.error('Error adding trainee:', error);
+                              toast({
+                                title: 'Грешка',
+                                description: 'Неуспешно добавяне на курсиста.',
+                                variant: 'destructive',
+                              });
+                            }
+                          })();
                         } else {
-                          // Create new group
-                          const newGroup: TrainingGroup = {
-                            id: `group-${Date.now()}`,
-                            startDate: dateKey,
-                            leader: selectedLeader,
-                            leaderId: `leader-${selectedLeader}`,
-                            currentDay: 0,
-                            status: 'предстояща' as 'активна' | 'завършена' | 'предстояща',
-                            trainees: [newTraineeData]
-                          };
-                          onUpdateGroups?.([...groups, newGroup]);
-                          toast({
-                            title: "Група създадена!",
-                            description: `Нова група с ръководител ${selectedLeader} е създадена за ${format(selectedDate, 'dd.MM.yyyy', { locale: bg })}.`,
-                          });
+                          // Create new group in database
+                          (async () => {
+                            try {
+                              const leader = availableLeaders.find(l => normalize(l.fullName) === normalize(selectedLeader));
+                              if (!leader) {
+                                toast({
+                                  title: 'Грешка',
+                                  description: 'Ръководителят не е намерен.',
+                                  variant: 'destructive',
+                                });
+                                return;
+                              }
+
+                              const group = await supabaseApi.createTrainingGroup({
+                                startDate: dateKey,
+                                leaderId: leader.id,
+                                currentDay: 1,
+                                status: 'активна',
+                              });
+
+                              // Add trainee to the new group
+                              const trainee = await supabaseApi.addTraineeToGroup(group.id, {
+                                name: newTrainee.name,
+                                phone: newTrainee.phone,
+                                email: newTrainee.email || '',
+                                position: newTrainee.position,
+                              });
+
+                              const newGroup: TrainingGroup = {
+                                id: group.id,
+                                startDate: dateKey,
+                                leader: selectedLeader,
+                                leaderId: leader.id,
+                                currentDay: 1,
+                                status: 'активна',
+                                trainees: [{
+                                  ...newTraineeData,
+                                  id: trainee.id,
+                                }]
+                              };
+                              onUpdateGroups?.([...groups, newGroup]);
+                              setNewTrainee({ name: '', phone: '', position: '', selectedDate: '', email: '' });
+                              setIsDateDialogOpen(false);
+                              toast({
+                                title: "Група създадена!",
+                                description: `Нова група с ръководител ${selectedLeader} е създадена за ${format(selectedDate, 'dd.MM.yyyy', { locale: bg })}.`,
+                              });
+                            } catch (error) {
+                              console.error('Error creating group:', error);
+                              toast({
+                                title: 'Грешка',
+                                description: 'Неуспешно създаване на групата.',
+                                variant: 'destructive',
+                              });
+                            }
+                          })();
                         }
-                        
-                        setNewTrainee({ name: '', phone: '', position: '', selectedDate: '', email: '' });
-                        setIsDateDialogOpen(false);
                       } else {
                         toast({
                           title: "Моля попълнете всички полета",
@@ -1446,12 +2383,14 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                               <SelectValue placeholder="Избери ръководител..." />
                             </SelectTrigger>
                             <SelectContent>
-                              {availableLeaders.map((leader) => (
-                                <SelectItem key={leader.id} value={leader.fullName}>
-                                  {formatNameWithEmoji(leader.fullName)}
-                                  {leader.email && ` (${leader.email})`}
-                                </SelectItem>
-                              ))}
+                          {availableLeaders
+                            .filter((leader) => canCreateForLeader(leader.id, leader.fullName))
+                            .map((leader) => (
+                              <SelectItem key={leader.id} value={leader.fullName}>
+                                {formatNameWithEmoji(leader.fullName)}
+                                {leader.email && ` (${leader.email})`}
+                              </SelectItem>
+                            ))}
                             </SelectContent>
                           </Select>
                         ) : (
@@ -1581,6 +2520,51 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                               <Button
                                 size="sm"
                                 variant="outline"
+                                onClick={() => {
+                                  setSelectedGroupForDetails(group);
+                                  setIsGroupDetailsDialogOpen(true);
+                                  setIsDateDialogOpen(false);
+                                }}
+                                title="Редактирай група"
+                                disabled={!canManageGroup(group)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    title="Изтрий група"
+                                    disabled={!canManageGroup(group)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Сигурни ли сте?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Това действие не може да бъде отменено. Групата и всички курсисти в нея ще бъдат изтрити.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Отказ</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => {
+                                        handleDeleteGroup(group.id);
+                                        setIsDateDialogOpen(false);
+                                      }}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      Изтрий
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                              <Button
+                                size="sm"
+                                variant="outline"
                                 onClick={() => handleAddToGroup(group.id)}
                               >
                                 <Plus className="h-4 w-4 mr-1" />
@@ -1592,12 +2576,11 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                               <Badge variant="outline">{getTrainingDayLabel(group.currentDay)}</Badge>
                             </div>
                             <div className="flex items-center gap-3">
-                              <Avatar className="h-10 w-10">
-                                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${group.leader}`} />
-                                <AvatarFallback>{group.leader[0]}</AvatarFallback>
-                              </Avatar>
+                              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-sm border-2 border-primary/30">
+                                {group.leader.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                              </div>
                               <div>
-                                <p className="font-medium text-foreground">{group.leader}</p>
+                                <p className="font-medium text-foreground">{formatNameWithEmoji(group.leader)}</p>
                                 <p className="text-sm text-muted-foreground">Инструктор</p>
                               </div>
                             </div>
@@ -1656,12 +2639,11 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                               </Badge>
                             </div>
                             <div className="flex items-center gap-3">
-                              <Avatar className="h-10 w-10">
-                                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${group.leader}`} />
-                                <AvatarFallback>{group.leader[0]}</AvatarFallback>
-                              </Avatar>
+                              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-sm border-2 border-primary/30">
+                                {group.leader.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                              </div>
                               <div>
-                                <p className="font-medium text-foreground">{group.leader}</p>
+                                <p className="font-medium text-foreground">{formatNameWithEmoji(group.leader)}</p>
                                 <p className="text-sm text-muted-foreground">Инструктор</p>
                               </div>
                             </div>
@@ -1703,6 +2685,9 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
               <UserPlus className="h-4 w-4" />
               Добави курсист в група
             </DialogTitle>
+            <DialogDescription>
+              Добавете нов курсист към групата за обучение.
+            </DialogDescription>
           </DialogHeader>
           {selectedGroupForAddTrainee && (
             <div className="space-y-4 mt-4">
@@ -1718,8 +2703,16 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                 </p>
               </div>
               
-              <form onSubmit={(e) => {
+              <form onSubmit={async (e) => {
                 e.preventDefault();
+                if (!canEdit) {
+                  toast({
+                    title: "Нямате права",
+                    description: "Само мениджъри/лидери могат да добавят курсисти.",
+                    variant: "destructive"
+                  });
+                  return;
+                }
                 if (newTraineeForGroup.name && newTraineeForGroup.phone && newTraineeForGroup.position) {
                   const newTraineeData = {
                     id: `trainee-${Date.now()}`,
@@ -1736,17 +2729,36 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                     levelHistory: []
                   };
                   
-                  const updatedGroups = groups.map(g => 
-                    g.id === selectedGroupForAddTrainee.id
-                      ? { ...g, trainees: [...g.trainees, newTraineeData] }
-                      : g
-                  );
-                  
-                  onUpdateGroups?.(updatedGroups);
-                  toast({
-                    title: "Курсист добавен!",
-                    description: `${newTraineeForGroup.name} е добавен/а към групата на ${selectedGroupForAddTrainee.leader}.`,
-                  });
+                  try {
+                    const trainee = await supabaseApi.addTraineeToGroup(selectedGroupForAddTrainee.id, {
+                      name: newTraineeForGroup.name,
+                      phone: newTraineeForGroup.phone,
+                      email: newTraineeForGroup.email || '',
+                      position: newTraineeForGroup.position,
+                    });
+
+                    const updatedGroups = groups.map(g => 
+                      g.id === selectedGroupForAddTrainee.id
+                        ? { ...g, trainees: [...g.trainees, {
+                          ...newTraineeData,
+                          id: trainee.id,
+                        }] }
+                        : g
+                    );
+                    
+                    onUpdateGroups?.(updatedGroups);
+                    toast({
+                      title: "Курсист добавен!",
+                      description: `${newTraineeForGroup.name} е добавен/а към групата на ${selectedGroupForAddTrainee.leader}.`,
+                    });
+                  } catch (error) {
+                    console.error('Error adding trainee:', error);
+                    toast({
+                      title: 'Грешка',
+                      description: 'Неуспешно добавяне на курсиста.',
+                      variant: 'destructive',
+                    });
+                  }
                   
                   setNewTraineeForGroup({ name: '', phone: '', position: '', email: '' });
                   setIsAddTraineeToGroupDialogOpen(false);
@@ -1855,6 +2867,9 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                   </>
                 )}
               </DialogTitle>
+              <DialogDescription>
+                {selectedGroupForDetails && `Детайли за групата на ${selectedGroupForDetails.leader}. Дата на започване: ${format(parse(selectedGroupForDetails.startDate, 'yyyy-MM-dd', new Date()), 'dd.MM.yyyy', { locale: bg })}`}
+              </DialogDescription>
             </DialogHeader>
             {selectedGroupForDetails && (
               <div className="space-y-4 mt-4">
@@ -1882,6 +2897,39 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                     <Label className="text-sm text-muted-foreground">Брой курсисти</Label>
                     <p className="font-semibold">{selectedGroupForDetails.trainees?.length || 0}</p>
                   </div>
+                  {selectedGroupForDetails.trainees && selectedGroupForDetails.trainees.length > 0 && (
+                    <div className="col-span-2">
+                      <Label className="text-sm text-muted-foreground">Среден прогрес на обучение</Label>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            {(() => {
+                              const traineesWithEmail = selectedGroupForDetails.trainees.filter(t => t.email);
+                              if (traineesWithEmail.length === 0) return 'Няма курсисти с имейл';
+                              const totalProgress = traineesWithEmail.reduce((sum, t) => {
+                                const progress = t.email ? (traineeProgressMap.get(t.email) || 0) : 0;
+                                return sum + progress;
+                              }, 0);
+                              const avgProgress = Math.round(totalProgress / traineesWithEmail.length);
+                              return `${avgProgress}% (${traineesWithEmail.length} курсисти)`;
+                            })()}
+                          </span>
+                        </div>
+                        <Progress 
+                          value={(() => {
+                            const traineesWithEmail = selectedGroupForDetails.trainees.filter(t => t.email);
+                            if (traineesWithEmail.length === 0) return 0;
+                            const totalProgress = traineesWithEmail.reduce((sum, t) => {
+                              const progress = t.email ? (traineeProgressMap.get(t.email) || 0) : 0;
+                              return sum + progress;
+                            }, 0);
+                            return Math.round(totalProgress / traineesWithEmail.length);
+                          })()} 
+                          className="h-2"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t pt-4">
@@ -1891,15 +2939,14 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                       {selectedGroupForDetails.trainees.map((trainee, idx) => (
                         <Card key={trainee.id || idx} className="p-3">
                           <div className="flex items-start gap-3">
-                            <Avatar className="h-10 w-10">
-                              <AvatarImage src={trainee.avatar} alt={trainee.name} />
-                              <AvatarFallback className="bg-primary/10 text-primary">
-                                {trainee.name
-                                  .split(' ')
-                                  .map((n) => n[0])
-                                  .join('')}
-                              </AvatarFallback>
-                            </Avatar>
+                            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-sm border-2 border-primary/30 flex-shrink-0">
+                              {trainee.name
+                                .split(' ')
+                                .map((n) => n[0])
+                                .join('')
+                                .slice(0, 2)
+                                .toUpperCase()}
+                            </div>
                             <div className="flex-1">
                               <p className="font-semibold">{formatNameWithEmoji(trainee.name)}</p>
                               <p className="text-sm text-muted-foreground">{trainee.position}</p>
@@ -1913,8 +2960,69 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                                   ✉️ {trainee.email}
                                 </p>
                               )}
+                              {trainee.introCompleted && (
+                                <Badge variant="default" className="mt-2 bg-green-500">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  Встъпително обучение завършено
+                                </Badge>
+                              )}
+                              {trainee.email && traineeProgressMap.has(trainee.email) && (
+                                <div className="mt-2 space-y-1">
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-muted-foreground">Прогрес на обучение:</span>
+                                    <span className="font-semibold">{traineeProgressMap.get(trainee.email) || 0}%</span>
+                                  </div>
+                                  <Progress 
+                                    value={traineeProgressMap.get(trainee.email) || 0} 
+                                    className="h-2"
+                                  />
+                                </div>
+                              )}
                             </div>
-                            <Badge variant="outline">{trainee.level || 'Курсист'}</Badge>
+                            <div className="flex flex-col gap-2 items-end">
+                              <Badge variant="outline">{trainee.level || 'Курсист'}</Badge>
+                              {trainee.introCompleted && canEdit && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs"
+                                  onClick={() => loadTraineeTrainingProgress(trainee)}
+                                >
+                                  <BookOpen className="h-3 w-3 mr-1" />
+                                  Етапи на обучение
+                                </Button>
+                              )}
+                              {selectedGroupForDetails.status === 'активна' && (
+                                <>
+                                  {!trainee.introCompleted ? (
+                                    canEdit ? (
+                                      <Button
+                                        size="sm"
+                                        variant="default"
+                                        className="text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                                        onClick={() => {
+                                          setTraineeForAccountCreation(trainee);
+                                          setAccountData({
+                                            email: trainee.email || '',
+                                            password: '',
+                                            confirmPassword: ''
+                                          });
+                                          setIsCreateAccountDialogOpen(true);
+                                        }}
+                                      >
+                                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                                        Маркирай встъпително обучение
+                                      </Button>
+                                    ) : (
+                                      <Badge variant="outline" className="text-xs text-orange-600 border-orange-600">
+                                        <Clock className="h-3 w-3 mr-1" />
+                                        Очаква маркиране
+                                      </Badge>
+                                    )
+                                  ) : null}
+                                </>
+                              )}
+                            </div>
                           </div>
                         </Card>
                       ))}
@@ -1927,6 +3035,74 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                   )}
                 </div>
 
+                {/* Training Stages Section */}
+                {selectedTraineeForTraining && traineeTrainingData.length > 0 && (
+                  <div className="border-t pt-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <Label className="text-base font-semibold block">
+                          Етапи на обучение: {formatNameWithEmoji(selectedTraineeForTraining.name)}
+                        </Label>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Маркирайте подточките на обучение за курсиста
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setSelectedTraineeForTraining(null);
+                          setTraineeTrainingData([]);
+                          setTraineeUserId(null);
+                          setTraineeRealtorId(null);
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    {/* Calculate overall progress */}
+                    {(() => {
+                      const totalSubsections = traineeTrainingData.reduce((sum, section) => sum + section.subsections.length, 0);
+                      const completedSubsections = traineeTrainingData.reduce((sum, section) => 
+                        sum + section.subsections.filter(sub => 
+                          sub.progress.lecture && 
+                          sub.progress.video && 
+                          sub.progress.practical && 
+                          sub.progress.handover && 
+                          sub.progress.exam
+                        ).length, 0
+                      );
+                      const overallProgress = totalSubsections > 0 ? (completedSubsections / totalSubsections) * 100 : 0;
+                      
+                      return (
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <Label className="text-sm font-semibold">Общ прогрес на обучението</Label>
+                            <span className="text-sm font-bold">{Math.round(overallProgress)}%</span>
+                          </div>
+                          <Progress value={overallProgress} className="h-2" />
+                          <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                            <span>Завършени {completedSubsections} от {totalSubsections} подточки</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Training Sections */}
+                    <div className="space-y-4 max-h-[400px] overflow-y-auto">
+                      {traineeTrainingData.map((section) => (
+                        <TrainingSectionCard
+                          key={section.id}
+                          section={section}
+                          onProgressUpdate={handleTraineeTrainingProgressUpdate}
+                          editable={canEdit}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {selectedGroupForDetails.status === 'активна' && (
                   <div className="border-t pt-4">
                     <Label className="text-sm text-muted-foreground mb-2 block">Прогрес на обучението</Label>
@@ -1935,9 +3111,403 @@ export const TrainingCalendar = ({ groups, onGroupClick, onUpdateGroups }: Train
                       <span>Ден {selectedGroupForDetails.currentDay} от 3</span>
                       <span>{Math.round((selectedGroupForDetails.currentDay / 3) * 100)}%</span>
                     </div>
+                    {canEdit && (
+                      <div className="mt-3 space-y-2">
+                        {/* Check if all trainees have completed intro */}
+                        {selectedGroupForDetails.currentDay === 1 && 
+                         selectedGroupForDetails.trainees.some(t => !t.introCompleted) && (
+                          <Button
+                            className="w-full"
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              try {
+                                await supabaseApi.markIntroCompleted(selectedGroupForDetails.id);
+                                const updatedGroups = groups.map(g =>
+                                  g.id === selectedGroupForDetails.id
+                                    ? {
+                                        ...g,
+                                        trainees: g.trainees.map(t => ({
+                                          ...t,
+                                          introCompleted: true,
+                                        })),
+                                      }
+                                    : g
+                                );
+                                onUpdateGroups?.(updatedGroups);
+                                setSelectedGroupForDetails((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        trainees: prev.trainees.map(t => ({
+                                          ...t,
+                                          introCompleted: true,
+                                        })),
+                                      }
+                                    : null
+                                );
+                                toast({
+                                  title: 'Встъпително обучение маркирано',
+                                  description: 'Всички курсисти са маркирани като завършили встъпително обучение.',
+                                });
+                              } catch (error) {
+                                console.error('Error marking intro as completed:', error);
+                                toast({
+                                  title: 'Грешка',
+                                  description: 'Неуспешно маркиране на встъпително обучение.',
+                                  variant: 'destructive',
+                                });
+                              }
+                            }}
+                          >
+                            Маркирай "Встъпително обучение" като завършено
+                          </Button>
+                        )}
+                        {selectedGroupForDetails.currentDay < 3 && (
+                          <Button
+                            className="w-full"
+                            size="sm"
+                            onClick={() => handleAdvanceGroupDay(selectedGroupForDetails)}
+                            disabled={
+                              selectedGroupForDetails.currentDay === 1 &&
+                              selectedGroupForDetails.trainees.some(t => !t.introCompleted)
+                            }
+                          >
+                            Маркирай ден като завършен
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
+            )}
+            {selectedGroupForDetails && canManageGroup(selectedGroupForDetails) && (
+              <div className="border-t pt-4 mt-4 flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    // TODO: Add edit group functionality
+                    toast({
+                      title: "Редактиране на група",
+                      description: "Функционалността за редактиране ще бъде добавена скоро.",
+                    });
+                  }}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Редактирай група
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="flex-1">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Изтрий група
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Сигурни ли сте?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Това действие не може да бъде отменено. Групата и всички курсисти в нея ще бъдат изтрити.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Отказ</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleDeleteGroup(selectedGroupForDetails.id)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Изтрий
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Account Dialog */}
+        <Dialog open={isCreateAccountDialogOpen} onOpenChange={setIsCreateAccountDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <UserPlus className="h-4 w-4" />
+                Създаване на акаунт
+              </DialogTitle>
+              <DialogDescription>
+                Въведете данни за създаване на акаунт за {traineeForAccountCreation?.name}. Ролята ще бъде "Чирак".
+              </DialogDescription>
+            </DialogHeader>
+            {traineeForAccountCreation && (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                
+                if (!accountData.email || !accountData.password) {
+                  toast({
+                    title: 'Грешка',
+                    description: 'Моля попълнете всички задължителни полета.',
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+
+                if (accountData.password.length < 6) {
+                  toast({
+                    title: 'Грешка',
+                    description: 'Паролата трябва да е поне 6 символа.',
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+
+                if (accountData.password !== accountData.confirmPassword) {
+                  toast({
+                    title: 'Грешка',
+                    description: 'Паролите не съвпадат.',
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+
+                try {
+                  // Mark intro as completed
+                  await supabaseApi.markTraineeIntroCompleted(traineeForAccountCreation.id);
+                  
+                  // Get team ID from group leader
+                  const leader = availableLeaders.find(l => 
+                    l.id === selectedGroupForDetails?.leaderId || 
+                    (selectedGroupForDetails && normalize(l.fullName) === normalize(selectedGroupForDetails.leader))
+                  );
+                  
+                  // Find team for this leader
+                  let teamId: string | undefined;
+                  if (leader) {
+                    const team = await supabaseApi.getUserTeam(leader.id);
+                    teamId = team?.id;
+                  }
+
+                  // Create account with provided email and password
+                  const { data: authData, error: authError } = await supabaseApi.supabase.auth.signUp({
+                    email: accountData.email.trim(),
+                    password: accountData.password,
+                    options: {
+                      data: {
+                        full_name: traineeForAccountCreation.name,
+                      },
+                    },
+                  });
+
+                  if (authError) {
+                    if (authError.message.includes('User already registered')) {
+                      throw new Error('Потребител с този имейл вече съществува.');
+                    }
+                    throw authError;
+                  }
+
+                  if (!authData.user) {
+                    throw new Error('Неуспешно създаване на акаунт.');
+                  }
+
+                  const profileId = authData.user.id;
+
+                  // Profile is automatically created by trigger, but we may need to update it
+                  // Wait a bit for trigger to complete
+                  await new Promise(resolve => setTimeout(resolve, 500));
+
+                  // Update profile if needed (trigger should have created it)
+                  const { error: profileUpdateError } = await supabaseApi.supabase
+                    .from('profiles')
+                    .update({
+                      full_name: traineeForAccountCreation.name,
+                      email: accountData.email.trim(),
+                    })
+                    .eq('id', profileId);
+
+                  // If update fails, try insert (in case trigger didn't work)
+                  if (profileUpdateError) {
+                    const { error: profileInsertError } = await supabaseApi.supabase
+                      .from('profiles')
+                      .insert({
+                        id: profileId,
+                        full_name: traineeForAccountCreation.name,
+                        email: accountData.email.trim(),
+                      });
+                    
+                    if (profileInsertError && !profileInsertError.message.includes('duplicate')) {
+                      throw profileInsertError;
+                    }
+                  }
+
+                  // Assign realtor role (Чирак = level 1)
+                  // Check if role already exists
+                  const { data: existingRole } = await supabaseApi.supabase
+                    .from('user_roles')
+                    .select('id')
+                    .eq('user_id', profileId)
+                    .eq('role', 'realtor')
+                    .single();
+
+                  if (!existingRole) {
+                    const { error: roleError } = await supabaseApi.supabase
+                      .from('user_roles')
+                      .insert({
+                        user_id: profileId,
+                        role: 'realtor',
+                      });
+
+                    if (roleError) throw roleError;
+                  }
+
+                  // Create realtor record
+                  // Check if realtor already exists
+                  const { data: existingRealtor } = await supabaseApi.supabase
+                    .from('realtors')
+                    .select('id')
+                    .eq('user_id', profileId)
+                    .single();
+
+                  let newRealtor;
+                  if (existingRealtor) {
+                    // Update existing realtor
+                    const { data: updatedRealtor, error: updateError } = await supabaseApi.supabase
+                      .from('realtors')
+                      .update({
+                        team_id: teamId || null,
+                        level: 1, // Чирак
+                      })
+                      .eq('id', existingRealtor.id)
+                      .select()
+                      .single();
+
+                    if (updateError) throw updateError;
+                    newRealtor = updatedRealtor;
+                  } else {
+                    // Create new realtor
+                    const { data: createdRealtor, error: realtorError } = await supabaseApi.supabase
+                      .from('realtors')
+                      .insert({
+                        user_id: profileId,
+                        team_id: teamId || null,
+                        level: 1, // Чирак
+                      })
+                      .select()
+                      .single();
+
+                    if (realtorError) throw realtorError;
+                    newRealtor = createdRealtor;
+                  }
+
+                  // Update trainee email in training_group_trainees
+                  await supabaseApi.supabase
+                    .from('training_group_trainees')
+                    .update({ email: accountData.email.trim() })
+                    .eq('id', traineeForAccountCreation.id);
+
+                  // Update local state
+                  const updatedGroups = groups.map(g =>
+                    g.id === selectedGroupForDetails?.id
+                      ? {
+                          ...g,
+                          trainees: g.trainees.map(t =>
+                            t.id === traineeForAccountCreation.id
+                              ? { ...t, introCompleted: true, email: accountData.email.trim() }
+                              : t
+                          ),
+                        }
+                      : g
+                  );
+                  onUpdateGroups?.(updatedGroups);
+                  
+                  setSelectedGroupForDetails((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          trainees: prev.trainees.map(t =>
+                            t.id === traineeForAccountCreation.id
+                              ? { ...t, introCompleted: true, email: accountData.email.trim() }
+                              : t
+                          ),
+                        }
+                      : null
+                  );
+
+                  toast({
+                    title: 'Акаунт създаден успешно',
+                    description: `${traineeForAccountCreation.name} е маркиран като завършил встъпително обучение и акаунтът е създаден.`,
+                  });
+
+                  // Close dialog and reset
+                  setIsCreateAccountDialogOpen(false);
+                  setTraineeForAccountCreation(null);
+                  setAccountData({ email: '', password: '', confirmPassword: '' });
+
+                  // Navigate to trainee's training page
+                  navigate(`/training-progress?userId=${profileId}`);
+                } catch (error) {
+                  console.error('Error creating account:', error);
+                  toast({
+                    title: 'Грешка',
+                    description: error instanceof Error ? error.message : 'Неуспешно създаване на акаунт.',
+                    variant: 'destructive',
+                  });
+                }
+              }} className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="account-email">Имейл *</Label>
+                  <Input
+                    id="account-email"
+                    type="email"
+                    value={accountData.email}
+                    onChange={(e) => setAccountData({ ...accountData, email: e.target.value })}
+                    placeholder="ivan@example.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="account-password">Парола *</Label>
+                  <Input
+                    id="account-password"
+                    type="password"
+                    value={accountData.password}
+                    onChange={(e) => setAccountData({ ...accountData, password: e.target.value })}
+                    placeholder="Минимум 6 символа"
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="account-confirm-password">Потвърди парола *</Label>
+                  <Input
+                    id="account-confirm-password"
+                    type="password"
+                    value={accountData.confirmPassword}
+                    onChange={(e) => setAccountData({ ...accountData, confirmPassword: e.target.value })}
+                    placeholder="Потвърди паролата"
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => {
+                      setIsCreateAccountDialogOpen(false);
+                      setTraineeForAccountCreation(null);
+                      setAccountData({ email: '', password: '', confirmPassword: '' });
+                    }}
+                  >
+                    Отказ
+                  </Button>
+                  <Button type="submit" className="flex-1">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Създай акаунт
+                  </Button>
+                </div>
+              </form>
             )}
           </DialogContent>
         </Dialog>

@@ -286,16 +286,46 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     setLoading(true);
     try {
       const data = await api.getTeamsByOffice(officeId);
-      const mapped = data.map((team: { id: string; name: string; officeId: string; leaderId?: string | null; leader?: { full_name?: string } }) => ({
-        id: team.id,
-        name: team.name,
-        office_id: team.officeId,
-        leader_id: team.leaderId,
-        leaderName: team.leader?.full_name ? formatNameWithoutElevenEleven(team.leader.full_name).displayName : undefined
-      }));
-      setTeams(mapped);
+      console.log(`[fetchTeams] Fetched ${data.length} teams for office ${officeId}`);
+      
+      // Мапване на данните - Supabase връща office_id, не officeId
+      const mapped = data.map((team: { 
+        id: string; 
+        name: string; 
+        office_id?: string; 
+        leader_id?: string | null; 
+        leader?: { full_name?: string } 
+      }) => {
+        // Проверка за правилен office_id
+        if (team.office_id && team.office_id !== officeId) {
+          console.warn(`[fetchTeams] Team ${team.id} (${team.name}) has wrong office_id: ${team.office_id} (expected ${officeId})`);
+        }
+        
+        return {
+          id: team.id,
+          name: team.name,
+          office_id: team.office_id || officeId,
+          leader_id: team.leader_id || null,
+          leaderName: team.leader?.full_name ? formatNameWithoutElevenEleven(team.leader.full_name).displayName : undefined
+        };
+      });
+      
+      // Стриктна дедупликация по ID (допълнителна защита)
+      const seenIds = new Set<string>();
+      const uniqueTeams = mapped.filter(team => {
+        if (seenIds.has(team.id)) {
+          console.warn(`[fetchTeams] Duplicate team ID in UI: ${team.id} (${team.name})`);
+          return false;
+        }
+        seenIds.add(team.id);
+        return true;
+      });
+      
+      console.log(`[fetchTeams] Setting ${uniqueTeams.length} unique teams for office ${officeId}`);
+      setTeams(uniqueTeams);
     } catch (error) {
       console.error('Error fetching teams:', error);
+      setTeams([]); // При грешка, изчистваме списъка
     } finally {
       setLoading(false);
     }
@@ -528,6 +558,86 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     setSelectedTeam(null);
     setShowKPI(false);
     fetchCountries();
+  };
+
+  const handleTrainingProgressUpdate = async (
+    sectionId: string,
+    subsectionId: string,
+    field: 'lecture' | 'video' | 'practical' | 'handover' | 'exam',
+    checked: boolean
+  ) => {
+    if (!selectedRealtor) return;
+
+    // Update local state
+    const updatedData = selectedRealtorTrainingData.map((section) => {
+      if (section.id === sectionId) {
+        return {
+          ...section,
+          subsections: section.subsections.map((subsection) => {
+            if (subsection.id === subsectionId) {
+              const newProgress = {
+                ...subsection.progress,
+                [field]: checked,
+              };
+              
+              // If exam is passed, automatically mark all other steps as completed
+              if (field === 'exam' && checked) {
+                return {
+                  ...subsection,
+                  progress: {
+                    lecture: true,
+                    video: true,
+                    practical: true,
+                    handover: true,
+                    exam: true,
+                  },
+                };
+              }
+              
+              return {
+                ...subsection,
+                progress: newProgress,
+              };
+            }
+            return subsection;
+          }),
+        };
+      }
+      return section;
+    });
+
+    setSelectedRealtorTrainingData(updatedData);
+    setSelectedRealtorTrainingProgress(calculateTrainingProgress(updatedData));
+
+    // Save to database
+    try {
+      const subsection = updatedData
+        .find((s) => s.id === sectionId)
+        ?.subsections.find((ss) => ss.id === subsectionId);
+
+      if (subsection) {
+        await api.updateTrainingProgress({
+          realtorId: selectedRealtor.id,
+          section: sectionId,
+          subsection: subsectionId,
+          lectureCompleted: subsection.progress.lecture,
+          videoCompleted: subsection.progress.video,
+          practicalCompleted: subsection.progress.practical,
+          handoverCompleted: subsection.progress.handover,
+          examCompleted: subsection.progress.exam,
+        });
+
+        // Show success message
+        if (field === 'exam' && checked) {
+          toast.success('Изпитът е минат! Подточката е завършена.');
+        } else {
+          toast.success('Прогресът е обновен');
+        }
+      }
+    } catch (error: unknown) {
+      toast.error('Грешка при запазване на прогреса');
+      console.error(error);
+    }
   };
 
   const handleLogout = async () => {
@@ -1046,37 +1156,35 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                           successMindset: false,
                         });
                         
-                        const kpi = await api.getRealtorKPI(realtor.id);
+                        const kpi = await api.getRealtorKPI(realtor.userId);
                         setSelectedRealtorKPI(kpi);
                         
                         // Fetch deals and diagnoses
-                        // TODO: Add API endpoints for realtor deals and diagnoses
-                        const deals: Array<Record<string, unknown>> = [];
-                        const diagnoses: Array<Record<string, unknown>> = [];
+                        const deals = await api.getRealtorDeals(realtor.id);
+                        const diagnoses = await api.getRealtorDiagnoses(realtor.id);
                         
-                        setSelectedRealtorDeals(deals);
-                        setSelectedRealtorDiagnoses(diagnoses);
+                        setSelectedRealtorDeals(deals as Array<Record<string, unknown>>);
+                        setSelectedRealtorDiagnoses(diagnoses as Array<Record<string, unknown>>);
                         
                         // Fetch training progress
-                        // TODO: Add API endpoint for training progress
-                        const trainingProgress: Array<{ section: string; subsection: string }> = [];
+                        const trainingProgress = await api.getRealtorTrainingProgress(realtor.id);
                         
                         if (trainingProgress && trainingProgress.length > 0) {
                           const updatedTrainingData = trainingStructure.map((section) => ({
                             ...section,
                             subsections: section.subsections.map((subsection) => {
                               const progressItem = trainingProgress.find(
-                                (p: { section: string; subsection: string }) => p.section === section.id && p.subsection === subsection.id
+                                (p: { section?: string; subsection?: string }) => p.section === section.id && p.subsection === subsection.id
                               );
                               return {
                                 ...subsection,
                                 progress: progressItem
                                   ? {
-                                      lecture: progressItem.lecture_completed || false,
-                                      video: progressItem.video_completed || false,
-                                      practical: progressItem.practical_completed || false,
-                                      handover: progressItem.handover_completed || false,
-                                      exam: progressItem.exam_completed || false,
+                                      lecture: (progressItem as { lecture_completed?: boolean }).lecture_completed || false,
+                                      video: (progressItem as { video_completed?: boolean }).video_completed || false,
+                                      practical: (progressItem as { practical_completed?: boolean }).practical_completed || false,
+                                      handover: (progressItem as { handover_completed?: boolean }).handover_completed || false,
+                                      exam: (progressItem as { exam_completed?: boolean }).exam_completed || false,
                                     }
                                   : subsection.progress,
                               };
@@ -1324,8 +1432,8 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                 <TrainingSectionCard
                   key={section.id}
                   section={section}
-                  onProgressUpdate={() => {}} // Read-only in detail view
-                  editable={false}
+                  onProgressUpdate={handleTrainingProgressUpdate}
+                  editable={true}
                 />
               ))}
             </div>

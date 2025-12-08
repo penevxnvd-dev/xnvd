@@ -190,26 +190,35 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
           ...section,
           subsections: section.subsections.map((subsection) => {
             const progressItem = progressData.find(
-              (p: { section: string; subsection: string }) => p.section === section.id && p.subsection === subsection.id
+              (p: { section?: string; subsection?: string }) => p.section === section.id && p.subsection === subsection.id
             );
             return {
               ...subsection,
               progress: progressItem
                 ? {
-                    completed: progressItem.completed || false,
-                    examCompleted: progressItem.exam_completed || false,
-                    examScore: progressItem.exam_score || null,
+                    lecture: (progressItem as { lecture_completed?: boolean }).lecture_completed || false,
+                    video: (progressItem as { video_completed?: boolean }).video_completed || false,
+                    practical: (progressItem as { practical_completed?: boolean }).practical_completed || false,
+                    handover: (progressItem as { handover_completed?: boolean }).handover_completed || false,
+                    exam: (progressItem as { exam_completed?: boolean }).exam_completed || false,
                   }
-                : undefined,
+                : subsection.progress,
             };
           }),
         }));
         setTrainingData(updatedData);
         const progress = calculateTrainingProgress(updatedData);
         setTrainingProgress(progress);
+      } else {
+        // If no progress data, use default structure
+        setTrainingData(trainingStructure);
+        setTrainingProgress(0);
       }
     } catch (error) {
       console.error('Error fetching training progress:', error);
+      // On error, use default structure
+      setTrainingData(trainingStructure);
+      setTrainingProgress(0);
     }
   }, [realtorData?.id]);
 
@@ -278,49 +287,77 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
     field: 'lecture' | 'video' | 'practical' | 'handover' | 'exam',
     checked: boolean
   ) => {
+    if (!realtorData?.id) return;
+
+    // Update local state first
+    const updatedData = trainingData.map((section) => {
+      if (section.id === sectionId) {
+        return {
+          ...section,
+          subsections: section.subsections.map((subsection) => {
+            if (subsection.id === subsectionId) {
+              const newProgress = {
+                ...subsection.progress,
+                [field]: checked,
+              };
+              
+              // If exam is passed, automatically mark all other steps as completed
+              if (field === 'exam' && checked) {
+                return {
+                  ...subsection,
+                  progress: {
+                    lecture: true,
+                    video: true,
+                    practical: true,
+                    handover: true,
+                    exam: true,
+                  },
+                };
+              }
+              
+              return {
+                ...subsection,
+                progress: newProgress,
+              };
+            }
+            return subsection;
+          }),
+        };
+      }
+      return section;
+    });
+
+    setTrainingData(updatedData);
+    setTrainingProgress(calculateTrainingProgress(updatedData));
+
+    // Save to database
     try {
-      const fieldMap: Record<string, string> = {
-        lecture: 'lecture_completed',
-        video: 'video_completed',
-        practical: 'practical_completed',
-        handover: 'handover_completed',
-        exam: 'exam_completed',
-      };
-      await supabaseApi.updateTrainingProgress({
-        section: sectionId,
-        subsection: subsectionId,
-        [fieldMap[field]]: checked,
-      });
+      const subsection = updatedData
+        .find((s) => s.id === sectionId)
+        ?.subsections.find((ss) => ss.id === subsectionId);
 
-      setTrainingData((prev) => {
-        const updated = prev.map((section) => {
-          if (section.id === sectionId) {
-            return {
-              ...section,
-              subsections: section.subsections.map((subsection) => {
-                if (subsection.id === subsectionId) {
-                  return {
-                    ...subsection,
-                    progress: {
-                      ...subsection.progress,
-                      [field]: checked,
-                    },
-                  };
-                }
-                return subsection;
-              }),
-            };
-          }
-          return section;
+      if (subsection) {
+        await supabaseApi.updateTrainingProgress({
+          realtorId: realtorData.id,
+          section: sectionId,
+          subsection: subsectionId,
+          lectureCompleted: subsection.progress.lecture,
+          videoCompleted: subsection.progress.video,
+          practicalCompleted: subsection.progress.practical,
+          handoverCompleted: subsection.progress.handover,
+          examCompleted: subsection.progress.exam,
         });
-        setTrainingProgress(calculateTrainingProgress(updated));
-        return updated;
-      });
 
-      toast.success('Прогресът е обновен');
+        // Show success message
+        if (field === 'exam' && checked) {
+          toast.success('Изпитът е минат! Подточката е завършена.');
+        } else {
+          toast.success('Прогресът е обновен');
+        }
+      }
     } catch (error: unknown) {
+      toast.error('Грешка при запазване на прогреса');
       console.error(error);
-      toast.error('Грешка при обновяване на прогреса');
     }
   };
 
@@ -739,8 +776,8 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
                 <TrainingSectionCard
                   key={section.id}
                   section={section}
-                  onProgressUpdate={handleProgressUpdate}
-                  editable={true}
+                  onProgressUpdate={() => {}}
+                  editable={false} // Реализаторите само разглеждат собственото обучение
                 />
               ))}
             </div>

@@ -5,7 +5,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { TrainingGroup } from '@/types';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+// Avatar removed - using modern design with initials badges instead
 import { Badge } from './ui/badge';
 import { Card } from './ui/card';
 import { Calendar, Users, BookOpen, CheckCircle2 } from 'lucide-react';
@@ -21,7 +21,7 @@ const getTrainingContent = (day: number) => {
   switch (day) {
     case 1:
       return {
-        title: 'Ден 1: Въвъдително обучение',
+        title: 'Ден 1: Встъпително обучение',
         duration: '2 часа',
         topics: [
           'Запознаване с компанията',
@@ -81,12 +81,9 @@ export const TrainingGroupDetail = ({ group, open, onOpenChange }: TrainingGroup
             <Progress value={progress} className="h-2" />
 
             <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16 border-2 border-primary/20">
-                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${group.leader}`} />
-                <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
-                  {group.leader[0]}
-                </AvatarFallback>
-              </Avatar>
+              <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-xl border-2 border-primary/30 flex-shrink-0">
+                {group.leader.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+              </div>
               <div>
                 <h3 className="text-xl font-bold text-foreground">{group.leader}</h3>
                 <p className="text-muted-foreground">Инструктор по обучение</p>
@@ -143,15 +140,14 @@ export const TrainingGroupDetail = ({ group, open, onOpenChange }: TrainingGroup
                   key={trainee.id}
                   className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                 >
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={trainee.avatar} alt={trainee.name} />
-                    <AvatarFallback className="bg-primary/10 text-primary">
-                      {trainee.name
-                        .split(' ')
-                        .map((n) => n[0])
-                        .join('')}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-sm border-2 border-primary/30 flex-shrink-0">
+                    {trainee.name
+                      .split(' ')
+                      .map((n) => n[0])
+                      .join('')
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </div>
                   <div className="flex-1">
                     <p className="font-medium text-foreground">{trainee.name}</p>
                     <p className="text-sm text-muted-foreground">{trainee.email}</p>

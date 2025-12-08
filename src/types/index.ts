@@ -9,10 +9,11 @@ export interface TrainingGroup {
   trainees: Agent[];
   currentDay: number; // 1-3
   status: 'активна' | 'завършена' | 'предстояща';
+  createdBy?: string | null; // ID of the user who created the group
 }
 
 export interface TrainingSchedule {
-  day1: 'Въвъдително обучение';
+  day1: 'Встъпително обучение';
   day2: 'Разговор с купувач';
   day3: 'Разговор с продавач и подготовка за изпит';
 }
@@ -50,6 +51,7 @@ export interface Agent {
     date: string;
     achievements: string[];
   }[];
+  introCompleted?: boolean; // For training group trainees
 }
 
 export interface TeamLeader {

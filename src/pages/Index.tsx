@@ -26,11 +26,13 @@ import { transformOffices } from '@/utils/dataTransform';
 import { Office, TeamLeader, Agent, TrainingGroup } from '@/types';
 import { ChevronLeft, Home, BarChart3, GraduationCap, Calendar, LogOut, Menu, ChevronDown } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
+import { useUserRole } from '@/hooks/useUserRole';
 
 type ViewType = 'offices' | 'leaders' | 'agents' | 'training';
 
 const Index = () => {
   const navigate = useRouterNavigate();
+  const { role } = useUserRole();
   const [loading, setLoading] = useState(true);
   const [offices, setOffices] = useState<Office[]>([]);
   
@@ -70,6 +72,86 @@ const Index = () => {
         navigate('/auth');
       });
   }, [navigate]);
+
+  // Fetch training groups from database
+  useEffect(() => {
+    const fetchTrainingGroups = async () => {
+      if (currentView !== 'training') return;
+      setLoadingTrainingGroups(true);
+      try {
+        const groups = await api.getAllTrainingGroups();
+        // Transform to match TrainingGroup interface
+        const transformedGroups: TrainingGroup[] = groups.map((g) => ({
+          id: g.id,
+          startDate: g.startDate,
+          leader: g.leader,
+          leaderId: g.leaderId,
+          trainees: g.trainees.map((t) => ({
+            id: t.id,
+            name: t.name,
+            phone: t.phone,
+            email: t.email,
+            position: t.position,
+            level: t.level,
+            trainingStage: t.trainingStage,
+            selectedDate: '', // Not used for active groups
+            introCompleted: t.introCompleted || false,
+          })),
+          currentDay: g.currentDay,
+          status: g.status,
+          createdBy: g.createdBy || null,
+        }));
+        setTrainingGroups(transformedGroups);
+      } catch (error) {
+        console.error('Error fetching training groups:', error);
+        // Fallback to mock data on error
+        setTrainingGroups(mockTrainingGroups);
+      } finally {
+        setLoadingTrainingGroups(false);
+      }
+    };
+
+    fetchTrainingGroups();
+  }, [currentView]);
+
+  const handleUpdateTrainingGroups = async (updatedGroups: TrainingGroup[]) => {
+    // Update local state immediately for better UX
+    setTrainingGroups(updatedGroups);
+    
+    // Refresh from database to ensure consistency after a short delay
+    // This allows the database write to complete
+    setTimeout(async () => {
+      try {
+        console.log('[handleUpdateTrainingGroups] Refreshing groups from database...');
+        const groups = await api.getAllTrainingGroups();
+        console.log('[handleUpdateTrainingGroups] Fetched groups:', groups.length);
+        const transformedGroups: TrainingGroup[] = groups.map((g) => ({
+          id: g.id,
+          startDate: g.startDate,
+          leader: g.leader,
+          leaderId: g.leaderId,
+          trainees: g.trainees.map((t) => ({
+            id: t.id,
+            name: t.name,
+            phone: t.phone,
+            email: t.email,
+            position: t.position,
+            level: t.level,
+            trainingStage: t.trainingStage,
+            selectedDate: '',
+            introCompleted: t.introCompleted || false,
+          })),
+          currentDay: g.currentDay,
+          status: g.status,
+        }));
+        console.log('[handleUpdateTrainingGroups] Setting transformed groups:', transformedGroups.length);
+        setTrainingGroups(transformedGroups);
+      } catch (error) {
+        console.error('[handleUpdateTrainingGroups] Error refreshing training groups:', error);
+        // Keep the updated groups if refresh fails
+      }
+    }, 500); // 500ms delay to allow database write to complete
+  };
   const [currentView, setCurrentView] = useState<ViewType>('offices');
   const [selectedOffice, setSelectedOffice] = useState<Office | null>(null);
   const [selectedLeader, setSelectedLeader] = useState<TeamLeader | null>(null);
@@ -80,6 +162,8 @@ const Index = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userInfo, setUserInfo] = useState<{fullName: string; email: string; role: string} | null>(null);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [trainingGroups, setTrainingGroups] = useState<TrainingGroup[]>([]);
+  const [loadingTrainingGroups, setLoadingTrainingGroups] = useState(false);
   const handleOfficeClick = (office: Office) => {
     setSelectedOffice(office);
     setCurrentView('leaders');
@@ -235,7 +319,26 @@ const Index = () => {
 
         {/* Main Content */}
         <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 flex-1">
-        {currentView === 'training' && <TrainingCalendar groups={mockTrainingGroups} onGroupClick={handleTrainingGroupClick} />}
+        {currentView === 'training' && (
+          loadingTrainingGroups ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Зареждане на групи...</p>
+              </div>
+            </div>
+          ) : (
+            <TrainingCalendar
+              groups={trainingGroups}
+              onGroupClick={handleTrainingGroupClick}
+              canEdit={role !== 'realtor' && role !== null}
+              onUpdateGroups={handleUpdateTrainingGroups}
+              currentUserName={userInfo?.fullName}
+              currentUserRole={role}
+              currentUserId={currentUserId || undefined}
+            />
+          )
+        )}
 
         {currentView === 'offices' && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
             {offices.length === 0 && !loading ? (

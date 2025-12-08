@@ -62,23 +62,23 @@ const TrainingPage = () => {
     try {
       const progressData = await api.getTrainingProgress();
 
-      if (progressData) {
+      if (progressData && progressData.length > 0) {
         // Обновяване на структурата с данни от базата
-        const updatedData = trainingData.map((section) => ({
+        const updatedData = trainingStructure.map((section) => ({
           ...section,
           subsections: section.subsections.map((subsection) => {
             const progressItem = progressData.find(
-              (p: { section: string; subsection: string }) => p.section === section.id && p.subsection === subsection.id
+              (p: { section?: string; subsection?: string }) => p.section === section.id && p.subsection === subsection.id
             );
             return {
               ...subsection,
               progress: progressItem
                 ? {
-                    lecture: progressItem.lecture_completed,
-                    video: progressItem.video_completed,
-                    practical: progressItem.practical_completed,
-                    handover: progressItem.handover_completed,
-                    exam: progressItem.exam_completed,
+                    lecture: (progressItem as { lecture_completed?: boolean }).lecture_completed || false,
+                    video: (progressItem as { video_completed?: boolean }).video_completed || false,
+                    practical: (progressItem as { practical_completed?: boolean }).practical_completed || false,
+                    handover: (progressItem as { handover_completed?: boolean }).handover_completed || false,
+                    exam: (progressItem as { exam_completed?: boolean }).exam_completed || false,
                   }
                 : subsection.progress,
             };
@@ -87,11 +87,18 @@ const TrainingPage = () => {
 
         setTrainingData(updatedData);
         setProgress(calculateTrainingProgress(updatedData));
+      } else {
+        // If no progress data, use default structure
+        setTrainingData(trainingStructure);
+        setProgress(0);
       }
     } catch (error) {
       console.error('Error fetching training progress:', error);
+      // On error, use default structure
+      setTrainingData(trainingStructure);
+      setProgress(0);
     }
-  }, [realtorId, trainingData]);
+  }, [realtorId]);
 
   const handleProgressUpdate = async (
     sectionId: string,
@@ -150,13 +157,14 @@ const TrainingPage = () => {
 
       if (subsection) {
         await api.updateTrainingProgress({
+          realtorId: realtorId,
           section: sectionId,
           subsection: subsectionId,
-          lecture_completed: subsection.progress.lecture,
-          video_completed: subsection.progress.video,
-          practical_completed: subsection.progress.practical,
-          handover_completed: subsection.progress.handover,
-          exam_completed: subsection.progress.exam,
+          lectureCompleted: subsection.progress.lecture,
+          videoCompleted: subsection.progress.video,
+          practicalCompleted: subsection.progress.practical,
+          handoverCompleted: subsection.progress.handover,
+          examCompleted: subsection.progress.exam,
         });
 
         // Ако изпитът е минат, показваме съобщение
@@ -186,8 +194,8 @@ const TrainingPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card shadow-sm sticky top-0 z-10">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <header className="border-b border-border/50 bg-card/80 backdrop-blur-lg shadow-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -248,8 +256,8 @@ const TrainingPage = () => {
             <TrainingSectionCard
               key={section.id}
               section={section}
-              onProgressUpdate={handleProgressUpdate}
-              editable={true}
+              onProgressUpdate={() => {}}
+              editable={false} // Реализаторът вижда, но не маркира
                                   />
           ))}
         </div>

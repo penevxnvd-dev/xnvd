@@ -40,8 +40,10 @@ export const TrainingSectionCard = ({
 
   return (
     <Card className={cn(
-      "transition-all duration-300 hover:shadow-lg",
-      isSectionCompleted && "border-2 border-success bg-success/5"
+      "transition-all duration-300 hover:shadow-xl hover:scale-[1.01] border-2",
+      isSectionCompleted 
+        ? "border-success/50 bg-gradient-to-br from-success/10 to-success/5 shadow-success/20" 
+        : "border-border/50 hover:border-primary/30 bg-gradient-to-br from-card to-card/50"
     )}>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CardHeader className="p-3 sm:p-6">

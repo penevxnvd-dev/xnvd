@@ -111,13 +111,13 @@ export const OfficeCard = ({ office, metrics, achievements = [], onClick }: Offi
                     Елит
                   </span>
                   <Badge className="text-sm px-3 py-1 font-bold bg-gradient-to-r from-red-500 to-red-600 text-white border-0 shadow-md shadow-red-500/30">
-                    {(metrics.levelDistribution[4] || 0) + (metrics.levelDistribution[5] || 0)}
+                    {((metrics.levelDistribution?.[4] || 0) + (metrics.levelDistribution?.[5] || 0))}
                   </Badge>
                 </div>
                 <div className="h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-gradient-to-r from-red-400 to-red-600 rounded-full transition-all duration-500"
-                    style={{ width: `${metrics.realtors > 0 ? (((metrics.levelDistribution[4] || 0) + (metrics.levelDistribution[5] || 0)) / metrics.realtors) * 100 : 0}%` }}
+                    style={{ width: `${metrics.realtors > 0 ? (((metrics.levelDistribution?.[4] || 0) + (metrics.levelDistribution?.[5] || 0)) / metrics.realtors) * 100 : 0}%` }}
                   />
                 </div>
               </div>
@@ -129,13 +129,13 @@ export const OfficeCard = ({ office, metrics, achievements = [], onClick }: Offi
                     Реализатор
                   </span>
                   <Badge className="text-sm px-3 py-1 font-bold bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-md shadow-blue-500/30">
-                    {(metrics.levelDistribution[2] || 0) + (metrics.levelDistribution[3] || 0)}
+                    {((metrics.levelDistribution?.[2] || 0) + (metrics.levelDistribution?.[3] || 0))}
                   </Badge>
                 </div>
                 <div className="h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-500"
-                    style={{ width: `${metrics.realtors > 0 ? (((metrics.levelDistribution[2] || 0) + (metrics.levelDistribution[3] || 0)) / metrics.realtors) * 100 : 0}%` }}
+                    style={{ width: `${metrics.realtors > 0 ? (((metrics.levelDistribution?.[2] || 0) + (metrics.levelDistribution?.[3] || 0)) / metrics.realtors) * 100 : 0}%` }}
                   />
                 </div>
               </div>
@@ -147,13 +147,13 @@ export const OfficeCard = ({ office, metrics, achievements = [], onClick }: Offi
                     Чирак
                   </span>
                   <Badge className="text-sm px-3 py-1 font-bold bg-gradient-to-r from-green-500 to-green-600 text-white border-0 shadow-md shadow-green-500/30">
-                    {metrics.levelDistribution[1] || 0}
+                    {metrics.levelDistribution?.[1] || 0}
                   </Badge>
                 </div>
                 <div className="h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-500"
-                    style={{ width: `${metrics.realtors > 0 ? ((metrics.levelDistribution[1] || 0) / metrics.realtors) * 100 : 0}%` }}
+                    style={{ width: `${metrics.realtors > 0 ? ((metrics.levelDistribution?.[1] || 0) / metrics.realtors) * 100 : 0}%` }}
                   />
                 </div>
               </div>

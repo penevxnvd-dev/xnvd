@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,12 +14,51 @@ import { cn } from '@/lib/utils';
 
 const TrainingProgressPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [userId, setUserId] = useState<string | null>(null);
   const [realtorId, setRealtorId] = useState<string | null>(null);
   const [trainingData, setTrainingData] = useState<TrainingSection[]>(trainingStructure);
   const [progress, setProgress] = useState(0);
   const [loading, setLoading] = useState(true);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+
+  const fetchTrainingProgress = useCallback(async () => {
+    if (!realtorId) return;
+
+    try {
+      const progressData = await supabaseApi.getTrainingProgress();
+
+      if (progressData) {
+        // Обновяване на структурата с данни от базата
+        setTrainingData((prevData) => {
+          const updatedData = prevData.map((section) => ({
+            ...section,
+            subsections: section.subsections.map((subsection) => {
+              const progressItem = progressData.find(
+                (p: { section: string; subsection: string }) => p.section === section.id && p.subsection === subsection.id
+              );
+              return {
+                ...subsection,
+                progress: progressItem
+                  ? {
+                      lecture: progressItem.lecture_completed,
+                      video: progressItem.video_completed,
+                      practical: progressItem.practical_completed,
+                      handover: progressItem.handover_completed,
+                      exam: progressItem.exam_completed,
+                    }
+                  : subsection.progress,
+              };
+            }),
+          }));
+          setProgress(calculateTrainingProgress(updatedData));
+          return updatedData;
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching training progress:', error);
+    }
+  }, [realtorId]);
 
   useEffect(() => {
     fetchUserData();
@@ -33,12 +72,25 @@ const TrainingProgressPage = () => {
 
   const fetchUserData = async () => {
     try {
-      const { user } = await supabaseApi.getCurrentUser();
-      if (user) {
-        setUserId(user.id);
-        const realtor = await supabaseApi.getCurrentRealtor();
+      // Check if userId is provided in query params (for viewing other user's progress)
+      const queryUserId = searchParams.get('userId');
+      
+      if (queryUserId) {
+        // Viewing another user's progress
+        setUserId(queryUserId);
+        const realtor = await supabaseApi.getCurrentRealtor(queryUserId);
         if (realtor) {
           setRealtorId(realtor.id);
+        }
+      } else {
+        // Viewing own progress
+        const { user } = await supabaseApi.getCurrentUser();
+        if (user) {
+          setUserId(user.id);
+          const realtor = await supabaseApi.getCurrentRealtor();
+          if (realtor) {
+            setRealtorId(realtor.id);
+          }
         }
       }
     } catch (error) {
@@ -47,43 +99,6 @@ const TrainingProgressPage = () => {
       setLoading(false);
     }
   };
-
-  const fetchTrainingProgress = useCallback(async () => {
-    if (!realtorId) return;
-
-    try {
-      const progressData = await supabaseApi.getTrainingProgress();
-
-      if (progressData) {
-        // Обновяване на структурата с данни от базата
-        const updatedData = trainingData.map((section) => ({
-          ...section,
-          subsections: section.subsections.map((subsection) => {
-            const progressItem = progressData.find(
-              (p: { section: string; subsection: string }) => p.section === section.id && p.subsection === subsection.id
-            );
-            return {
-              ...subsection,
-              progress: progressItem
-                ? {
-                    lecture: progressItem.lecture_completed,
-                    video: progressItem.video_completed,
-                    practical: progressItem.practical_completed,
-                    handover: progressItem.handover_completed,
-                    exam: progressItem.exam_completed,
-                  }
-                : subsection.progress,
-            };
-          }),
-        }));
-
-        setTrainingData(updatedData);
-        setProgress(calculateTrainingProgress(updatedData));
-      }
-    } catch (error) {
-      console.error('Error fetching training progress:', error);
-    }
-  }, [realtorId, trainingData]);
 
   const handleProgressUpdate = async (
     sectionId: string,

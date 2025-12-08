@@ -1,5 +1,5 @@
 import { Card } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+// Avatar removed - using modern design with initials badges instead
 import { Users, TrendingUp, DollarSign } from 'lucide-react';
 import { TeamLeader } from '@/types';
 import { calculateLeaderMetrics, formatCurrency } from '@/utils/calculations';
@@ -20,15 +20,14 @@ export const TeamLeaderCard = ({ leader, onClick }: TeamLeaderCardProps) => {
     >
       <div className="space-y-4">
         <div className="flex items-center gap-4">
-          <Avatar className="h-16 w-16 border-2 border-primary/20">
-            <AvatarImage src={leader.avatar} alt={leader.name} />
-            <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-              {leader.name
-                .split(' ')
-                .map((n) => n[0])
-                .join('')}
-            </AvatarFallback>
-          </Avatar>
+          <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-lg border-2 border-primary/30 flex-shrink-0">
+            {leader.name
+              .split(' ')
+              .map((n) => n[0])
+              .join('')
+              .slice(0, 2)
+              .toUpperCase()}
+          </div>
           <div className="flex-1">
             <h3 className="text-base sm:text-lg font-semibold text-foreground break-words">{formatNameWithEmoji(leader.name)}</h3>
             <p className="text-sm text-muted-foreground mb-2 break-words">{leader.position}</p>

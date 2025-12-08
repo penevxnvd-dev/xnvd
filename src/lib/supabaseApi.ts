@@ -9,83 +9,6 @@ type Tables<T extends keyof Database['public']['Tables']> = Database['public']['
 type TablesInsert<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert'];
 type TablesUpdate<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update'];
 
-/**
- * Helper function: Try hardcoded data first, then local backup, then Supabase
- * Priority: 1. Hardcoded, 2. Local backup, 3. Supabase (fallback only)
- */
-async function withLocalBackupFirst<T>(
-  tableName: string,
-  getHardcoded: () => T[],
-  getHardcodedFiltered?: (filter: (item: T) => boolean) => T[],
-  filter?: (item: T) => boolean,
-  supabaseCall?: () => Promise<{ data: T[] | null; error: unknown }>
-): Promise<{ data: T[]; fromHardcoded: boolean; fromBackup: boolean }> {
-  // 1. Try hardcoded data first (PRIMARY source)
-  try {
-    let hardcodedData: T[];
-    if (filter && getHardcodedFiltered) {
-      hardcodedData = getHardcodedFiltered(filter);
-    } else {
-      hardcodedData = getHardcoded();
-      if (filter) {
-        hardcodedData = hardcodedData.filter(filter);
-      }
-    }
-    
-    if (hardcodedData && hardcodedData.length > 0) {
-      console.info(`[withLocalBackupFirst] Using hardcoded data for ${tableName} (${hardcodedData.length} records)`);
-      return {
-        data: hardcodedData,
-        fromHardcoded: true,
-        fromBackup: false,
-      };
-    }
-  } catch (error) {
-    console.warn(`[withLocalBackupFirst] Error getting hardcoded ${tableName}:`, error);
-  }
-
-  // 2. Try local backup (SECONDARY source)
-  try {
-    const backupData = await localBackup.queryTable<T>(tableName, filter);
-    if (backupData && backupData.length > 0) {
-      console.info(`[withLocalBackupFirst] Using local backup for ${tableName} (${backupData.length} records)`);
-      return {
-        data: backupData,
-        fromHardcoded: false,
-        fromBackup: true,
-      };
-    }
-  } catch (error) {
-    console.warn(`[withLocalBackupFirst] Error getting local backup for ${tableName}:`, error);
-  }
-
-  // 3. Try Supabase (FALLBACK only)
-  if (supabaseCall) {
-    try {
-      console.info(`[withLocalBackupFirst] Hardcoded and backup empty for ${tableName}, trying Supabase...`);
-      const result = await supabaseCall();
-      if (!result.error && result.data && result.data.length > 0) {
-        console.info(`[withLocalBackupFirst] Using Supabase for ${tableName} (${result.data.length} records)`);
-        return {
-          data: result.data,
-          fromHardcoded: false,
-          fromBackup: false,
-        };
-      }
-    } catch (error) {
-      console.warn(`[withLocalBackupFirst] Error getting Supabase data for ${tableName}:`, error);
-    }
-  }
-
-  // All sources failed or empty - return empty array
-  console.info(`[withLocalBackupFirst] All sources empty for ${tableName}, returning empty array`);
-  return {
-    data: [],
-    fromHardcoded: false,
-    fromBackup: false,
-  };
-}
-
 class SupabaseApiClient {
   // Expose supabase client
   get supabase() {
@@ -220,51 +143,20 @@ class SupabaseApiClient {
 
   // Countries - Supabase first, then local backup
   async getCountries() {
-    try {
-      // Try Supabase first
-      const { data, error } = await supabase
-        .from('countries')
-        .select('*')
-        .order('name', { ascending: true });
-      
-      if (error) {
-        console.warn('[getCountries] Supabase error, trying local backup:', error.message);
-        // Fallback to local backup
-        const backupData = await withLocalBackupFirst(
-          'countries',
-          () => [],
-          undefined,
-          undefined,
-          async () => ({ data: null, error })
-        );
-        return (backupData.data as Tables<'countries'>[]) || [];
+    const result = await withLocalBackupFirst(
+      'countries',
+      async () => {
+        const { data, error } = await supabase
+          .from('countries')
+          .select('*')
+          .order('name', { ascending: true });
+        return { data, error };
       }
-      
-      if (data && data.length > 0) {
-        return data as Tables<'countries'>[];
-      }
-      
-      // If Supabase returns empty, try local backup
-      const backupData = await withLocalBackupFirst(
-        'countries',
-        () => [],
-        undefined,
-        undefined,
-        async () => ({ data: [], error: null })
-      );
-      return (backupData.data as Tables<'countries'>[]) || [];
-    } catch (error) {
-      console.error('[getCountries] Error:', error);
-      // Final fallback to local backup
-      const backupData = await withLocalBackupFirst(
-        'countries',
-        () => [],
-        undefined,
-        undefined,
-        async () => ({ data: null, error })
-      );
-      return (backupData.data as Tables<'countries'>[]) || [];
+    );
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
     }
+    return (result.data as Tables<'countries'>[]) || [];
   }
 
   // Cities - Supabase first, then local backup
@@ -308,10 +200,8 @@ class SupabaseApiClient {
   }
 
   async getAllOffices() {
-    return withLocalBackupFirst(
+    const result = await withLocalBackupFirst(
       'offices',
-      () => [],
-      undefined,
       async () => {
         const { data, error } = await supabase
           .from('offices')
@@ -319,7 +209,11 @@ class SupabaseApiClient {
           .order('name', { ascending: true });
         return { data, error };
       }
-    ).then(result => result.data as Tables<'offices'>[]);
+    );
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+    return (result.data as Tables<'offices'>[]) || [];
   }
 
   async getAllOfficesFull() {
@@ -344,29 +238,87 @@ class SupabaseApiClient {
     return offices.find(o => o.id === officeId) || null;
   }
 
-  // Teams - hardcoded first, then backup, then Supabase
+  // Teams - Supabase first, then local backup
   async getTeamsByOffice(officeId: string) {
-    return withLocalBackupFirst(
-      'teams',
-      () => [],
-      (team) => (team as { office_id?: string }).office_id === officeId,
-      async () => {
-        const { data, error } = await supabase
-          .from('teams')
-          .select('*')
-          .eq('office_id', officeId)
-          .order('name', { ascending: true });
-        return { data, error };
+    // Засега използваме директно Supabase за да избегнем проблеми с local backup
+    // Local backup може да съдържа стари или неправилни данни
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
+    
+    try {
+      // Директно заявка към Supabase за актуални данни
+      const { data, error } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('office_id', officeId)
+        .order('name', { ascending: true });
+      
+      if (error) {
+        throw handleSupabaseError(error);
       }
-    ).then(result => result.data as Tables<'teams'>[]);
+      
+      const teams = (data as Tables<'teams'>[]) || [];
+      
+      // Стриктна дедупликация по ID и валидация на office_id
+      const seenIds = new Set<string>();
+      const uniqueTeams: Tables<'teams'>[] = [];
+      
+      for (const team of teams) {
+        // Проверка дали office_id съвпада (допълнителна защита)
+        if (team.office_id !== officeId) {
+          console.warn(`[getTeamsByOffice] Team ${team.id} (${team.name}) has wrong office_id: ${team.office_id} (expected ${officeId})`);
+          continue;
+        }
+        
+        // Проверка за дублиране по ID
+        if (seenIds.has(team.id)) {
+          console.warn(`[getTeamsByOffice] Duplicate team ID found: ${team.id} (${team.name})`);
+          continue;
+        }
+        
+        seenIds.add(team.id);
+        uniqueTeams.push(team);
+      }
+      
+      console.info(`[getTeamsByOffice] Returning ${uniqueTeams.length} unique teams for office ${officeId}:`, uniqueTeams.map(t => t.name));
+      return uniqueTeams;
+    } catch (error) {
+      // Fallback към local backup само ако Supabase не работи
+      console.warn('[getTeamsByOffice] Supabase failed, trying local backup...', error);
+      const result = await withLocalBackupFirst(
+        'teams',
+        async () => ({ data: null, error }),
+        (team) => {
+          const teamData = team as { office_id?: string };
+          return teamData.office_id === officeId;
+        }
+      );
+      
+      if (result.error && !result.fromCache) {
+        throw handleSupabaseError(result.error);
+      }
+      
+      const teams = (result.data as Tables<'teams'>[]) || [];
+      // Дедупликация и филтриране
+      const seenIds = new Set<string>();
+      const uniqueTeams: Tables<'teams'>[] = [];
+      
+      for (const team of teams) {
+        if (team.office_id !== officeId) continue;
+        if (seenIds.has(team.id)) continue;
+        seenIds.add(team.id);
+        uniqueTeams.push(team);
+      }
+      
+      return uniqueTeams;
+    }
   }
 
-  // Realtors - hardcoded first, then backup, then Supabase
+  // Realtors - Supabase first, then local backup
   async getRealtorsByTeam(teamId: string) {
-    return withLocalBackupFirst(
+    const result = await withLocalBackupFirst(
       'realtors',
-      () => [],
-      (realtor) => (realtor as { team_id?: string }).team_id === teamId,
       async () => {
         const { data, error } = await supabase
           .from('realtors')
@@ -374,65 +326,375 @@ class SupabaseApiClient {
           .eq('team_id', teamId)
           .order('level', { ascending: false });
         return { data, error };
-      }
-    ).then(result => result.data as Tables<'realtors'>[]);
+      },
+      (realtor) => (realtor as { team_id?: string }).team_id === teamId
+    );
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+    return (result.data as Tables<'realtors'>[]) || [];
   }
 
-  async getAllTeamLeaders() {
-    const teams = await withLocalBackupFirst(
+  // Get cities managed by a regional manager
+  async getUserManagedCities(userId: string) {
+    const result = await withLocalBackupFirst(
+      'cities',
+      async () => {
+        const { data, error } = await supabase
+          .from('cities')
+          .select('id, name, country_id')
+          .eq('manager_id', userId);
+        return { data, error };
+      },
+      (city) => (city as { manager_id?: string }).manager_id === userId
+    );
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+    return (result.data as Array<{ id: string; name: string; country_id: string }>) || [];
+  }
+
+  // Get office managed by an office manager
+  async getUserManagedOffice(userId: string) {
+    const result = await withLocalBackupFirst(
+      'offices',
+      async () => {
+        const { data, error } = await supabase
+          .from('offices')
+          .select('id, name, city_id, address')
+          .eq('manager_id', userId)
+          .limit(1)
+          .single();
+        return { data, error };
+      },
+      (office) => (office as { manager_id?: string }).manager_id === userId
+    );
+    if (result.error && !result.fromCache) {
+      return null;
+    }
+    return result.data as { id: string; name: string; city_id: string; address?: string } | null;
+  }
+
+  // Get team led by a team leader
+  async getUserTeam(userId: string) {
+    const result = await withLocalBackupFirst(
       'teams',
-      () => [],
-      undefined,
       async () => {
         const { data, error } = await supabase
           .from('teams')
-          .select('*');
+          .select('id, name, office_id, leader_id')
+          .eq('leader_id', userId)
+          .limit(1)
+          .single();
         return { data, error };
-      }
-    ).then(result => result.data);
+      },
+      (team) => (team as { leader_id?: string }).leader_id === userId
+    );
+    if (result.error && !result.fromCache) {
+      return null;
+    }
+    return result.data as { id: string; name: string; office_id: string; leader_id: string } | null;
+  }
 
-    const leaderIds = teams
-      .map(t => (t as { leader_id?: string }).leader_id)
-      .filter((id): id is string => !!id);
-    
-    const profiles = [];
-    return profiles.filter(p => leaderIds.includes(p.id));
+  // Get city and office for a team leader by leaderId
+  async getLeaderCityAndOffice(leaderId: string) {
+    try {
+      // Get team by leader_id
+      const { data: team, error: teamError } = await supabase
+        .from('teams')
+        .select('office_id')
+        .eq('leader_id', leaderId)
+        .limit(1)
+        .single();
+
+      if (teamError || !team) return null;
+
+      // Get office by office_id
+      const { data: office, error: officeError } = await supabase
+        .from('offices')
+        .select('id, name, city_id')
+        .eq('id', team.office_id)
+        .limit(1)
+        .single();
+
+      if (officeError || !office) return null;
+
+      // Get city by city_id
+      const { data: city, error: cityError } = await supabase
+        .from('cities')
+        .select('id, name')
+        .eq('id', office.city_id)
+        .limit(1)
+        .single();
+
+      if (cityError || !city) return null;
+
+      return {
+        cityId: city.id,
+        cityName: city.name,
+        officeId: office.id,
+        officeName: office.name,
+      };
+    } catch (error) {
+      console.error('Error getting leader city and office:', error);
+      return null;
+    }
+  }
+
+  async getAllTeamLeaders() {
+    try {
+      // Get all teams with their leaders
+      const { data: teams, error: teamsError } = await supabase
+        .from('teams')
+        .select('leader_id')
+        .not('leader_id', 'is', null);
+
+      if (teamsError) throw teamsError;
+
+      const leaderIds = teams
+        .map(t => t.leader_id)
+        .filter((id): id is string => !!id);
+
+      if (leaderIds.length === 0) return [];
+
+      // Get profiles for all leaders
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', leaderIds);
+
+      if (profilesError) throw profilesError;
+
+      return (profiles || []).map(profile => ({
+        id: profile.id,
+        fullName: profile.full_name || profile.email,
+        email: profile.email,
+      }));
+    } catch (error) {
+      console.error('Error fetching team leaders:', error);
+      // Fallback to local backup
+      const result = await withLocalBackupFirst(
+        'teams',
+        async () => ({ data: null, error }),
+        undefined
+      );
+      if (result.error && !result.fromCache) {
+        throw handleSupabaseError(result.error);
+      }
+      const teams = (result.data as Tables<'teams'>[]) || [];
+      const leaderIds = teams
+        .map(t => t.leader_id)
+        .filter((id): id is string => !!id);
+      
+      const profilesResult = await withLocalBackupFirst(
+        'profiles',
+        async () => {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*');
+          return { data, error };
+        }
+      );
+      const profiles = (profilesResult.data as Tables<'profiles'>[]) || [];
+      return profiles
+        .filter(p => leaderIds.includes(p.id))
+        .map(profile => ({
+          id: profile.id,
+          fullName: profile.full_name || profile.email,
+          email: profile.email,
+        }));
+    }
+  }
+
+  async getAllOfficeManagers() {
+    try {
+      // Get all offices with their managers
+      const { data: offices, error: officesError } = await supabase
+        .from('offices')
+        .select('manager_id')
+        .not('manager_id', 'is', null);
+
+      if (officesError) throw officesError;
+
+      const managerIds = offices
+        .map(o => o.manager_id)
+        .filter((id): id is string => !!id);
+
+      if (managerIds.length === 0) return [];
+
+      // Get profiles for all office managers
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', managerIds);
+
+      if (profilesError) throw profilesError;
+
+      return (profiles || []).map(profile => ({
+        id: profile.id,
+        fullName: profile.full_name || profile.email,
+        email: profile.email,
+      }));
+    } catch (error) {
+      console.error('Error fetching office managers:', error);
+      // Fallback to local backup
+      const result = await withLocalBackupFirst(
+        'offices',
+        async () => ({ data: null, error }),
+        undefined
+      );
+      if (result.error && !result.fromCache) {
+        throw handleSupabaseError(result.error);
+      }
+      const offices = (result.data as Tables<'offices'>[]) || [];
+      const managerIds = offices
+        .map(o => o.manager_id)
+        .filter((id): id is string => !!id);
+      
+      const profilesResult = await withLocalBackupFirst(
+        'profiles',
+        async () => {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*');
+          return { data, error };
+        }
+      );
+      const profiles = (profilesResult.data as Tables<'profiles'>[]) || [];
+      return profiles
+        .filter(p => managerIds.includes(p.id))
+        .map(profile => ({
+          id: profile.id,
+          fullName: profile.full_name || profile.email,
+          email: profile.email,
+        }));
+    }
+  }
+
+  async getAllRegionalManagers() {
+    try {
+      // Get all cities with their managers
+      const { data: cities, error: citiesError } = await supabase
+        .from('cities')
+        .select('manager_id')
+        .not('manager_id', 'is', null);
+
+      if (citiesError) throw citiesError;
+
+      const managerIds = cities
+        .map(c => c.manager_id)
+        .filter((id): id is string => !!id);
+
+      if (managerIds.length === 0) return [];
+
+      // Get profiles for all regional managers
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', managerIds);
+
+      if (profilesError) throw profilesError;
+
+      return (profiles || []).map(profile => ({
+        id: profile.id,
+        fullName: profile.full_name || profile.email,
+        email: profile.email,
+      }));
+    } catch (error) {
+      console.error('Error fetching regional managers:', error);
+      // Fallback to local backup
+      const result = await withLocalBackupFirst(
+        'cities',
+        async () => ({ data: null, error }),
+        undefined
+      );
+      if (result.error && !result.fromCache) {
+        throw handleSupabaseError(result.error);
+      }
+      const cities = (result.data as Tables<'cities'>[]) || [];
+      const managerIds = cities
+        .map(c => c.manager_id)
+        .filter((id): id is string => !!id);
+      
+      const profilesResult = await withLocalBackupFirst(
+        'profiles',
+        async () => {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*');
+          return { data, error };
+        }
+      );
+      const profiles = (profilesResult.data as Tables<'profiles'>[]) || [];
+      return profiles
+        .filter(p => managerIds.includes(p.id))
+        .map(profile => ({
+          id: profile.id,
+          fullName: profile.full_name || profile.email,
+          email: profile.email,
+        }));
+    }
   }
 
   async getAvailableProfilesForTeam(teamId: string) {
     const teamRealtors = await this.getRealtorsByTeam(teamId);
-    const allProfiles = [];
-    const assignedIds = new Set(teamRealtors.map(r => (r as { user_id?: string }).user_id));
+    const profilesResult = await withLocalBackupFirst(
+      'profiles',
+      async () => {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*');
+        return { data, error };
+      }
+    );
+    const allProfiles = (profilesResult.data as Tables<'profiles'>[]) || [];
+    const assignedIds = new Set(teamRealtors.map(r => r.user_id));
     return allProfiles.filter(p => !assignedIds.has(p.id));
   }
 
-  async getCurrentRealtor(userId: string) {
-    const realtors = [];
-    const realtor = realtors.find(r => (r as { user_id?: string }).user_id === userId);
-    if (realtor) {
-      return realtor as Tables<'realtors'>;
+  async getCurrentRealtor(userId?: string) {
+    let currentUserId = userId;
+    if (!currentUserId) {
+      const { user } = await this.getCurrentUser();
+      if (!user) return null;
+      currentUserId = user.id;
     }
     
-    // Try Supabase
-    const { data, error } = await supabase
-      .from('realtors')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+    const result = await withLocalBackupFirst(
+      'realtors',
+      async () => {
+        const { data, error } = await supabase
+          .from('realtors')
+          .select('*')
+          .eq('user_id', currentUserId)
+          .single();
+        return { data, error };
+      },
+      (realtor) => (realtor as { user_id?: string }).user_id === currentUserId
+    );
     
-    if (error) throw error;
-    return data;
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+    
+    if (result.data && !Array.isArray(result.data)) {
+      return result.data as Tables<'realtors'>;
+    }
+    
+    if (Array.isArray(result.data) && result.data.length > 0) {
+      return result.data[0] as Tables<'realtors'>;
+    }
+    
+    return null;
   }
 
-  // Deals - hardcoded first, then backup, then Supabase
+  // Deals - Supabase first, then local backup
   async getMyDeals(userId: string) {
     const realtor = await this.getCurrentRealtor(userId);
     if (!realtor) return [];
     
-    return withLocalBackupFirst(
+    const result = await withLocalBackupFirst(
       'deals',
-      () => [],
-      (deal) => (deal as { realtor_id?: string }).realtor_id === realtor.id,
       async () => {
         const { data, error } = await supabase
           .from('deals')
@@ -440,19 +702,22 @@ class SupabaseApiClient {
           .eq('realtor_id', realtor.id)
           .order('deal_date', { ascending: false });
         return { data, error };
-      }
-    ).then(result => result.data as Tables<'deals'>[]);
+      },
+      (deal) => (deal as { realtor_id?: string }).realtor_id === realtor.id
+    );
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+    return (result.data as Tables<'deals'>[]) || [];
   }
 
-  // Diagnoses - hardcoded first, then backup, then Supabase
+  // Diagnoses - Supabase first, then local backup
   async getMyDiagnoses(userId: string) {
     const realtor = await this.getCurrentRealtor(userId);
     if (!realtor) return [];
     
-    return withLocalBackupFirst(
+    const result = await withLocalBackupFirst(
       'diagnoses',
-      () => [],
-      (diagnosis) => (diagnosis as { realtor_id?: string }).realtor_id === realtor.id,
       async () => {
         const { data, error } = await supabase
           .from('diagnoses')
@@ -460,27 +725,113 @@ class SupabaseApiClient {
           .eq('realtor_id', realtor.id)
           .order('diagnosis_date', { ascending: false });
         return { data, error };
-      }
-    ).then(result => result.data as Tables<'diagnoses'>[]);
+      },
+      (diagnosis) => (diagnosis as { realtor_id?: string }).realtor_id === realtor.id
+    );
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+    return (result.data as Tables<'diagnoses'>[]) || [];
   }
 
-  // Training Progress - hardcoded first, then backup, then Supabase
-  async getTrainingProgress(userId: string) {
-    const realtor = await this.getCurrentRealtor(userId);
+  // Training Progress - Supabase first, then local backup
+  async getTrainingProgress(userId?: string) {
+    let realtor;
+    if (userId) {
+      realtor = await this.getCurrentRealtor(userId);
+    } else {
+      const { user } = await this.getCurrentUser();
+      if (!user) return [];
+      realtor = await this.getCurrentRealtor(user.id);
+    }
     if (!realtor) return [];
     
-    return withLocalBackupFirst(
+    const result = await withLocalBackupFirst(
       'training_progress',
-      () => [],
-      (progress) => (progress as { realtor_id?: string }).realtor_id === realtor.id,
       async () => {
+        if (!supabase) {
+          throw new Error('Supabase client is not initialized');
+        }
         const { data, error } = await supabase
           .from('training_progress')
           .select('*')
           .eq('realtor_id', realtor.id);
         return { data, error };
-      }
-    ).then(result => result.data as Tables<'training_progress'>[]);
+      },
+      (progress) => (progress as { realtor_id?: string }).realtor_id === realtor.id
+    );
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+    return (result.data as Tables<'training_progress'>[]) || [];
+  }
+
+  // Get deals by realtor_id (for managers/leaders viewing their team members)
+  async getRealtorDeals(realtorId: string) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
+    const result = await withLocalBackupFirst(
+      'deals',
+      async () => {
+        const { data, error } = await supabase
+          .from('deals')
+          .select('*')
+          .eq('realtor_id', realtorId)
+          .order('deal_date', { ascending: false });
+        return { data, error };
+      },
+      (deal) => (deal as { realtor_id?: string }).realtor_id === realtorId
+    );
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+    return (result.data as Tables<'deals'>[]) || [];
+  }
+
+  // Get diagnoses by realtor_id (for managers/leaders viewing their team members)
+  async getRealtorDiagnoses(realtorId: string) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
+    const result = await withLocalBackupFirst(
+      'diagnoses',
+      async () => {
+        const { data, error } = await supabase
+          .from('diagnoses')
+          .select('*')
+          .eq('realtor_id', realtorId)
+          .order('diagnosis_date', { ascending: false });
+        return { data, error };
+      },
+      (diagnosis) => (diagnosis as { realtor_id?: string }).realtor_id === realtorId
+    );
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+    return (result.data as Tables<'diagnoses'>[]) || [];
+  }
+
+  // Get training progress by realtor_id (for managers/leaders viewing their team members)
+  async getRealtorTrainingProgress(realtorId: string) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
+    const result = await withLocalBackupFirst(
+      'training_progress',
+      async () => {
+        const { data, error } = await supabase
+          .from('training_progress')
+          .select('*')
+          .eq('realtor_id', realtorId);
+        return { data, error };
+      },
+      (progress) => (progress as { realtor_id?: string }).realtor_id === realtorId
+    );
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+    return (result.data as Tables<'training_progress'>[]) || [];
   }
 
   // Realtor Goals - hardcoded first, then backup, then Supabase
@@ -496,18 +847,18 @@ class SupabaseApiClient {
     }
 
     const deals = await this.getMyDeals(userId);
-    const goals = await withLocalBackupFirst(
+    const goalsResult = await withLocalBackupFirst(
       'realtor_goals',
-      () => [],
-      (goal) => (goal as { realtor_id?: string }).realtor_id === realtor.id,
       async () => {
         const { data, error } = await supabase
           .from('realtor_goals')
           .select('*')
           .eq('realtor_id', realtor.id);
         return { data, error };
-      }
-    ).then(result => result.data);
+      },
+      (goal) => (goal as { realtor_id?: string }).realtor_id === realtor.id
+    );
+    const goals = (goalsResult.data as Tables<'realtor_goals'>[]) || [];
 
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
@@ -539,49 +890,210 @@ class SupabaseApiClient {
 
   async getTeamKPI(teamId: string) {
     const realtors = await this.getRealtorsByTeam(teamId);
-    const kpis = await Promise.all(realtors.map(r => this.getRealtorKPI((r as { user_id?: string }).user_id || '')));
-    
+    if (realtors.length === 0) {
+      return {
+        realtors: 0,
+        deals: 0,
+        diagnoses: 0,
+        successRate: 0,
+        totalDealValue: 0,
+        levelDistribution: {},
+      };
+    }
+
+    // Get deals and diagnoses for all realtors
+    const allDeals = await Promise.all(
+      realtors.map(async (r) => {
+        const userId = (r as { user_id?: string }).user_id;
+        if (!userId) return [];
+        return await this.getMyDeals(userId);
+      })
+    );
+    const flatDeals = allDeals.flat();
+
+    const allDiagnoses = await Promise.all(
+      realtors.map(async (r) => {
+        const userId = (r as { user_id?: string }).user_id;
+        if (!userId) return [];
+        return await this.getMyDiagnoses(userId);
+      })
+    );
+    const flatDiagnoses = allDiagnoses.flat();
+
+    // Calculate level distribution
+    const levelDistribution: Record<number, number> = {};
+    realtors.forEach((r) => {
+      const level = (r as { level?: number }).level || 1;
+      levelDistribution[level] = (levelDistribution[level] || 0) + 1;
+    });
+
+    // Calculate metrics
+    const currentMonth = new Date();
+    currentMonth.setDate(1);
+    currentMonth.setHours(0, 0, 0, 0);
+
+    const monthDeals = flatDeals.filter(
+      (deal) => new Date((deal as { deal_date?: string }).deal_date || '') >= currentMonth
+    );
+    const monthDiagnoses = flatDiagnoses.filter(
+      (diagnosis) => new Date((diagnosis as { diagnosis_date?: string }).diagnosis_date || '') >= currentMonth
+    );
+
+    const successRate = monthDiagnoses.length > 0
+      ? Math.round((monthDeals.length / monthDiagnoses.length) * 100)
+      : 0;
+
+    const totalDealValue = monthDeals.reduce((sum, deal) => {
+      const dealValue = (deal as { deal_value?: string | number }).deal_value;
+      return sum + (typeof dealValue === 'string' ? parseFloat(dealValue) : (dealValue || 0));
+    }, 0);
+
     return {
-      deals: kpis.reduce((sum, kpi) => sum + kpi.deals, 0),
-      keys: kpis.reduce((sum, kpi) => sum + kpi.keys, 0),
-      exclusives: kpis.reduce((sum, kpi) => sum + kpi.exclusives, 0),
-      revenue: kpis.reduce((sum, kpi) => sum + kpi.revenue, 0),
+      realtors: realtors.length,
+      deals: monthDeals.length,
+      diagnoses: monthDiagnoses.length,
+      successRate,
+      totalDealValue,
+      levelDistribution,
     };
   }
 
   async getOfficeKPI(officeId: string) {
     const teams = await this.getTeamsByOffice(officeId);
+    if (teams.length === 0) {
+      return {
+        realtors: 0,
+        deals: 0,
+        diagnoses: 0,
+        successRate: 0,
+        totalDealValue: 0,
+        levelDistribution: {},
+      };
+    }
+
     const kpis = await Promise.all(teams.map(t => this.getTeamKPI(t.id)));
     
+    // Aggregate all metrics
+    const totalRealtors = kpis.reduce((sum, kpi) => sum + kpi.realtors, 0);
+    const totalDeals = kpis.reduce((sum, kpi) => sum + kpi.deals, 0);
+    const totalDiagnoses = kpis.reduce((sum, kpi) => sum + kpi.diagnoses, 0);
+    const totalDealValue = kpis.reduce((sum, kpi) => sum + kpi.totalDealValue, 0);
+    
+    // Merge level distributions
+    const levelDistribution: Record<number, number> = {};
+    kpis.forEach((kpi) => {
+      Object.entries(kpi.levelDistribution).forEach(([level, count]) => {
+        levelDistribution[Number(level)] = (levelDistribution[Number(level)] || 0) + count;
+      });
+    });
+
+    const successRate = totalDiagnoses > 0
+      ? Math.round((totalDeals / totalDiagnoses) * 100)
+      : 0;
+
     return {
-      deals: kpis.reduce((sum, kpi) => sum + kpi.deals, 0),
-      keys: kpis.reduce((sum, kpi) => sum + kpi.keys, 0),
-      exclusives: kpis.reduce((sum, kpi) => sum + kpi.exclusives, 0),
-      revenue: kpis.reduce((sum, kpi) => sum + kpi.revenue, 0),
+      realtors: totalRealtors,
+      deals: totalDeals,
+      diagnoses: totalDiagnoses,
+      successRate,
+      totalDealValue,
+      levelDistribution,
     };
   }
 
   async getCityKPI(cityId: string) {
     const offices = await this.getOfficesByCity(cityId);
+    if (offices.length === 0) {
+      return {
+        realtors: 0,
+        deals: 0,
+        diagnoses: 0,
+        successRate: 0,
+        totalDealValue: 0,
+        levelDistribution: {},
+      };
+    }
+
     const kpis = await Promise.all(offices.map(o => this.getOfficeKPI(o.id)));
     
+    // Aggregate all metrics
+    const totalRealtors = kpis.reduce((sum, kpi) => sum + kpi.realtors, 0);
+    const totalDeals = kpis.reduce((sum, kpi) => sum + kpi.deals, 0);
+    const totalDiagnoses = kpis.reduce((sum, kpi) => sum + kpi.diagnoses, 0);
+    const totalDealValue = kpis.reduce((sum, kpi) => sum + kpi.totalDealValue, 0);
+    
+    // Merge level distributions
+    const levelDistribution: Record<number, number> = {};
+    kpis.forEach((kpi) => {
+      Object.entries(kpi.levelDistribution).forEach(([level, count]) => {
+        levelDistribution[Number(level)] = (levelDistribution[Number(level)] || 0) + count;
+      });
+    });
+
+    const successRate = totalDiagnoses > 0
+      ? Math.round((totalDeals / totalDiagnoses) * 100)
+      : 0;
+
     return {
-      deals: kpis.reduce((sum, kpi) => sum + kpi.deals, 0),
-      keys: kpis.reduce((sum, kpi) => sum + kpi.keys, 0),
-      exclusives: kpis.reduce((sum, kpi) => sum + kpi.exclusives, 0),
-      revenue: kpis.reduce((sum, kpi) => sum + kpi.revenue, 0),
+      realtors: totalRealtors,
+      deals: totalDeals,
+      diagnoses: totalDiagnoses,
+      successRate,
+      totalDealValue,
+      levelDistribution,
     };
   }
 
-  // Buyer Schedule - hardcoded first, then backup, then Supabase
+  async getCountryKPI(countryId: string) {
+    const cities = await this.getCitiesByCountry(countryId);
+    if (cities.length === 0) {
+      return {
+        realtors: 0,
+        deals: 0,
+        diagnoses: 0,
+        successRate: 0,
+        totalDealValue: 0,
+        levelDistribution: {},
+      };
+    }
+
+    const kpis = await Promise.all(cities.map(c => this.getCityKPI(c.id)));
+    
+    // Aggregate all metrics
+    const totalRealtors = kpis.reduce((sum, kpi) => sum + kpi.realtors, 0);
+    const totalDeals = kpis.reduce((sum, kpi) => sum + kpi.deals, 0);
+    const totalDiagnoses = kpis.reduce((sum, kpi) => sum + kpi.diagnoses, 0);
+    const totalDealValue = kpis.reduce((sum, kpi) => sum + kpi.totalDealValue, 0);
+    
+    // Merge level distributions
+    const levelDistribution: Record<number, number> = {};
+    kpis.forEach((kpi) => {
+      Object.entries(kpi.levelDistribution).forEach(([level, count]) => {
+        levelDistribution[Number(level)] = (levelDistribution[Number(level)] || 0) + count;
+      });
+    });
+
+    const successRate = totalDiagnoses > 0
+      ? Math.round((totalDeals / totalDiagnoses) * 100)
+      : 0;
+
+    return {
+      realtors: totalRealtors,
+      deals: totalDeals,
+      diagnoses: totalDiagnoses,
+      successRate,
+      totalDealValue,
+      levelDistribution,
+    };
+  }
+
+  // Buyer Schedule - Supabase first, then local backup
   async getBuyerSchedule(userId: string) {
     const realtor = await this.getCurrentRealtor(userId);
     if (!realtor) return [];
     
-    return withLocalBackupFirst(
+    const result = await withLocalBackupFirst(
       'buyer_schedule',
-      () => [],
-      (schedule) => (schedule as { realtor_id?: string }).realtor_id === realtor.id,
       async () => {
         const { data, error } = await supabase
           .from('buyer_schedule')
@@ -589,19 +1101,19 @@ class SupabaseApiClient {
           .eq('realtor_id', realtor.id)
           .order('schedule_date', { ascending: true });
         return { data, error };
-      }
-    ).then(result => result.data as Tables<'buyer_schedule'>[]);
+      },
+      (schedule) => (schedule as { realtor_id?: string }).realtor_id === realtor.id
+    );
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+    return (result.data as Tables<'buyer_schedule'>[]) || [];
   }
 
-  // Messages - hardcoded first, then backup, then Supabase
+  // Messages - Supabase first, then local backup
   async getMessages(userId: string) {
-    return withLocalBackupFirst(
+    const result = await withLocalBackupFirst(
       'messages',
-      () => [],
-      (msg) => {
-        const message = msg as { sender_id?: string; receiver_id?: string };
-        return message.sender_id === userId || message.receiver_id === userId;
-      },
       async () => {
         const { data, error } = await supabase
           .from('messages')
@@ -609,23 +1121,83 @@ class SupabaseApiClient {
           .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
           .order('created_at', { ascending: false });
         return { data, error };
+      },
+      (msg) => {
+        const message = msg as { sender_id?: string; receiver_id?: string };
+        return message.sender_id === userId || message.receiver_id === userId;
       }
-    ).then(result => result.data as Tables<'messages'>[]);
+    );
+    if (result.error && !result.fromCache) {
+      throw handleSupabaseError(result.error);
+    }
+    return (result.data as Tables<'messages'>[]) || [];
   }
 
   // Write operations always go to Supabase (can't hardcode writes)
+  async createCountry(data: { name: string; code: string }) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
+    const { data: country, error } = await supabase
+      .from('countries')
+      .insert({ name: data.name, code: data.code.toUpperCase() })
+      .select()
+      .single();
+
+    if (error) throw handleSupabaseError(error);
+    return country;
+  }
+
+  async updateCountry(id: string, data: { name?: string; code?: string }) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
+    const updateData: { name?: string; code?: string } = {};
+    if (data.name) updateData.name = data.name;
+    if (data.code) updateData.code = data.code.toUpperCase();
+    
+    const { data: country, error } = await supabase
+      .from('countries')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw handleSupabaseError(error);
+    return country;
+  }
+
+  async deleteCountry(id: string) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
+    const { error } = await supabase
+      .from('countries')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw handleSupabaseError(error);
+    return { success: true };
+  }
+
   async createCity(data: { name: string; countryId: string }) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
     const { data: city, error } = await supabase
       .from('cities')
       .insert({ name: data.name, country_id: data.countryId })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) throw handleSupabaseError(error);
     return city;
   }
 
   async updateCity(id: string, data: { name: string }) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
     const { data: city, error } = await supabase
       .from('cities')
       .update({ name: data.name })
@@ -633,32 +1205,41 @@ class SupabaseApiClient {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) throw handleSupabaseError(error);
     return city;
   }
 
   async deleteCity(id: string) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
     const { error } = await supabase
       .from('cities')
       .delete()
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) throw handleSupabaseError(error);
     return { success: true };
   }
 
   async createOffice(data: { name: string; cityId: string; address?: string }) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
     const { data: office, error } = await supabase
       .from('offices')
       .insert({ name: data.name, city_id: data.cityId, address: data.address })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) throw handleSupabaseError(error);
     return office;
   }
 
   async updateOffice(id: string, data: { name?: string; address?: string }) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
     const { data: office, error } = await supabase
       .from('offices')
       .update(data)
@@ -666,54 +1247,73 @@ class SupabaseApiClient {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) throw handleSupabaseError(error);
     return office;
   }
 
   async deleteOffice(id: string) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
     const { error } = await supabase
       .from('offices')
       .delete()
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) throw handleSupabaseError(error);
     return { success: true };
   }
 
   async createTeam(data: { name: string; officeId: string; leaderId?: string }) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
     const { data: team, error } = await supabase
       .from('teams')
       .insert({ name: data.name, office_id: data.officeId, leader_id: data.leaderId })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) throw handleSupabaseError(error);
     return team;
   }
 
   async updateTeam(id: string, data: { name?: string; leaderId?: string }) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
+    const updateData: { name?: string; leader_id?: string | null } = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.leaderId !== undefined) updateData.leader_id = data.leaderId || null;
+    
     const { data: team, error } = await supabase
       .from('teams')
-      .update({ name: data.name, leader_id: data.leaderId })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) throw handleSupabaseError(error);
     return team;
   }
 
   async deleteTeam(id: string) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
     const { error } = await supabase
       .from('teams')
       .delete()
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) throw handleSupabaseError(error);
     return { success: true };
   }
 
   async createRealtor(data: { userId: string; teamId?: string; level?: number }) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
     const { data: realtor, error } = await supabase
       .from('realtors')
       .insert({
@@ -724,29 +1324,39 @@ class SupabaseApiClient {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) throw handleSupabaseError(error);
     return realtor;
   }
 
   async updateRealtor(id: string, data: { teamId?: string; level?: number }) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
+    const updateData: { team_id?: string | null; level?: number } = {};
+    if (data.teamId !== undefined) updateData.team_id = data.teamId || null;
+    if (data.level !== undefined) updateData.level = data.level;
+    
     const { data: realtor, error } = await supabase
       .from('realtors')
-      .update(data)
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) throw handleSupabaseError(error);
     return realtor;
   }
 
   async deleteRealtor(id: string) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
     const { error } = await supabase
       .from('realtors')
       .delete()
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) throw handleSupabaseError(error);
     return { success: true };
   }
 
@@ -873,24 +1483,93 @@ class SupabaseApiClient {
     handoverCompleted?: boolean;
     examCompleted?: boolean;
   }) {
-    const { data: progress, error } = await supabase
+    // Validate required fields
+    if (!data.realtorId || !data.section || !data.subsection) {
+      throw new Error('Missing required fields: realtorId, section, or subsection');
+    }
+
+    // Verify realtor exists
+    const { data: realtor, error: realtorError } = await supabase
+      .from('realtors')
+      .select('id')
+      .eq('id', data.realtorId)
+      .single();
+
+    if (realtorError || !realtor) {
+      throw new Error(`Realtor with id ${data.realtorId} not found`);
+    }
+
+    // Build update data with only provided fields
+    const updateData: Record<string, string | boolean> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    // Only update fields that are explicitly provided
+    if (data.lectureCompleted !== undefined) {
+      updateData.lecture_completed = data.lectureCompleted;
+    }
+    if (data.videoCompleted !== undefined) {
+      updateData.video_completed = data.videoCompleted;
+    }
+    if (data.practicalCompleted !== undefined) {
+      updateData.practical_completed = data.practicalCompleted;
+    }
+    if (data.handoverCompleted !== undefined) {
+      updateData.handover_completed = data.handoverCompleted;
+    }
+    if (data.examCompleted !== undefined) {
+      updateData.exam_completed = data.examCompleted;
+    }
+
+    // Try to update first (if record exists)
+    const { data: updated, error: updateError } = await supabase
       .from('training_progress')
-      .upsert({
+      .update(updateData)
+      .eq('realtor_id', data.realtorId)
+      .eq('section', data.section)
+      .eq('subsection', data.subsection)
+      .select()
+      .maybeSingle();
+
+    // If update succeeded, return the result
+    if (updated && !updateError) {
+      return updated;
+    }
+
+    // If update failed because record doesn't exist, try insert
+    // Check if error is because no rows were updated (record doesn't exist)
+    if (updateError || !updated) {
+      // Insert new record - set all fields, using provided values or false as default
+      const insertData: Record<string, string | boolean> = {
         realtor_id: data.realtorId,
         section: data.section,
         subsection: data.subsection,
-        lecture_completed: data.lectureCompleted,
-        video_completed: data.videoCompleted,
-        practical_completed: data.practicalCompleted,
-        handover_completed: data.handoverCompleted,
-        exam_completed: data.examCompleted,
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+        lecture_completed: data.lectureCompleted ?? false,
+        video_completed: data.videoCompleted ?? false,
+        practical_completed: data.practicalCompleted ?? false,
+        handover_completed: data.handoverCompleted ?? false,
+        exam_completed: data.examCompleted ?? false,
+      };
 
-    if (error) throw error;
-    return progress;
+      const { data: progress, error: insertError } = await supabase
+        .from('training_progress')
+        .insert(insertData)
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Error inserting training progress:', insertError);
+        console.error('Insert data:', JSON.stringify(insertData, null, 2));
+        console.error('Realtor ID:', data.realtorId);
+        console.error('Section:', data.section);
+        console.error('Subsection:', data.subsection);
+        throw insertError;
+      }
+      return progress;
+    }
+
+    // This shouldn't happen, but just in case
+    throw new Error('Unexpected error in updateTrainingProgress');
   }
 
   async updateRealtorGoals(data: {
@@ -1055,6 +1734,422 @@ class SupabaseApiClient {
 
     if (error) throw error;
     return { success: true };
+  }
+
+  // Training Groups - CRUD operations
+  async getAllTrainingGroups() {
+    try {
+      const { data: groups, error } = await supabase
+        .from('training_groups')
+        .select(`
+          *,
+          leader:profiles!training_groups_leader_id_fkey(id, full_name, email),
+          created_by
+        `)
+        .order('start_date', { ascending: false });
+
+      if (error) throw error;
+
+      // Get trainees for each group
+      const groupsWithTrainees = await Promise.all(
+        (groups || []).map(async (group) => {
+          const { data: trainees, error: traineesError } = await supabase
+            .from('training_group_trainees')
+            .select('*')
+            .eq('group_id', group.id)
+            .order('created_at', { ascending: true });
+
+          if (traineesError) {
+            console.error('Error fetching trainees for group:', group.id, traineesError);
+            return {
+              ...group,
+              trainees: [],
+            };
+          }
+
+          return {
+            id: group.id,
+            startDate: group.start_date,
+            leaderId: group.leader_id,
+            leader: group.leader?.full_name || 'Неизвестен',
+            currentDay: group.current_day,
+            status: group.status,
+            trainees: (trainees || []).map((t) => ({
+              id: t.id,
+              name: t.name,
+              phone: t.phone || '',
+              email: t.email || '',
+              position: t.position || '',
+              introCompleted: t.intro_completed || false,
+              trainingStage: t.training_stage,
+              level: t.level || 'Чирак',
+            })),
+            createdBy: group.created_by || null,
+          };
+        })
+      );
+
+      return groupsWithTrainees;
+    } catch (error) {
+      console.error('Error fetching training groups:', error);
+      throw handleSupabaseError(error);
+    }
+  }
+
+  async getTrainingGroupById(groupId: string) {
+    try {
+      const { data: group, error } = await supabase
+        .from('training_groups')
+        .select(`
+          *,
+          leader:profiles!training_groups_leader_id_fkey(id, full_name, email)
+        `)
+        .eq('id', groupId)
+        .single();
+
+      if (error) throw error;
+      if (!group) return null;
+
+      const { data: trainees, error: traineesError } = await supabase
+        .from('training_group_trainees')
+        .select('*')
+        .eq('group_id', groupId)
+        .order('created_at', { ascending: true });
+
+      if (traineesError) {
+        console.error('Error fetching trainees:', traineesError);
+        return null;
+      }
+
+      return {
+        id: group.id,
+        startDate: group.start_date,
+        leaderId: group.leader_id,
+        leader: group.leader?.full_name || 'Неизвестен',
+        currentDay: group.current_day,
+        status: group.status,
+        trainees: (trainees || []).map((t) => ({
+          id: t.id,
+          name: t.name,
+          phone: t.phone || '',
+          email: t.email || '',
+          position: t.position || '',
+          introCompleted: t.intro_completed || false,
+          trainingStage: t.training_stage,
+          level: t.level || 'Чирак',
+        })),
+      };
+    } catch (error) {
+      console.error('Error fetching training group:', error);
+      throw handleSupabaseError(error);
+    }
+  }
+
+  async createTrainingGroup(data: {
+    startDate: string;
+    leaderId: string;
+    currentDay?: number;
+    status?: 'активна' | 'завършена' | 'предстояща';
+  }) {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
+
+      const { data: group, error } = await supabase
+        .from('training_groups')
+        .insert({
+          start_date: data.startDate,
+          leader_id: data.leaderId,
+          current_day: data.currentDay || 1,
+          status: data.status || 'активна',
+          created_by: userId || null,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return group;
+    } catch (error) {
+      console.error('Error creating training group:', error);
+      throw handleSupabaseError(error);
+    }
+  }
+
+  async updateTrainingGroup(groupId: string, data: {
+    startDate?: string;
+    leaderId?: string;
+    currentDay?: number;
+    status?: 'активна' | 'завършена' | 'предстояща';
+  }) {
+    try {
+      const updateData: Record<string, string | number> = {};
+      if (data.startDate) updateData.start_date = data.startDate;
+      if (data.leaderId) updateData.leader_id = data.leaderId;
+      if (data.currentDay !== undefined) updateData.current_day = data.currentDay;
+      if (data.status) updateData.status = data.status;
+
+      const { data: group, error } = await supabase
+        .from('training_groups')
+        .update(updateData)
+        .eq('id', groupId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return group;
+    } catch (error) {
+      console.error('Error updating training group:', error);
+      throw handleSupabaseError(error);
+    }
+  }
+
+  async deleteTrainingGroup(groupId: string) {
+    try {
+      // Delete trainees first (CASCADE should handle this, but let's be explicit)
+      await supabase
+        .from('training_group_trainees')
+        .delete()
+        .eq('group_id', groupId);
+
+      const { error } = await supabase
+        .from('training_groups')
+        .delete()
+        .eq('id', groupId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting training group:', error);
+      throw handleSupabaseError(error);
+    }
+  }
+
+  // Training Group Trainees - CRUD operations
+  async addTraineeToGroup(groupId: string, data: {
+    name: string;
+    phone?: string;
+    email?: string;
+    position?: string;
+  }) {
+    try {
+      const { data: trainee, error } = await supabase
+        .from('training_group_trainees')
+        .insert({
+          group_id: groupId,
+          name: data.name,
+          phone: data.phone || null,
+          email: data.email || null,
+          position: data.position || null,
+          intro_completed: false,
+          training_stage: 1,
+          level: 'Чирак',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return trainee;
+    } catch (error) {
+      console.error('Error adding trainee to group:', error);
+      throw handleSupabaseError(error);
+    }
+  }
+
+  async updateTrainee(traineeId: string, data: {
+    name?: string;
+    phone?: string;
+    email?: string;
+    position?: string;
+    introCompleted?: boolean;
+    trainingStage?: number;
+    level?: string;
+    groupId?: string;
+  }) {
+    try {
+      const updateData: Record<string, string | number | boolean | null> = {};
+      if (data.name) updateData.name = data.name;
+      if (data.phone !== undefined) updateData.phone = data.phone || null;
+      if (data.email !== undefined) updateData.email = data.email || null;
+      if (data.position !== undefined) updateData.position = data.position || null;
+      if (data.introCompleted !== undefined) updateData.intro_completed = data.introCompleted;
+      if (data.trainingStage !== undefined) updateData.training_stage = data.trainingStage;
+      if (data.level) updateData.level = data.level;
+      if (data.groupId) updateData.group_id = data.groupId;
+
+      const { data: trainee, error } = await supabase
+        .from('training_group_trainees')
+        .update(updateData)
+        .eq('id', traineeId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return trainee;
+    } catch (error) {
+      console.error('Error updating trainee:', error);
+      throw handleSupabaseError(error);
+    }
+  }
+
+  async deleteTrainee(traineeId: string) {
+    try {
+      const { error } = await supabase
+        .from('training_group_trainees')
+        .delete()
+        .eq('id', traineeId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting trainee:', error);
+      throw handleSupabaseError(error);
+    }
+  }
+
+  async markIntroCompleted(groupId: string) {
+    try {
+      // Mark all trainees in the group as having completed intro
+      const { error } = await supabase
+        .from('training_group_trainees')
+        .update({ intro_completed: true })
+        .eq('group_id', groupId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Error marking intro as completed:', error);
+      throw handleSupabaseError(error);
+    }
+  }
+
+  async markTraineeIntroCompleted(traineeId: string) {
+    try {
+      const { data: trainee, error } = await supabase
+        .from('training_group_trainees')
+        .update({ intro_completed: true })
+        .eq('id', traineeId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return trainee;
+    } catch (error) {
+      console.error('Error marking trainee intro as completed:', error);
+      throw handleSupabaseError(error);
+    }
+  }
+
+  async createTraineeProfile(traineeId: string, teamId?: string) {
+    try {
+      // Get trainee data
+      const { data: trainee, error: traineeError } = await supabase
+        .from('training_group_trainees')
+        .select('*')
+        .eq('id', traineeId)
+        .single();
+
+      if (traineeError) throw traineeError;
+      if (!trainee) throw new Error('Trainee not found');
+
+      // Check if profile already exists by email
+      let profileId: string | null = null;
+      if (trainee.email) {
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', trainee.email)
+          .single();
+
+        if (existingProfile) {
+          profileId = existingProfile.id;
+        }
+      }
+
+      // Create profile if doesn't exist
+      if (!profileId) {
+        // Generate a temporary password
+        const tempPassword = `Temp${Math.random().toString(36).slice(-8)}!`;
+        
+        // Create auth user
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: trainee.email || `${trainee.name.toLowerCase().replace(/\s+/g, '.')}@training.local`,
+          password: tempPassword,
+          options: {
+            data: {
+              full_name: trainee.name,
+            },
+          },
+        });
+
+        if (authError) throw authError;
+        if (!authData.user) throw new Error('Failed to create user');
+
+        profileId = authData.user.id;
+
+        // Create profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: profileId,
+            full_name: trainee.name,
+            email: trainee.email || `${trainee.name.toLowerCase().replace(/\s+/g, '.')}@training.local`,
+          });
+
+        if (profileError) throw profileError;
+
+        // Assign realtor role
+        await supabase
+          .from('user_roles')
+          .insert({
+            user_id: profileId,
+            role: 'realtor',
+          });
+      }
+
+      // Create or update realtor record
+      const { data: existingRealtor } = await supabase
+        .from('realtors')
+        .select('id')
+        .eq('user_id', profileId)
+        .single();
+
+      let realtorId: string;
+      if (existingRealtor) {
+        // Update existing realtor
+        const { data: updatedRealtor, error: updateError } = await supabase
+          .from('realtors')
+          .update({
+            team_id: teamId || null,
+            level: 1,
+          })
+          .eq('id', existingRealtor.id)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        realtorId = updatedRealtor.id;
+      } else {
+        // Create new realtor
+        const { data: newRealtor, error: createError } = await supabase
+          .from('realtors')
+          .insert({
+            user_id: profileId,
+            team_id: teamId || null,
+            level: 1,
+          })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        realtorId = newRealtor.id;
+      }
+
+      return { profileId, realtorId };
+    } catch (error) {
+      console.error('Error creating trainee profile:', error);
+      throw handleSupabaseError(error);
+    }
   }
 }
 

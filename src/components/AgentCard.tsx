@@ -1,5 +1,5 @@
 import { Card } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+// Avatar removed - using modern design with initials badges instead
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Agent } from '@/types';
@@ -32,15 +32,14 @@ export const AgentCard = ({ agent, onClick }: AgentCardProps) => {
       className="p-6 cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 bg-card border-border"
     >
       <div className="flex items-start gap-4">
-        <Avatar className="h-14 w-14 border-2 border-primary/20">
-          <AvatarImage src={agent.avatar} alt={agent.name} />
-          <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-            {agent.name
-              .split(' ')
-              .map((n) => n[0])
-              .join('')}
-          </AvatarFallback>
-        </Avatar>
+        <div className="h-14 w-14 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-base border-2 border-primary/30 flex-shrink-0">
+          {agent.name
+            .split(' ')
+            .map((n) => n[0])
+            .join('')
+            .slice(0, 2)
+            .toUpperCase()}
+        </div>
 
         <div className="flex-1">
           <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">

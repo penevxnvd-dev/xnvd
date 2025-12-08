@@ -5,7 +5,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+// Avatar removed - using modern design with initials badges instead
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Card } from '@/components/ui/card';
@@ -93,15 +93,14 @@ export const AgentDetailDialog = ({ agent, open, onOpenChange }: AgentDetailDial
         <DialogHeader>
           <DialogTitle className="sr-only">Данни за агент</DialogTitle>
           <div className="flex items-start gap-4 pt-2">
-            <Avatar className="h-20 w-20 border-2 border-primary/20">
-              <AvatarImage src={agent.avatar} alt={agent.name} />
-              <AvatarFallback className="bg-primary/10 text-primary font-semibold text-lg">
-                {agent.name
-                  .split(' ')
-                  .map((n) => n[0])
-                  .join('')}
-              </AvatarFallback>
-            </Avatar>
+            <div className="h-20 w-20 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-2xl border-2 border-primary/30 flex-shrink-0">
+              {agent.name
+                .split(' ')
+                .map((n) => n[0])
+                .join('')
+                .slice(0, 2)
+                .toUpperCase()}
+            </div>
             <div className="flex-1">
               <h2 className="text-2xl font-bold text-foreground">{agent.name}</h2>
               <p className="text-muted-foreground">{agent.position}</p>
