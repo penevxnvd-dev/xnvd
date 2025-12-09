@@ -19,5 +19,19 @@
     "office_id": "b8722aa0-9560-424a-a1fa-72d9cd439637",
     "leader_id": "dbde39c2-e12b-493a-9ad2-baaa0242d75f",
     "created_at": "2025-12-08T00:19:15.405452+00:00"
+  },
+  {
+    "id": "0c5d5a28-4d44-4bf7-9f44-4f4b7c2d2f01",
+    "name": "Екип Мирослав Христов",
+    "office_id": "b87c65f4-f393-4601-bbd7-2d0e296b6c4f",
+    "leader_id": "e8cf002f-31c6-4cb5-988a-795b739b10a6",
+    "created_at": "2025-12-09T10:21:41.864582+00:00"
+  },
+  {
+    "id": "c8e6de6c-4f1c-4f9b-8c1c-0fa784f1a9d2",
+    "name": "Екип Васил Амити",
+    "office_id": "4b7c8fcb-97b4-4d3f-9170-e6e5480f8030",
+    "leader_id": "54672263-ae93-4aa8-8c17-b84d3994aa1e",
+    "created_at": "2025-12-09T10:21:41.864582+00:00"
   }
 ]
