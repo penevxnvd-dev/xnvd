@@ -318,6 +318,12 @@ export const TrainingCalendar = ({
     const cityOffice = leaderCityMap.get(leader.id);
     if (!cityOffice) return true; // If city/office not found, allow viewing (fallback)
 
+    // Ако има избран град (selectedCityId), филтрираме по град за ВСИЧКИ роли
+    // Това гарантира, че календарът за Пловдив не показва групи от Бургас и обратно
+    if (selectedCityId) {
+      return cityOffice.cityId === selectedCityId;
+    }
+
     // Краси Кътев - вижда само Бургас
     if (isKrasi) {
       return cityOffice.cityName === 'Бургас';
@@ -329,12 +335,7 @@ export const TrainingCalendar = ({
     }
 
     // Regional manager - вижда градовете в техния регион
-    // Ако има избран град, показва само групите от този град
     if (isRegionalManager) {
-      if (selectedCityId) {
-        // Ако има избран град, показва само групите от този град
-        return cityOffice.cityId === selectedCityId;
-      }
       // Ако няма избран град, показва всички градове в техния регион
       if (userManagedCities.length > 0) {
         return userManagedCities.includes(cityOffice.cityId);
