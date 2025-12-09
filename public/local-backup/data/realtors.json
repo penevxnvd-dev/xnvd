@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "id": "67911d1d-cb8e-4944-b396-663dec364843",
+    "user_id": "8eb5422b-780c-4610-b557-50df32a395f0",
+    "team_id": "d83d37b7-ebdb-42ff-b49b-e3f55e9a4958",
+    "level": 1,
+    "hire_date": "2025-12-08",
+    "confidence": false,
+    "sales_resilience": false,
+    "success_mindset": false,
+    "created_at": "2025-12-08T15:43:15.877355+00:00",
+    "updated_at": "2025-12-08T15:43:15.877355+00:00"
+  }
+]

@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "id": "0a45ad26-76dc-49fb-acc5-06876081601a",
+    "realtor_id": "67911d1d-cb8e-4944-b396-663dec364843",
+    "section": "work-with-buyer",
+    "subsection": "diagnosis",
+    "lecture_completed": false,
+    "video_completed": false,
+    "practical_completed": false,
+    "handover_completed": false,
+    "exam_completed": false,
+    "updated_at": "2025-12-08T21:06:55.246144+00:00"
+  }
+]
