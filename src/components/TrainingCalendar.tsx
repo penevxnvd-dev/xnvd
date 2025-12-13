@@ -118,6 +118,7 @@ export const TrainingCalendar = ({
   const normalize = (name?: string): string => (name || '').toLowerCase().replace(/\s+/g, ' ').trim();
   const isKrasi = normalize(currentUserName).includes('краси') && normalize(currentUserName).includes('кътев');
   const isKamen = normalize(currentUserName).includes('камен') && normalize(currentUserName).includes('георг');
+  const isGeorgiPenev = normalize(currentUserName).includes('георги') && normalize(currentUserName).includes('пенев');
   const isTeamLeader = currentUserRole === 'team_leader';
   const isRegionalManager = currentUserRole === 'regional_manager';
   const isOfficeManager = currentUserRole === 'office_manager';
@@ -334,6 +335,11 @@ export const TrainingCalendar = ({
       return cityOffice.cityName === 'Бургас' || cityOffice.cityName === 'Пловдив';
     }
 
+    // Георги Пенев - вижда всички групи в Бургас
+    if (isGeorgiPenev) {
+      return cityOffice.cityName === 'Бургас';
+    }
+
     // Regional manager - вижда градовете в техния регион
     if (isRegionalManager) {
       // Ако няма избран град, показва всички градове в техния регион
@@ -364,7 +370,7 @@ export const TrainingCalendar = ({
   };
 
   // Filter groups based on view permissions
-  const visibleGroups = useMemo(() => groups.filter(g => canViewGroup(g)), [groups, availableLeaders, leaderCityMap, userManagedCities, userManagedOffice, userTeam, realtorOffice, selectedCityId, isKrasi, isKamen, isRegionalManager, isOfficeManager, isTeamLeader, isRealtor]);
+  const visibleGroups = useMemo(() => groups.filter(g => canViewGroup(g)), [groups, availableLeaders, leaderCityMap, userManagedCities, userManagedOffice, userTeam, realtorOffice, selectedCityId, isKrasi, isKamen, isGeorgiPenev, isRegionalManager, isOfficeManager, isTeamLeader, isRealtor]);
   const activeGroups = useMemo(() => visibleGroups.filter(g => g.status === 'активна'), [visibleGroups]);
   const completedGroups = useMemo(() => visibleGroups.filter(g => g.status === 'завършена'), [visibleGroups]);
   
@@ -384,6 +390,9 @@ export const TrainingCalendar = ({
           // Will filter after we have city info
         } else if (isKamen) {
           // Камен Георгиев - вижда ръководители от Бургас и Пловдив
+          // Will filter after we have city info
+        } else if (isGeorgiPenev) {
+          // Георги Пенев - вижда всички ръководители от Бургас
           // Will filter after we have city info
         } else if (isTeamLeader && currentUserName) {
           // Team leader - вижда само себе си
@@ -426,6 +435,12 @@ export const TrainingCalendar = ({
         const cityOffice = leaderCityMap.get(leader.id);
         return cityOffice && (cityOffice.cityName === 'Бургас' || cityOffice.cityName === 'Пловдив');
       });
+    } else if (isGeorgiPenev) {
+      // Георги Пенев - вижда всички ръководители от Бургас
+      filtered = availableLeaders.filter(leader => {
+        const cityOffice = leaderCityMap.get(leader.id);
+        return cityOffice && cityOffice.cityName === 'Бургас';
+      });
     } else if (isRegionalManager && userManagedCities.length > 0) {
       // Regional manager - вижда ръководители от градовете в техния регион
       filtered = availableLeaders.filter(leader => {
@@ -446,7 +461,7 @@ export const TrainingCalendar = ({
         setSelectedLeader(filtered[0].fullName);
       }
     }
-  }, [leaderCityMap, userManagedCities, userManagedOffice, isKrasi, isKamen, isRegionalManager, isOfficeManager]);
+  }, [leaderCityMap, userManagedCities, userManagedOffice, isKrasi, isKamen, isGeorgiPenev, isRegionalManager, isOfficeManager, availableLeaders, selectedLeader]);
 
   const [registeredTrainees, setRegisteredTrainees] = useState<Array<{
     id: string;
