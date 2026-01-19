@@ -19,7 +19,7 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Menu, ChevronLeft, Home, Plus, Pencil, Trash2, Calendar, ChevronDown, FileText, Target, CheckCircle2, XCircle, Award, TrendingUp, GraduationCap, BarChart3, Users, Settings, Download, BookOpen, LogOut } from 'lucide-react';
+import { GripVertical, Menu, ChevronLeft, Home, Plus, Pencil, Trash2, Calendar, ChevronDown, FileText, Target, CheckCircle2, XCircle, Award, TrendingUp, GraduationCap, BarChart3, Users, Settings, Download, BookOpen, LogOut, Stethoscope, ClipboardCheck, Activity, Handshake, DollarSign, Percent } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,7 +35,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 // Avatar removed - using modern design with initials badges instead
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
+import { UserManagementDialog } from '@/components/UserManagementDialog';
 import { NotificationCenter } from '@/components/NotificationCenter';
+import { useUserRole } from '@/hooks/useUserRole';
+import { hasPermission } from '@/utils/permissions';
 import { exportKPIData, exportDeals, exportDiagnoses } from '@/lib/export';
 import { toast } from 'sonner';
 import {
@@ -48,12 +51,15 @@ import { TrainingManagementDialog } from '@/components/TrainingManagementDialog'
 import { TopologySidebar } from '@/components/TopologySidebar';
 import { transformOffices } from '@/utils/dataTransform';
 import { Office as UIOffice } from '@/types';
-import { trainingStructure, calculateTrainingProgress, TrainingSection } from '@/data/trainingStructure';
+import { trainingStructure, calculateTrainingProgress, TrainingSection, isTrainingFullyCompleted } from '@/data/trainingStructure';
 import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
 import { Progress } from '@/components/ui/progress';
 import { formatNameWithEmoji, formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
-import logo from '@/assets/logo.jpeg';
+import { AppLayout } from '@/components/layouts/AppLayout';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseApi } from '@/lib/supabaseApi';
+import { useMemo } from 'react';
+import { StatBadge } from '@/components/StatBadge';
 
 type ViewLevel = 'realtors' | 'realtor-detail';
 
@@ -128,15 +134,25 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
   const [selectedRealtorTrainingData, setSelectedRealtorTrainingData] = useState<TrainingSection[]>(trainingStructure);
   const [selectedRealtorTrainingProgress, setSelectedRealtorTrainingProgress] = useState(0);
   const [topologyOffices, setTopologyOffices] = useState<UIOffice[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem('sidebarOpen');
+    return saved !== null ? saved === 'true' : false; // Default to closed
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sidebarOpen', String(sidebarOpen));
+  }, [sidebarOpen]);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [userManagementOpen, setUserManagementOpen] = useState(false);
   const [trainingDialogOpen, setTrainingDialogOpen] = useState(false);
   const [selectedRealtorForTraining, setSelectedRealtorForTraining] = useState<{ id: string; name: string } | null>(null);
+  const { role } = useUserRole();
 
   const [loading, setLoading] = useState(true);
   const [kpiMetrics, setKpiMetrics] = useState<KPIMetrics | null>(null);
   const [showKPI, setShowKPI] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [realtorFilter, setRealtorFilter] = useState<'all' | 'trainees' | 'realtors'>('all');
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -259,10 +275,6 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
     }
   };
 
-  const handleLogout = async () => {
-    await api.logout();
-    navigate('/auth');
-  };
 
   const getBreadcrumb = () => {
     const parts = ['Начало'];
@@ -272,6 +284,16 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
     }
     return parts.join(' / ');
   };
+
+  // Filter realtors based on selected filter
+  const filteredRealtors = useMemo(() => {
+    if (realtorFilter === 'trainees') {
+      return realtors.filter(r => r.level === 1);
+    } else if (realtorFilter === 'realtors') {
+      return realtors.filter(r => r.level > 1);
+    }
+    return realtors;
+  }, [realtors, realtorFilter]);
 
   const handleHome = () => {
     setCurrentView('realtors');
@@ -345,6 +367,17 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
           examCompleted: subsection.progress.exam,
         });
 
+        // Check if training is fully completed and promote trainee to realtor
+        if (isTrainingFullyCompleted(updatedData) && selectedRealtor.userId) {
+          try {
+            await supabaseApi.promoteTraineeToRealtor(selectedRealtor.userId, team?.id || undefined);
+            toast.success('🎉 Обучението е завършено! Курсистът е повишен до Реализатор.');
+          } catch (error) {
+            console.error('Error promoting trainee:', error);
+            // Don't show error to user, just log it
+          }
+        }
+
         // Show success message
         if (field === 'exam' && checked) {
           toast.success('Изпитът е минат! Подточката е завършена.');
@@ -413,9 +446,37 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
     );
   }
 
+  const customNavbarContent = (
+    <>
+      {/* Compact KPI Cards */}
+      {showKPI && kpiMetrics && (
+        <div className="flex items-center gap-1.5 sm:gap-2 ml-2 sm:ml-4">
+          <StatBadge
+            icon={Stethoscope}
+            value={kpiMetrics.diagnoses || 0}
+            title="Диагнози"
+            colorScheme="pink"
+          />
+          <StatBadge
+            icon={Handshake}
+            value={kpiMetrics.deals || 0}
+            title="Сделки"
+            colorScheme="amber"
+          />
+          <StatBadge
+            icon={BarChart3}
+            value={formatSuccessRate(kpiMetrics.successRate || 0)}
+            title="Успеваемост"
+            colorScheme="green"
+          />
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Topology Sidebar */}
+      {/* Topology Sidebar - Custom for TeamLeader */}
       <TopologySidebar
         offices={topologyOffices}
         onOfficeClick={() => {}}
@@ -426,187 +487,286 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
         mode="team-leader"
+        showQuickActions={true}
+        onTrainingCalendarClick={() => navigate('/training-calendar')}
+        onTrainingListClick={() => navigate('/training-list')}
+        onBackClick={handleBack}
+        showBackButton={currentView === 'realtor-detail'}
+        onExportClick={() => {
+          if (kpiMetrics) {
+            exportKPIData(kpiMetrics, `kpi-team-${team?.name}-${new Date().toISOString().split('T')[0]}`);
+            toast.success('KPI данните са експортирани');
+          }
+        }}
+        role="team_leader"
+        teamName={team?.name ? `Екип: ${team.name}` : undefined}
+        breadcrumb={getBreadcrumb()}
       />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-      <header className="border-b border-border bg-card/95 backdrop-blur-lg shadow-sm sticky top-0 z-30">
-        <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4">
-          {/* Top row - Logo, Title, Actions */}
-          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="h-8 w-8 sm:h-9 sm:w-9"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-              <button 
-                onClick={handleHome} 
-                className="hover:opacity-80 transition-opacity cursor-pointer flex-shrink-0"
-              >
-                <img src={logo} alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 object-contain" />
-              </button>
-              <div className="min-w-0 flex-1">
-                <h1 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground truncate">Екип: {team?.name || ''}</h1>
-                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{getBreadcrumb()}</p>
-              </div>
-              {/* Compact KPI Cards after title */}
-              {showKPI && kpiMetrics && (
-                <div className="flex items-center gap-1.5 sm:gap-2 ml-2 sm:ml-4">
-                  <div 
-                    className="group cursor-pointer rounded-md px-2 py-1 sm:px-2.5 sm:py-1.5 bg-gradient-to-br from-blue-500/10 to-blue-500/5 hover:from-blue-500/20 hover:to-blue-500/10 border border-blue-500/20 hover:border-blue-500/40 transition-all duration-300 hover:scale-105"
-                    title="Диагнози"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <Users className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                      <span className="text-xs sm:text-sm font-bold text-blue-700 dark:text-blue-300">{kpiMetrics.diagnoses || 0}</span>
-                    </div>
-                  </div>
-                  
-                  <div 
-                    className="group cursor-pointer rounded-md px-2 py-1 sm:px-2.5 sm:py-1.5 bg-gradient-to-br from-green-500/10 to-green-500/5 hover:from-green-500/20 hover:to-green-500/10 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 hover:scale-105"
-                    title="Сделки"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <TrendingUp className="h-3 w-3 text-green-600 dark:text-green-400" />
-                      <span className="text-xs sm:text-sm font-bold text-green-700 dark:text-green-300">{kpiMetrics.deals || 0}</span>
-                    </div>
-                  </div>
-                  
-                  <div 
-                    className="group cursor-pointer rounded-md px-2 py-1 sm:px-2.5 sm:py-1.5 bg-gradient-to-br from-purple-500/10 to-purple-500/5 hover:from-purple-500/20 hover:to-purple-500/10 border border-purple-500/20 hover:border-purple-500/40 transition-all duration-300 hover:scale-105"
-                    title="Успеваемост"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <Award className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-                      <span className="text-xs sm:text-sm font-bold text-purple-700 dark:text-purple-300">
-                        {formatSuccessRate(kpiMetrics.successRate || 0)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
+      {/* Main Content with AppLayout navbar */}
+      <AppLayout
+        showSidebar={false}
+        customNavbarContent={customNavbarContent}
+        onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+      >
+        <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-6 sm:space-y-8">
+        {loading ? (
+          <div className="space-y-6">
+            {/* Loading Skeletons */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardHeader className="p-4">
+                    <div className="h-4 w-24 bg-muted rounded" />
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <div className="h-8 w-16 bg-muted rounded" />
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-            <div className="flex gap-2">
-              <Button onClick={() => navigate('/training-calendar')} variant="outline" size="sm" className="text-xs sm:text-sm">
-                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Календар</span>
-              </Button>
-              <Button onClick={() => navigate('/training-progress')} variant="outline" size="sm" className="text-xs sm:text-sm">
-                <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Обучение</span>
-              </Button>
-              {currentView === 'realtor-detail' && (
-                <Button onClick={handleBack} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
-                  <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                  <span>Назад</span>
-                </Button>
-              )}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-                    <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    <span className="hidden sm:inline">Експорт</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Експорт на данни</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {selectedRealtorKPI && (
-                    <>
-                      <DropdownMenuItem onClick={() => {
-                        exportKPIData(selectedRealtorKPI, `kpi-realtor-${selectedRealtor?.user.fullName}-${new Date().toISOString().split('T')[0]}`);
-                        toast.success('KPI данните са експортирани');
-                      }}>
-                        <BarChart3 className="h-4 w-4 mr-2" />
-                        KPI данни (Реализатор)
-                      </DropdownMenuItem>
-                      {selectedRealtorDeals.length > 0 && (
-                        <DropdownMenuItem onClick={() => {
-                          exportDeals(selectedRealtorDeals, `deals-${selectedRealtor?.user.fullName}-${new Date().toISOString().split('T')[0]}`);
-                          toast.success('Сделките са експортирани');
-                        }}>
-                          <TrendingUp className="h-4 w-4 mr-2" />
-                          Сделки (Реализатор)
-                        </DropdownMenuItem>
-                      )}
-                      {selectedRealtorDiagnoses.length > 0 && (
-                        <DropdownMenuItem onClick={() => {
-                          exportDiagnoses(selectedRealtorDiagnoses, `diagnoses-${selectedRealtor?.user.fullName}-${new Date().toISOString().split('T')[0]}`);
-                          toast.success('Диагнозите са експортирани');
-                        }}>
-                          <Users className="h-4 w-4 mr-2" />
-                          Диагнози (Реализатор)
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
-                  {kpiMetrics && (
-                    <DropdownMenuItem onClick={() => {
-                      exportKPIData(kpiMetrics, `kpi-team-${team?.name}-${new Date().toISOString().split('T')[0]}`);
-                      toast.success('KPI данните са експортирани');
-                    }}>
-                      <BarChart3 className="h-4 w-4 mr-2" />
-                      KPI данни (Екип)
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem disabled>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Експорт на всички данни (скоро)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <NotificationCenter />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-[10px] sm:text-xs border border-primary/30">
-                        {userInfo?.fullName?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U'}
-                      </div>
-                      <span className="hidden sm:inline">{userInfo?.fullName || 'Акаунт'}</span>
-                      <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
-                    </div>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium">{userInfo?.fullName || 'Потребител'}</p>
-                      <p className="text-xs text-muted-foreground">{userInfo?.email || ''}</p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">
-                    Роля: {userInfo?.role || 'Неизвестна'}
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
-                    <Settings className="h-4 w-4 mr-2" />
-                    Настройки на акаунта
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Изход
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardContent className="p-6">
+                    <div className="h-32 bg-muted rounded" />
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
-        {loading ? (
-          <div className="text-center text-muted-foreground">Зареждане...</div>
         ) : (
           <>
+            {/* Statistics and Filters for Realtors View */}
+            {currentView === 'realtors' && (
+              <div className="space-y-6">
+                {/* Modern Statistics Cards with Animations */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+                  <Card className="group relative overflow-hidden border-2 border-transparent hover:border-primary/20 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] bg-gradient-to-br from-card to-card/50">
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <CardHeader className="p-4 sm:p-6 relative">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm sm:text-base flex items-center gap-2 font-semibold">
+                          <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                            <Users className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                          </div>
+                          <span>Всички</span>
+                        </CardTitle>
+                        <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 sm:p-6 pt-0 relative">
+                      <div className="flex items-baseline gap-2">
+                        <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                          {realtors.length}
+                        </div>
+                        <span className="text-xs sm:text-sm text-muted-foreground">члена</span>
+                      </div>
+                      <div className="mt-2 h-1 w-full bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-primary rounded-full" style={{ width: '100%' }} />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="group relative overflow-hidden border-2 border-transparent hover:border-blue-500/20 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] bg-gradient-to-br from-blue-50/50 dark:from-blue-950/20 to-card">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <CardHeader className="p-4 sm:p-6 relative">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm sm:text-base flex items-center gap-2 font-semibold">
+                          <div className="p-2 rounded-lg bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
+                            <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <span>Нови курсисти</span>
+                        </CardTitle>
+                        <Badge variant="secondary" className="bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">
+                          Нови
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 sm:p-6 pt-0 relative">
+                      <div className="flex items-baseline gap-2">
+                        <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-400 dark:to-blue-300 bg-clip-text text-transparent">
+                          {realtors.filter(r => r.level === 1).length}
+                        </div>
+                        <span className="text-xs sm:text-sm text-muted-foreground">курсисти</span>
+                      </div>
+                      <div className="mt-2 h-1 w-full bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-500" 
+                          style={{ width: `${realtors.length > 0 ? (realtors.filter(r => r.level === 1).length / realtors.length) * 100 : 0}%` }} 
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="group relative overflow-hidden border-2 border-transparent hover:border-green-500/20 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] bg-gradient-to-br from-green-50/50 dark:from-green-950/20 to-card">
+                    <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <CardHeader className="p-4 sm:p-6 relative">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm sm:text-base flex items-center gap-2 font-semibold">
+                          <div className="p-2 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
+                            <Award className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400" />
+                          </div>
+                          <span>Завършили</span>
+                        </CardTitle>
+                        <Badge variant="secondary" className="bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Готови
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 sm:p-6 pt-0 relative">
+                      <div className="flex items-baseline gap-2">
+                        <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-green-600 to-green-500 dark:from-green-400 dark:to-green-300 bg-clip-text text-transparent">
+                          {realtors.filter(r => r.level > 1).length}
+                        </div>
+                        <span className="text-xs sm:text-sm text-muted-foreground">реализатори</span>
+                      </div>
+                      <div className="mt-2 h-1 w-full bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500" 
+                          style={{ width: `${realtors.length > 0 ? (realtors.filter(r => r.level > 1).length / realtors.length) * 100 : 0}%` }} 
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Modern Filter Tabs with Better Styling */}
+                <div className="flex flex-wrap gap-2 sm:gap-3">
+                  <Button
+                    variant={realtorFilter === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setRealtorFilter('all')}
+                    className={cn(
+                      "transition-all duration-200",
+                      realtorFilter === 'all' 
+                        ? "shadow-md scale-105 bg-gradient-to-r from-primary to-primary/90" 
+                        : "hover:scale-105 hover:shadow-sm"
+                    )}
+                  >
+                    <Users className="h-3.5 w-3.5 mr-1.5" />
+                    Всички
+                    <Badge variant="secondary" className="ml-2 bg-background/50">
+                      {realtors.length}
+                    </Badge>
+                  </Button>
+                  <Button
+                    variant={realtorFilter === 'trainees' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setRealtorFilter('trainees')}
+                    className={cn(
+                      "transition-all duration-200",
+                      realtorFilter === 'trainees' 
+                        ? "shadow-md scale-105 bg-gradient-to-r from-blue-500 to-blue-600 text-white border-blue-600" 
+                        : "hover:scale-105 hover:shadow-sm hover:border-blue-500/50"
+                    )}
+                  >
+                    <GraduationCap className="h-3.5 w-3.5 mr-1.5" />
+                    Нови курсисти
+                    <Badge 
+                      variant="secondary" 
+                      className={cn(
+                        "ml-2",
+                        realtorFilter === 'trainees' 
+                          ? "bg-white/20 text-white border-white/30" 
+                          : "bg-blue-500/10 text-blue-700 dark:text-blue-300"
+                      )}
+                    >
+                      {realtors.filter(r => r.level === 1).length}
+                    </Badge>
+                  </Button>
+                  <Button
+                    variant={realtorFilter === 'realtors' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setRealtorFilter('realtors')}
+                    className={cn(
+                      "transition-all duration-200",
+                      realtorFilter === 'realtors' 
+                        ? "shadow-md scale-105 bg-gradient-to-r from-green-500 to-green-600 text-white border-green-600" 
+                        : "hover:scale-105 hover:shadow-sm hover:border-green-500/50"
+                    )}
+                  >
+                    <Award className="h-3.5 w-3.5 mr-1.5" />
+                    Завършили
+                    <Badge 
+                      variant="secondary" 
+                      className={cn(
+                        "ml-2",
+                        realtorFilter === 'realtors' 
+                          ? "bg-white/20 text-white border-white/30" 
+                          : "bg-green-500/10 text-green-700 dark:text-green-300"
+                      )}
+                    >
+                      {realtors.filter(r => r.level > 1).length}
+                    </Badge>
+                  </Button>
+                </div>
+
+                {/* Attention Section for New Trainees */}
+                {realtorFilter === 'trainees' && realtors.filter(r => r.level === 1).length > 0 && (
+                  <Card className="border-2 border-blue-500/30 bg-gradient-to-br from-blue-50/50 dark:from-blue-950/30 to-card animate-in slide-in-from-top-4 duration-500">
+                    <CardHeader className="p-4 sm:p-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 rounded-full bg-blue-500/10">
+                          <GraduationCap className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div className="flex-1">
+                          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                            Нови курсисти - Требува внимание
+                            <Badge className="bg-blue-500 text-white animate-pulse">
+                              {realtors.filter(r => r.level === 1).length}
+                            </Badge>
+                          </CardTitle>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Тези курсисти изискват подкрепа и насоки за успешно завършване на обучението
+                          </p>
+                        </div>
+                        <Button
+                          onClick={() => navigate('/training-list')}
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          <BookOpen className="h-4 w-4 mr-2" />
+                          Виж обучението
+                        </Button>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                )}
+
+                {/* Empty State */}
+                {filteredRealtors.length === 0 && (
+                  <Card className="border-dashed border-2">
+                    <CardContent className="flex flex-col items-center justify-center py-12 sm:py-16">
+                      <div className="p-4 rounded-full bg-muted mb-4">
+                        <Users className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                      <h3 className="text-lg font-semibold mb-2">
+                        {realtorFilter === 'trainees' 
+                          ? 'Няма нови курсисти' 
+                          : realtorFilter === 'realtors' 
+                          ? 'Няма завършили реализатори'
+                          : 'Няма реализатори в екипа'}
+                      </h3>
+                      <p className="text-sm text-muted-foreground text-center max-w-sm mb-4">
+                        {realtorFilter === 'trainees'
+                          ? 'В момента няма нови курсисти, които да изискват внимание.'
+                          : realtorFilter === 'realtors'
+                          ? 'В момента няма завършили реализатори в екипа.'
+                          : 'Екипът все още няма реализатори. Добавете нови членове чрез управлението на акаунти.'}
+                      </p>
+                      {hasPermission(role, 'manage.users') && (
+                        <Button onClick={() => setUserManagementOpen(true)} variant="outline">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Добави нов член
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -615,26 +775,32 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
             >
               <SortableContext
                 items={
-                  currentView === 'realtors' ? realtors.map(r => r.id) : []
+                  currentView === 'realtors' ? filteredRealtors.map(r => r.id) : []
                 }
                 strategy={rectSortingStrategy}
               >
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-                  {currentView === 'realtors' && realtors.map((realtor) => (
-                    realtor.user && (
-                      <SortableCard key={realtor.id} id={realtor.id}>
-                        <div className="relative group">
-                          <RealizatorCardWithKPI
-                            realtor={{
-                              id: realtor.id,
-                              name: realtor.user.fullName,
-                              email: realtor.user.email,
-                              level: realtor.level,
-                              confidence: false,
-                              salesResilience: false,
-                              successMindset: false
-                            }}
-                            onClick={async () => {
+                {/* Modern Grid Layout with Better Spacing */}
+                {currentView === 'realtors' && filteredRealtors.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
+                    {filteredRealtors.map((realtor) => (
+                      realtor.user && (
+                        <SortableCard 
+                          key={realtor.id} 
+                          id={realtor.id}
+                          className="transform transition-all duration-300 hover:scale-105 hover:z-10"
+                        >
+                          <div className="relative group h-full">
+                            <RealizatorCardWithKPI
+                              realtor={{
+                                id: realtor.id,
+                                name: realtor.user.fullName,
+                                email: realtor.user.email,
+                                level: realtor.level,
+                                confidence: false,
+                                salesResilience: false,
+                                successMindset: false
+                              }}
+                              onClick={async () => {
                               // Fetch full realtor data with all fields
                               try {
                                 setSelectedRealtor({
@@ -644,18 +810,17 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
                                   successMindset: false,
                                 });
                                 
-                                const kpi = await api.getRealtorKPI(realtor.userId);
+                                // Parallelize all API calls
+                                const [kpi, deals, diagnoses, trainingProgress] = await Promise.all([
+                                  api.getRealtorKPI(realtor.userId),
+                                  api.getRealtorDeals(realtor.id),
+                                  api.getRealtorDiagnoses(realtor.id),
+                                  api.getRealtorTrainingProgress(realtor.id)
+                                ]);
+                                
                                 setSelectedRealtorKPI(kpi);
-                                
-                                // Fetch deals and diagnoses
-                                const deals = await api.getRealtorDeals(realtor.id);
-                                const diagnoses = await api.getRealtorDiagnoses(realtor.id);
-                                
                                 setSelectedRealtorDeals(deals as Array<Record<string, unknown>>);
                                 setSelectedRealtorDiagnoses(diagnoses as Array<Record<string, unknown>>);
-                                
-                                // Fetch training progress
-                                const trainingProgress = await api.getRealtorTrainingProgress(realtor.id);
                                 
                                 if (trainingProgress && trainingProgress.length > 0) {
                                   const updatedTrainingData = trainingStructure.map((section) => ({
@@ -695,7 +860,7 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 bg-background/95 backdrop-blur-sm hover:bg-primary hover:text-primary-foreground shadow-lg"
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedRealtorForTraining({ id: realtor.id, name: realtor.user.fullName });
@@ -708,8 +873,9 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
                         </div>
                       </SortableCard>
                     )
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </SortableContext>
               <DragOverlay>
                 {activeId ? (
@@ -927,10 +1093,9 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
             </div>
           </div>
         )}
-      </main>
-      </div>
+        </div>
 
-      {/* Account Settings Dialog */}
+        {/* Account Settings Dialog */}
       {userInfo && (
         <AccountSettingsDialog
           open={accountSettingsOpen}
@@ -949,6 +1114,14 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
           realtorName={selectedRealtorForTraining.name}
         />
       )}
+
+        {/* User Management Dialog */}
+        <UserManagementDialog
+          open={userManagementOpen}
+          onOpenChange={setUserManagementOpen}
+          onUpdate={fetchUserInfo}
+        />
+      </AppLayout>
     </div>
   );
 };

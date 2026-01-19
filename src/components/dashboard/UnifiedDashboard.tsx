@@ -122,6 +122,12 @@ export const UnifiedDashboard = ({
           isOpen={sidebarOpen}
           onToggle={() => setSidebarOpen(!sidebarOpen)}
           mode={role === 'admin' ? 'admin' : role === 'regional_manager' ? 'admin' : 'office-manager'}
+          showQuickActions={true}
+          onTrainingCalendarClick={hasPermission(role, 'view.training') ? () => navigate('/training-calendar') : undefined}
+          onTrainingListClick={hasPermission(role, 'view.training') ? () => navigate('/training-list') : undefined}
+          role={role}
+          teamName={customHeader ? undefined : (userInfo?.role || 'Дашборд')}
+          breadcrumb={customBreadcrumb.join(' / ')}
         />
       )}
 
@@ -151,65 +157,8 @@ export const UnifiedDashboard = ({
                 >
                   <img src={logo} alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 object-contain" />
                 </button>
-                <div className="min-w-0">
-                  {customHeader || (
-                    <h1 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground truncate">
-                      {userInfo?.role || 'Дашборд'}
-                    </h1>
-                  )}
-                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
-                    {customBreadcrumb.join(' / ')}
-                  </p>
-                </div>
               </div>
               <div className="flex gap-2">
-                {hasPermission(role, 'view.training') && (
-                  <>
-                    <Button
-                      onClick={() => navigate('/training-calendar')}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs sm:text-sm"
-                    >
-                      <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                      <span className="hidden sm:inline">Календар</span>
-                    </Button>
-                    <Button
-                      onClick={() => navigate('/training-progress')}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs sm:text-sm"
-                    >
-                      <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                      <span className="hidden sm:inline">Обучение</span>
-                    </Button>
-                  </>
-                )}
-                {canExport && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-                        <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                        <span className="hidden sm:inline">Експорт</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Експорт на данни</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {kpiMetrics && (
-                        <DropdownMenuItem
-                          onClick={() => {
-                            exportKPIData(kpiMetrics, `kpi-${role}-${new Date().toISOString().split('T')[0]}`);
-                            toast.success('KPI данните са експортирани');
-                          }}
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          KPI данни
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
                 <NotificationCenter />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

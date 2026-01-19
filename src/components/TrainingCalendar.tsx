@@ -1,8 +1,9 @@
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -13,17 +14,18 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 import { Calendar as CalendarIcon, Users, Award, BookOpen, UserPlus, Clock, Edit, Trash2, Plus, ChevronLeft, ChevronRight, PlayCircle, CheckCircle2, Search, Filter, Download, Printer, Copy, Grid3x3, List, Calendar, BarChart3, Bell, X, MoreVertical, LayoutGrid, LayoutList, GripVertical } from 'lucide-react';
-import { TrainingGroup, Agent } from '@/types';
+import { TrainingGroup, Agent, TrainingDayNotes, TrainingDayStage } from '@/types';
 import { UserRole } from '@/hooks/useUserRole';
 // Avatar removed - using modern design with initials badges instead
-import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import { useState, useRef, useMemo, useEffect, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatNameWithEmoji } from '@/utils/nameEmojis';
 import { toast } from '@/hooks/use-toast';
 import { supabaseApi } from '@/lib/supabaseApi';
-import { trainingStructure, TrainingSection, calculateTrainingProgress } from '@/data/trainingStructure';
-import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
+import { trainingStructure, calculateTrainingProgress } from '@/data/trainingStructure';
 import { format, addDays, nextMonday, nextDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, startOfWeek, endOfWeek, addMonths, subMonths, parse, differenceInDays, isPast, isFuture } from 'date-fns';
 import { bg } from 'date-fns/locale';
 import {
@@ -56,6 +58,19 @@ interface TrainingCalendarProps {
   currentUserRole?: UserRole;
   currentUserId?: string; // ID of current user for permission checks
   selectedCityId?: string | null; // Selected city ID for regional managers
+  traineesAndRecruits?: Array<{
+    id: string;
+    name: string;
+    email: string;
+    type: 'trainee' | 'recruit';
+    level?: number;
+    teamId: string | null;
+    createdAt: string;
+  }>; // All trainees and recruits from database
+  loadingTrainees?: boolean; // Loading state for trainees
+  viewMode?: 'month' | 'week' | 'day' | 'list';
+  filterStatus?: 'all' | 'active' | 'upcoming' | 'completed';
+  searchQuery?: string;
 }
 
 const getTrainingDayLabel = (day: number) => {
@@ -80,14 +95,32 @@ export const TrainingCalendar = ({
   currentUserRole,
   currentUserId,
   selectedCityId,
+  traineesAndRecruits = [],
+  loadingTrainees = false,
+  viewMode: externalViewMode = 'month',
+  filterStatus: externalFilterStatus = 'all',
+  searchQuery: externalSearchQuery = '',
 }: TrainingCalendarProps) => {
   const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isDateDialogOpen, setIsDateDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day' | 'list'>('month');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'upcoming' | 'completed'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day' | 'list'>(externalViewMode);
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'upcoming' | 'completed'>(externalFilterStatus);
+  const [searchQuery, setSearchQuery] = useState(externalSearchQuery);
+  
+  // Sync external props with internal state
+  useEffect(() => {
+    setViewMode(externalViewMode);
+  }, [externalViewMode]);
+  
+  useEffect(() => {
+    setFilterStatus(externalFilterStatus);
+  }, [externalFilterStatus]);
+  
+  useEffect(() => {
+    setSearchQuery(externalSearchQuery);
+  }, [externalSearchQuery]);
   const [hoveredDate, setHoveredDate] = useState<Date | null>(null);
   const [contextMenuDate, setContextMenuDate] = useState<Date | null>(null);
   const [showQuickAdd, setShowQuickAdd] = useState<string | null>(null);
@@ -283,20 +316,8 @@ export const TrainingCalendar = ({
     // Admin has full access
     if (currentUserRole === 'admin') return true;
     
-    // Regional manager and office manager have full access
-    if (currentUserRole === 'regional_manager' || currentUserRole === 'office_manager') return true;
-    
-    // Specific users with management rights: Краси Кътев, Камен Георгиев, Георги Пенев, Лазар Бундев
-    if (currentUserName) {
-      const normalizedName = normalize(currentUserName);
-      const hasManagementRights = 
-        normalizedName.includes('краси') && normalizedName.includes('кътев') ||
-        normalizedName.includes('камен') && normalizedName.includes('георг') ||
-        normalizedName.includes('георги') && normalizedName.includes('пенев') ||
-        normalizedName.includes('лазар') && normalizedName.includes('бундев');
-      
-      if (hasManagementRights) return true;
-    }
+    // All management positions (regional_manager, office_manager, team_leader) have full access
+    if (currentUserRole === 'regional_manager' || currentUserRole === 'office_manager' || currentUserRole === 'team_leader') return true;
     
     // Creator can manage their own groups (if currentUserId is available)
     if (currentUserId && group.createdBy && group.createdBy === currentUserId) return true;
@@ -498,16 +519,19 @@ export const TrainingCalendar = ({
     position: '',
     email: ''
   });
-  const [selectedTraineeForTraining, setSelectedTraineeForTraining] = useState<Agent | null>(null);
-  const [traineeTrainingData, setTraineeTrainingData] = useState<TrainingSection[]>([]);
-  const [traineeUserId, setTraineeUserId] = useState<string | null>(null);
-  const [traineeRealtorId, setTraineeRealtorId] = useState<string | null>(null);
   const [isCreateAccountDialogOpen, setIsCreateAccountDialogOpen] = useState(false);
   const [traineeForAccountCreation, setTraineeForAccountCreation] = useState<Agent | null>(null);
   const [accountData, setAccountData] = useState({
     email: '',
     password: '',
     confirmPassword: ''
+  });
+  const [isDayNotesDialogOpen, setIsDayNotesDialogOpen] = useState(false);
+  const [editingDayNotes, setEditingDayNotes] = useState<{ group: TrainingGroup; day: number } | null>(null);
+  const [dayNotesData, setDayNotesData] = useState<TrainingDayNotes>({
+    description: '',
+    howItWent: '',
+    stages: []
   });
   // Map to store training progress for each trainee (key: trainee email or id)
   const [traineeProgressMap, setTraineeProgressMap] = useState<Map<string, number>>(new Map());
@@ -601,181 +625,6 @@ export const TrainingCalendar = ({
     }
   }, [activeGroups.length, loadTraineesProgress]); // Only run when number of active groups changes
 
-  // Load training progress for a trainee
-  const loadTraineeTrainingProgress = useCallback(async (trainee: Agent) => {
-    try {
-      // Find profile by email
-      if (!trainee.email) {
-        toast({
-          title: 'Грешка',
-          description: 'Курсистът няма имейл адрес.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const { data: profile } = await supabaseApi.supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', trainee.email)
-        .single();
-
-      if (!profile) {
-        toast({
-          title: 'Грешка',
-          description: 'Профилът на курсиста не е намерен.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      setTraineeUserId(profile.id);
-
-      // Get realtor by user_id
-      const { data: realtor } = await supabaseApi.supabase
-        .from('realtors')
-        .select('id')
-        .eq('user_id', profile.id)
-        .single();
-
-      if (!realtor) {
-        toast({
-          title: 'Грешка',
-          description: 'Курсистът все още няма профил като реализатор.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      setTraineeRealtorId(realtor.id);
-
-      // Get training progress
-      const progressData = await supabaseApi.getTrainingProgress(profile.id);
-
-      // Update training structure with progress
-      const updatedData = trainingStructure.map((section) => ({
-        ...section,
-        subsections: section.subsections.map((subsection) => {
-          const progressItem = progressData.find(
-            (p: { section?: string; subsection?: string }) => p.section === section.id && p.subsection === subsection.id
-          );
-          return {
-            ...subsection,
-            progress: progressItem
-              ? {
-                  lecture: (progressItem as { lecture_completed?: boolean }).lecture_completed || false,
-                  video: (progressItem as { video_completed?: boolean }).video_completed || false,
-                  practical: (progressItem as { practical_completed?: boolean }).practical_completed || false,
-                  handover: (progressItem as { handover_completed?: boolean }).handover_completed || false,
-                  exam: (progressItem as { exam_completed?: boolean }).exam_completed || false,
-                }
-              : subsection.progress,
-          };
-        }),
-      }));
-
-      setTraineeTrainingData(updatedData);
-      setSelectedTraineeForTraining(trainee);
-    } catch (error) {
-      console.error('Error loading trainee training progress:', error);
-      toast({
-        title: 'Грешка',
-        description: 'Неуспешно зареждане на данни за обучение.',
-        variant: 'destructive',
-      });
-    }
-  }, []);
-
-  // Handle training progress update
-  const handleTraineeTrainingProgressUpdate = useCallback(async (
-    sectionId: string,
-    subsectionId: string,
-    field: 'lecture' | 'video' | 'practical' | 'handover' | 'exam',
-    checked: boolean
-  ) => {
-    if (!traineeRealtorId) return;
-
-    // Save current state for potential revert
-    const previousData = traineeTrainingData;
-
-    // Update local state
-    setTraineeTrainingData((currentData) => {
-      return currentData.map((section) => {
-        if (section.id === sectionId) {
-          return {
-            ...section,
-            subsections: section.subsections.map((subsection) => {
-              if (subsection.id === subsectionId) {
-                const newProgress = {
-                  ...subsection.progress,
-                  [field]: checked,
-                };
-                
-                // If exam is completed, automatically mark all other steps as completed
-                if (field === 'exam' && checked) {
-                  return {
-                    ...subsection,
-                    progress: {
-                      lecture: true,
-                      video: true,
-                      practical: true,
-                      handover: true,
-                      exam: true,
-                    },
-                  };
-                }
-                
-                return {
-                  ...subsection,
-                  progress: newProgress,
-                };
-              }
-              return subsection;
-            }),
-          };
-        }
-        return section;
-      });
-    });
-
-    // Save to database
-    try {
-      await supabaseApi.updateTrainingProgress({
-        realtorId: traineeRealtorId,
-        section: sectionId,
-        subsection: subsectionId,
-        lectureCompleted: field === 'lecture' ? checked : undefined,
-        videoCompleted: field === 'video' ? checked : undefined,
-        practicalCompleted: field === 'practical' ? checked : undefined,
-        handoverCompleted: field === 'handover' ? checked : undefined,
-        examCompleted: field === 'exam' ? checked : undefined,
-      });
-
-      // Update progress in the map
-      if (selectedTraineeForTraining?.email) {
-        const updatedProgress = calculateTrainingProgress(traineeTrainingData);
-        setTraineeProgressMap(prev => {
-          const newMap = new Map(prev);
-          newMap.set(selectedTraineeForTraining.email!, updatedProgress);
-          return newMap;
-        });
-      }
-
-      toast({
-        title: 'Прогресът е обновен',
-        description: 'Промените са запазени успешно.',
-      });
-    } catch (error) {
-      console.error('Error updating training progress:', error);
-      toast({
-        title: 'Грешка',
-        description: 'Неуспешно запазване на промените.',
-        variant: 'destructive',
-      });
-      // Revert local state on error
-      setTraineeTrainingData(previousData);
-    }
-  }, [traineeRealtorId, selectedTraineeForTraining]);
 
   const handleAdvanceGroupDay = async (group: TrainingGroup) => {
     if (!onUpdateGroups) return;
@@ -854,13 +703,14 @@ export const TrainingCalendar = ({
   };
 
   // Изчисляване на следващия понеделник и четвъртък
-  const getNextMonday = () => {
+  // Memoized date calculations
+  const getNextMonday = useCallback(() => {
     const today = new Date();
     const next = nextMonday(today);
     return format(next, 'dd.MM.yyyy');
-  };
+  }, []);
 
-  const getNextThursday = () => {
+  const getNextThursday = useCallback(() => {
     const today = new Date();
     let next = nextDay(today, 4); // 4 = Thursday
     // Ако четвъртък е преди понеделник (т.е. тази седмица), вземи следващия
@@ -868,9 +718,9 @@ export const TrainingCalendar = ({
       next = addDays(next, 7);
     }
     return format(next, 'dd.MM.yyyy');
-  };
+  }, []);
 
-  const upcomingGroups = [
+  const upcomingGroups = useMemo(() => [
     {
       id: 'upcoming-monday',
       date: getNextMonday(),
@@ -883,9 +733,9 @@ export const TrainingCalendar = ({
       day: 'Четвъртък',
       trainees: registeredTrainees.filter(t => t.selectedDate === 'thursday')
     }
-  ];
+  ], [registeredTrainees, getNextMonday, getNextThursday]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (newTrainee.name && newTrainee.phone && newTrainee.position && newTrainee.selectedDate) {
       const newEntry = {
@@ -900,9 +750,9 @@ export const TrainingCalendar = ({
       });
       setNewTrainee({ name: '', phone: '', position: '', selectedDate: '', email: '' });
     }
-  };
+  }, [newTrainee, registeredTrainees]);
 
-  const handleEditTrainee = (trainee: Agent, groupId?: string) => {
+  const handleEditTrainee = useCallback((trainee: Agent, groupId?: string) => {
     setEditingTrainee({
       id: trainee.id,
       name: trainee.name,
@@ -912,9 +762,9 @@ export const TrainingCalendar = ({
       groupId
     });
     setIsEditDialogOpen(true);
-  };
+  }, []);
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = useCallback(async () => {
     if (!editingTrainee) return;
 
     try {
@@ -966,7 +816,7 @@ export const TrainingCalendar = ({
         variant: 'destructive',
       });
     }
-  };
+  }, [editingTrainee, groups, onUpdateGroups]);
 
   const handleDeleteGroup = async (groupId: string) => {
     if (!window.confirm('Сигурни ли сте, че искате да изтриете тази група? Това действие не може да бъде отменено.')) {
@@ -1145,7 +995,7 @@ export const TrainingCalendar = ({
     }
   };
 
-  const handleDragStart = (event: DragStartEvent) => {
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event;
     setActiveId(active.id as string);
     
@@ -1158,7 +1008,7 @@ export const TrainingCalendar = ({
         setDraggedTrainee({ trainee, groupId: group.id });
       }
     }
-  };
+  }, [groups]);
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -1220,8 +1070,8 @@ export const TrainingCalendar = ({
     }
   };
 
-  // Sortable Trainee Item Component
-  const SortableTraineeItem = ({ trainee, groupId, onEdit, onDelete }: { 
+  // Sortable Trainee Item Component - Memoized for performance
+  const SortableTraineeItem = memo(({ trainee, groupId, onEdit, onDelete }: { 
     trainee: Agent; 
     groupId?: string;
     onEdit: () => void;
@@ -1281,7 +1131,66 @@ export const TrainingCalendar = ({
         </div>
       </div>
     );
-  };
+  });
+
+  // Loading state with proper skeleton loaders
+  if (loadingTrainees && groups.length === 0) {
+    return (
+      <div className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
+        {/* Statistics Skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="overflow-hidden">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <Skeleton className="h-9 w-9 rounded-lg" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-8 w-12" />
+                </div>
+                <Skeleton className="mt-3 h-2 w-full rounded-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        
+        {/* Header Skeleton */}
+        <Card className="p-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-8 w-64" />
+              <div className="flex gap-2">
+                <Skeleton className="h-9 w-24" />
+                <Skeleton className="h-9 w-24" />
+                <Skeleton className="h-9 w-24" />
+              </div>
+            </div>
+            <Skeleton className="h-4 w-full" />
+          </div>
+        </Card>
+
+        {/* Calendar Grid Skeleton */}
+        <Card className="p-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-6 w-32" />
+              <div className="flex gap-2">
+                <Skeleton className="h-8 w-8 rounded" />
+                <Skeleton className="h-8 w-8 rounded" />
+              </div>
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {Array.from({ length: 35 }).map((_, i) => (
+                <Skeleton key={i} className="h-24 w-full rounded-md" />
+              ))}
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <DndContext
@@ -1290,16 +1199,16 @@ export const TrainingCalendar = ({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="space-y-6">
+      <div className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Редактиране на курсист</DialogTitle>
-            <DialogDescription>
-              Редактирайте информацията за курсиста.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Редактиране на курсист</DialogTitle>
+              <DialogDescription>
+                Редактирайте информацията за курсиста.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="edit-name">Име и фамилия</Label>
               <Input
@@ -1344,9 +1253,9 @@ export const TrainingCalendar = ({
             <Button onClick={handleSaveEdit} className="w-full">
               Запази промените
             </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+            </div>
+          </DialogContent>
+        </Dialog>
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
@@ -1387,210 +1296,9 @@ export const TrainingCalendar = ({
           </div>
         </DialogContent>
       </Dialog>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <CalendarIcon className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-bold text-foreground">Календар на обученията</h2>
-        </div>
-        
-        {/* Toolbar with filters, search, and view options */}
-        <div className="flex items-center gap-2">
-          {/* Search */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Search className="h-4 w-4 mr-2" />
-                Търсене
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80 p-0">
-              <Command>
-                <CommandInput 
-                  placeholder="Търсене по име, телефон..." 
-                  value={searchQuery}
-                  onValueChange={setSearchQuery}
-                />
-                <CommandList>
-                  <CommandEmpty>Няма резултати.</CommandEmpty>
-                  <CommandGroup heading="Курсисти">
-                    {[...activeGroups, ...completedGroups].flatMap(g => g.trainees)
-                      .filter(t => 
-                        searchQuery && (
-                          t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          t.phone.includes(searchQuery)
-                        )
-                      )
-                      .slice(0, 5)
-                      .map(t => (
-                        <CommandItem key={t.id} onSelect={() => {
-                          const group = [...activeGroups, ...completedGroups].find(g => g.trainees.some(tr => tr.id === t.id));
-                          if (group) {
-                            const date = parse(group.startDate, 'yyyy-MM-dd', new Date());
-                            setCurrentMonth(date);
-                            setSelectedDate(date);
-                            setIsDateDialogOpen(true);
-                          }
-                        }}>
-                          <Users className="h-4 w-4 mr-2" />
-                          {formatNameWithEmoji(t.name)} - {t.phone}
-                        </CommandItem>
-                      ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
 
-          {/* Filter */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Filter className="h-4 w-4 mr-2" />
-                Филтър
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuLabel>Статус на групите</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setFilterStatus('all')}>
-                Всички
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterStatus('active')}>
-                Активни
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterStatus('upcoming')}>
-                Предстоящи
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterStatus('completed')}>
-                Завършени
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* View Mode */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                {viewMode === 'month' && <LayoutGrid className="h-4 w-4 mr-2" />}
-                {viewMode === 'week' && <Calendar className="h-4 w-4 mr-2" />}
-                {viewMode === 'day' && <CalendarIcon className="h-4 w-4 mr-2" />}
-                {viewMode === 'list' && <LayoutList className="h-4 w-4 mr-2" />}
-                Изглед
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuLabel>Изглед</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setViewMode('month')}>
-                <LayoutGrid className="h-4 w-4 mr-2" />
-                Месечен
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setViewMode('week')}>
-                <Calendar className="h-4 w-4 mr-2" />
-                Седмичен
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setViewMode('day')}>
-                <CalendarIcon className="h-4 w-4 mr-2" />
-                Дневен
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setViewMode('list')}>
-                <LayoutList className="h-4 w-4 mr-2" />
-                Списък
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Export */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Експорт
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuLabel>Експорт</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => {
-                // Export as CSV
-                const csv = [
-                  ['Дата', 'Инструктор', 'Статус', 'Курсисти', 'Ден'].join(','),
-                  ...groups.map(g => [
-                    g.startDate,
-                    g.leader,
-                    g.status,
-                    g.trainees.length,
-                    g.currentDay
-                  ].join(','))
-                ].join('\n');
-                const blob = new Blob([csv], { type: 'text/csv' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `training-calendar-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-                a.click();
-                toast({ title: 'Експортирано успешно!', description: 'Календарът е експортиран като CSV.' });
-              }}>
-                <Download className="h-4 w-4 mr-2" />
-                CSV
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => window.print()}>
-                <Printer className="h-4 w-4 mr-2" />
-                Печат
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      {/* Statistics Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Активни групи</p>
-              <p className="text-2xl font-bold text-green-600">{activeGroups.length}</p>
-            </div>
-            <PlayCircle className="h-8 w-8 text-green-500/50" />
-          </div>
-          <Progress value={(activeGroups.length / (groups.length || 1)) * 100} className="mt-2" />
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Предстоящи групи</p>
-              <p className="text-2xl font-bold text-blue-600">{upcomingGroups.reduce((sum, g) => sum + g.trainees.length, 0) > 0 ? upcomingGroups.length : 0}</p>
-            </div>
-            <Clock className="h-8 w-8 text-blue-500/50" />
-          </div>
-          <Progress value={upcomingGroups.length * 10} className="mt-2" />
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Завършени групи</p>
-              <p className="text-2xl font-bold text-gray-600">{completedGroups.length}</p>
-            </div>
-            <CheckCircle2 className="h-8 w-8 text-gray-500/50" />
-          </div>
-          <Progress value={(completedGroups.length / (groups.length || 1)) * 100} className="mt-2" />
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Общо курсисти</p>
-              <p className="text-2xl font-bold text-primary">
-                {groups.reduce((sum, g) => sum + g.trainees.length, 0) + registeredTrainees.length}
-              </p>
-            </div>
-            <Users className="h-8 w-8 text-primary/50" />
-          </div>
-          <Progress value={75} className="mt-2" />
-        </Card>
-      </div>
-
-      {/* View Tabs */}
-      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'calendar' | 'list' | 'grid' | 'timeline')} className="w-full">
+      {/* Modern View Tabs */}
+      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'month' | 'week' | 'day' | 'list')} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="month"><LayoutGrid className="h-4 w-4 mr-2" />Месечен</TabsTrigger>
           <TabsTrigger value="week"><Calendar className="h-4 w-4 mr-2" />Седмичен</TabsTrigger>
@@ -1598,19 +1306,25 @@ export const TrainingCalendar = ({
           <TabsTrigger value="list"><LayoutList className="h-4 w-4 mr-2" />Списък</TabsTrigger>
         </TabsList>
 
-        {/* Month View */}
-        <TabsContent value="month" className="mt-4">
-          <Card className="p-4 bg-background border-2 border-primary/20">
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xl font-bold text-foreground">
-                  {format(currentMonth, 'MMMM yyyy', { locale: bg })}
-                </h3>
+        {/* Modern Month View */}
+        <TabsContent value="month" className="mt-6">
+          <Card className="p-4 sm:p-6 bg-background border-2 border-border/50 shadow-sm">
+            <div className="mb-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+                <div>
+                  <h3 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                    {format(currentMonth, 'MMMM yyyy', { locale: bg })}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Преглед на групи и курсисти
+                  </p>
+                </div>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                    className="transition-all duration-200 hover:scale-105 hover:shadow-sm"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
@@ -1618,6 +1332,7 @@ export const TrainingCalendar = ({
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentMonth(new Date())}
+                    className="transition-all duration-200 hover:scale-105 hover:shadow-sm hover:bg-primary hover:text-primary-foreground"
                   >
                     Днес
                   </Button>
@@ -1625,6 +1340,7 @@ export const TrainingCalendar = ({
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                    className="transition-all duration-200 hover:scale-105 hover:shadow-sm"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
@@ -1632,12 +1348,15 @@ export const TrainingCalendar = ({
               </div>
             </div>
 
-        {/* Calendar Grid */}
+        {/* Modern Calendar Grid */}
         <div className="w-full">
-          {/* Weekday Headers */}
-          <div className="grid grid-cols-7 gap-1 mb-1">
+          {/* Modern Weekday Headers */}
+          <div className="grid grid-cols-7 gap-2 mb-2">
             {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'].map((day) => (
-              <div key={day} className="text-center text-xs font-semibold text-muted-foreground py-1">
+              <div 
+                key={day} 
+                className="text-center text-sm font-semibold text-muted-foreground py-2 px-1 rounded-md bg-muted/30"
+              >
                 {day}
               </div>
             ))}
@@ -1929,13 +1648,28 @@ export const TrainingCalendar = ({
                               <p className="text-sm">Групи: {dayGroups.length}</p>
                               <p className="text-sm">Курсисти: {totalTrainees}</p>
                               {dayGroups.map((g, i) => (
-                                <div key={i} className="text-xs">
-                                  {g.leader && <p>{formatNameWithEmoji(g.leader)}</p>}
-                                  <p className="text-muted-foreground">
-                                    {g.status === 'активна' && `Ден ${g.currentDay}/3`}
-                                    {g.status === 'завършена' && 'Завършена'}
-                                    {(!g.status || g.status === 'предстояща') && 'Предстояща'}
-                                  </p>
+                                <div key={i} className="text-xs space-y-1">
+                                  {g.leader && <p className="font-semibold">{formatNameWithEmoji(g.leader)}</p>}
+                                  <div className="flex items-center gap-1">
+                                    {g.status === 'активна' && (
+                                      <Badge variant="default" className="bg-green-500 text-white text-xs px-1.5 py-0.5">
+                                        <PlayCircle className="h-2.5 w-2.5 mr-0.5" />
+                                        Ден {g.currentDay}/3
+                                      </Badge>
+                                    )}
+                                    {g.status === 'завършена' && (
+                                      <Badge variant="secondary" className="bg-gray-500 text-white text-xs px-1.5 py-0.5">
+                                        <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
+                                        Завършена
+                                      </Badge>
+                                    )}
+                                    {(!g.status || g.status === 'предстояща') && (
+                                      <Badge variant="outline" className="bg-blue-500 text-white border-blue-500 text-xs px-1.5 py-0.5">
+                                        <Clock className="h-2.5 w-2.5 mr-0.5" />
+                                        Предстояща
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </div>
                               ))}
                             </>
@@ -2050,111 +1784,157 @@ export const TrainingCalendar = ({
 
         {/* List View */}
         <TabsContent value="list" className="mt-4">
-          <Card className="p-4 bg-background border-2 border-primary/20">
-            <div className="space-y-3">
-              {[...activeGroups, ...completedGroups]
-                .filter(g => {
-                  if (filterStatus === 'all') return true;
-                  if (filterStatus === 'active') return g.status === 'активна';
-                  if (filterStatus === 'completed') return g.status === 'завършена';
-                  return true;
-                })
-                .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
-                .map(group => (
-                  <Card key={group.id} className="p-4 hover:shadow-lg transition-shadow">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-sm border-2 border-primary/30">
-                            {group.leader.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-semibold">{formatNameWithEmoji(group.leader)}</p>
-                            <p className="text-sm text-muted-foreground">{format(parse(group.startDate, 'yyyy-MM-dd', new Date()), 'dd.MM.yyyy')}</p>
-                          </div>
+          <div className="space-y-3">
+            {[...activeGroups, ...completedGroups]
+              .filter(g => {
+                if (filterStatus === 'all') return true;
+                if (filterStatus === 'active') return g.status === 'активна';
+                if (filterStatus === 'completed') return g.status === 'завършена';
+                return true;
+              })
+              .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
+              .map(group => (
+                <div 
+                  key={group.id} 
+                  className="p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
+                  onClick={() => onGroupClick(group)}
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-sm border-2 border-primary/30 flex-shrink-0">
+                          {group.leader.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
                         </div>
-                        <div className="flex items-center gap-4 text-sm">
-                          <Badge variant={group.status === 'активна' ? 'default' : 'secondary'}>
-                            {group.status}
-                          </Badge>
-                          <span>{group.trainees.length} курсисти</span>
-                          {group.status === 'активна' && (
-                            <span>Ден {group.currentDay}/3</span>
-                          )}
-                          {group.trainees.length > 0 && (
-                            <div className="flex items-center gap-2">
-                              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-xs text-muted-foreground">
-                                Среден прогрес: {(() => {
-                                  const traineesWithEmail = group.trainees.filter(t => t.email);
-                                  if (traineesWithEmail.length === 0) return '0%';
-                                  const totalProgress = traineesWithEmail.reduce((sum, t) => {
-                                    const progress = t.email ? (traineeProgressMap.get(t.email) || 0) : 0;
-                                    return sum + progress;
-                                  }, 0);
-                                  return Math.round(totalProgress / traineesWithEmail.length) + '%';
-                                })()}
-                              </span>
-                            </div>
-                          )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold truncate">{formatNameWithEmoji(group.leader)}</p>
+                          <p className="text-sm text-muted-foreground">{format(parse(group.startDate, 'yyyy-MM-dd', new Date()), 'dd.MM.yyyy')}</p>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline" onClick={() => handleCopyGroup(group)}>
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => onGroupClick(group)}>
-                          Преглед
-                        </Button>
-                        {canManageGroup(group) && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedGroupForDetails(group);
-                                setIsGroupDetailsDialogOpen(true);
-                              }}
-                              title="Редактирай група"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  title="Изтрий група"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Сигурни ли сте?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Това действие не може да бъде отменено. Групата и всички курсисти в нея ще бъдат изтрити.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Отказ</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeleteGroup(group.id)}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                  >
-                                    Изтрий
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </>
+                      <div className="flex items-center gap-4 text-sm flex-wrap">
+                        {group.status === 'активна' && (
+                          <Badge className="bg-green-500 text-white">
+                            <PlayCircle className="h-3 w-3 mr-1" />
+                            Активна - Ден {group.currentDay}/3
+                          </Badge>
+                        )}
+                        {group.status === 'завършена' && (
+                          <Badge className="bg-gray-500 text-white">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Завършена
+                          </Badge>
+                        )}
+                        {(!group.status || group.status === 'предстояща') && (
+                          <Badge className="bg-blue-500 text-white">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Предстояща
+                          </Badge>
+                        )}
+                        <span className="text-muted-foreground">{group.trainees.length} курсисти</span>
+                        {group.trainees.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">
+                              Среден прогрес: {(() => {
+                                const traineesWithEmail = group.trainees.filter(t => t.email);
+                                if (traineesWithEmail.length === 0) return '0%';
+                                const totalProgress = traineesWithEmail.reduce((sum, t) => {
+                                  const progress = t.email ? (traineeProgressMap.get(t.email) || 0) : 0;
+                                  return sum + progress;
+                                }, 0);
+                                return Math.round(totalProgress / traineesWithEmail.length) + '%';
+                              })()}
+                            </span>
+                          </div>
+                        )}
+                        {/* Day Notes Info */}
+                        {group.dayNotes?.[group.currentDay.toString()] && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <BookOpen className="h-3 w-3" />
+                            <span>Има дневна информация</span>
+                            {group.dayNotes[group.currentDay.toString()].stages && 
+                             group.dayNotes[group.currentDay.toString()].stages!.length > 0 && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {group.dayNotes[group.currentDay.toString()].stages!.length} етапа
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
+                      {/* Day Notes Preview */}
+                      {group.dayNotes?.[group.currentDay.toString()]?.description && (
+                        <div className="mt-2 text-sm text-muted-foreground line-clamp-2">
+                          {group.dayNotes[group.currentDay.toString()].description}
+                        </div>
+                      )}
                     </div>
-                  </Card>
-                ))}
-            </div>
-          </Card>
+                    <div className="flex gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <Button size="sm" variant="outline" onClick={() => handleCopyGroup(group)}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => onGroupClick(group)}>
+                        Преглед
+                      </Button>
+                      {canManageGroup(group) && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedGroupForDetails(group);
+                              setIsGroupDetailsDialogOpen(true);
+                            }}
+                            title="Редактирай група"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                title="Изтрий група"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Сигурни ли сте?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Това действие не може да бъде отменено. Групата и всички курсисти в нея ще бъдат изтрити.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Отказ</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteGroup(group.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Изтрий
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            {[...activeGroups, ...completedGroups].filter(g => {
+              if (filterStatus === 'all') return true;
+              if (filterStatus === 'active') return g.status === 'активна';
+              if (filterStatus === 'completed') return g.status === 'завършена';
+              return true;
+            }).length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium">Няма групи</p>
+                <p className="text-sm">Няма намерени групи с избраните филтри.</p>
+              </div>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
 
@@ -2910,7 +2690,7 @@ export const TrainingCalendar = ({
                 {selectedGroupForDetails && `Детайли за групата на ${selectedGroupForDetails.leader}. Дата на започване: ${format(parse(selectedGroupForDetails.startDate, 'yyyy-MM-dd', new Date()), 'dd.MM.yyyy', { locale: bg })}`}
               </DialogDescription>
             </DialogHeader>
-            {selectedGroupForDetails && (
+                {selectedGroupForDetails && (
               <div className="space-y-4 mt-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -2923,13 +2703,155 @@ export const TrainingCalendar = ({
                       {format(parse(selectedGroupForDetails.startDate, 'yyyy-MM-dd', new Date()), 'dd.MM.yyyy', { locale: bg })}
                     </p>
                   </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Статус на групата</Label>
+                    {canManageGroup(selectedGroupForDetails) ? (
+                      <Select
+                        value={selectedGroupForDetails.status || 'предстояща'}
+                        onValueChange={async (newStatus) => {
+                          try {
+                            await supabaseApi.updateTrainingGroup(selectedGroupForDetails.id, {
+                              status: newStatus as 'активна' | 'завършена' | 'предстояща',
+                            });
+                            const updatedGroups = groups.map(g =>
+                              g.id === selectedGroupForDetails.id
+                                ? { ...g, status: newStatus as 'активна' | 'завършена' | 'предстояща' }
+                                : g
+                            );
+                            onUpdateGroups?.(updatedGroups);
+                            setSelectedGroupForDetails((prev) =>
+                              prev ? { ...prev, status: newStatus as 'активна' | 'завършена' | 'предстояща' } : null
+                            );
+                            toast({
+                              title: 'Статус обновен',
+                              description: `Статусът на групата е променен на "${newStatus}".`,
+                            });
+                          } catch (error) {
+                            console.error('Error updating group status:', error);
+                            toast({
+                              title: 'Грешка',
+                              description: 'Неуспешно обновяване на статуса.',
+                              variant: 'destructive',
+                            });
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="предстояща">Предстояща</SelectItem>
+                          <SelectItem value="активна">Активна</SelectItem>
+                          <SelectItem value="завършена">Завършена</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="mt-1">
+                        {selectedGroupForDetails.status === 'активна' && (
+                          <Badge className="bg-green-500 text-white">
+                            <PlayCircle className="h-3 w-3 mr-1" />
+                            Активна
+                          </Badge>
+                        )}
+                        {selectedGroupForDetails.status === 'завършена' && (
+                          <Badge className="bg-gray-500 text-white">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Завършена
+                          </Badge>
+                        )}
+                        {(!selectedGroupForDetails.status || selectedGroupForDetails.status === 'предстояща') && (
+                          <Badge className="bg-blue-500 text-white">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Предстояща
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   {selectedGroupForDetails.status === 'активна' && (
                     <div>
                       <Label className="text-sm text-muted-foreground">Текущ ден</Label>
-                      <p className="font-semibold">Ден {selectedGroupForDetails.currentDay} от 3</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {getTrainingDayLabel(selectedGroupForDetails.currentDay)}
-                      </p>
+                      {canManageGroup(selectedGroupForDetails) ? (
+                        <Select
+                          value={selectedGroupForDetails.currentDay.toString()}
+                          onValueChange={async (newDay) => {
+                            try {
+                              const dayNum = parseInt(newDay, 10);
+                              await supabaseApi.updateTrainingGroup(selectedGroupForDetails.id, {
+                                currentDay: dayNum,
+                                status: dayNum >= 3 ? 'завършена' : 'активна',
+                              });
+                              const updatedGroups = groups.map(g =>
+                                g.id === selectedGroupForDetails.id
+                                  ? {
+                                      ...g,
+                                      currentDay: dayNum,
+                                      status: dayNum >= 3 ? 'завършена' : 'активна',
+                                    }
+                                  : g
+                              );
+                              onUpdateGroups?.(updatedGroups);
+                              setSelectedGroupForDetails((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      currentDay: dayNum,
+                                      status: dayNum >= 3 ? 'завършена' : 'активна',
+                                    }
+                                  : null
+                              );
+                              toast({
+                                title: 'Ден обновен',
+                                description: `Денът на групата е променен на ${dayNum}.`,
+                              });
+                            } catch (error) {
+                              console.error('Error updating group day:', error);
+                              toast({
+                                title: 'Грешка',
+                                description: 'Неуспешно обновяване на деня.',
+                                variant: 'destructive',
+                              });
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">Ден 1: Встъпително обучение</SelectItem>
+                            <SelectItem value="2">Ден 2: Разговор с купувач</SelectItem>
+                            <SelectItem value="3">Ден 3: Разговор с продавач и изпит</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className="mt-1">
+                          <p className="font-semibold">Ден {selectedGroupForDetails.currentDay} от 3</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {getTrainingDayLabel(selectedGroupForDetails.currentDay)}
+                          </p>
+                        </div>
+                      )}
+                      {canManageGroup(selectedGroupForDetails) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full mt-2"
+                          onClick={() => {
+                            const day = selectedGroupForDetails.currentDay;
+                            const dayNotes = selectedGroupForDetails.dayNotes?.[day.toString()] || {
+                              description: '',
+                              howItWent: '',
+                              stages: []
+                            };
+                            setEditingDayNotes({ group: selectedGroupForDetails, day });
+                            setDayNotesData(dayNotes);
+                            setIsDayNotesDialogOpen(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Редактирай дневна информация
+                        </Button>
+                      )}
                     </div>
                   )}
                   <div>
@@ -3020,12 +2942,14 @@ export const TrainingCalendar = ({
                             </div>
                             <div className="flex flex-col gap-2 items-end">
                               <Badge variant="outline">{trainee.level || 'Курсист'}</Badge>
-                              {trainee.introCompleted && canEdit && (
+                              {trainee.email && (
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   className="text-xs"
-                                  onClick={() => loadTraineeTrainingProgress(trainee)}
+                                  onClick={() => {
+                                    navigate(`/training?traineeEmail=${encodeURIComponent(trainee.email || '')}`);
+                                  }}
                                 >
                                   <BookOpen className="h-3 w-3 mr-1" />
                                   Етапи на обучение
@@ -3074,73 +2998,6 @@ export const TrainingCalendar = ({
                   )}
                 </div>
 
-                {/* Training Stages Section */}
-                {selectedTraineeForTraining && traineeTrainingData.length > 0 && (
-                  <div className="border-t pt-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <Label className="text-base font-semibold block">
-                          Етапи на обучение: {formatNameWithEmoji(selectedTraineeForTraining.name)}
-                        </Label>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Маркирайте подточките на обучение за курсиста
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setSelectedTraineeForTraining(null);
-                          setTraineeTrainingData([]);
-                          setTraineeUserId(null);
-                          setTraineeRealtorId(null);
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    
-                    {/* Calculate overall progress */}
-                    {(() => {
-                      const totalSubsections = traineeTrainingData.reduce((sum, section) => sum + section.subsections.length, 0);
-                      const completedSubsections = traineeTrainingData.reduce((sum, section) => 
-                        sum + section.subsections.filter(sub => 
-                          sub.progress.lecture && 
-                          sub.progress.video && 
-                          sub.progress.practical && 
-                          sub.progress.handover && 
-                          sub.progress.exam
-                        ).length, 0
-                      );
-                      const overallProgress = totalSubsections > 0 ? (completedSubsections / totalSubsections) * 100 : 0;
-                      
-                      return (
-                        <div className="mb-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <Label className="text-sm font-semibold">Общ прогрес на обучението</Label>
-                            <span className="text-sm font-bold">{Math.round(overallProgress)}%</span>
-                          </div>
-                          <Progress value={overallProgress} className="h-2" />
-                          <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                            <span>Завършени {completedSubsections} от {totalSubsections} подточки</span>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Training Sections */}
-                    <div className="space-y-4 max-h-[400px] overflow-y-auto">
-                      {traineeTrainingData.map((section) => (
-                        <TrainingSectionCard
-                          key={section.id}
-                          section={section}
-                          onProgressUpdate={handleTraineeTrainingProgressUpdate}
-                          editable={canEdit}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {selectedGroupForDetails.status === 'активна' && (
                   <div className="border-t pt-4">
@@ -3150,6 +3007,64 @@ export const TrainingCalendar = ({
                       <span>Ден {selectedGroupForDetails.currentDay} от 3</span>
                       <span>{Math.round((selectedGroupForDetails.currentDay / 3) * 100)}%</span>
                     </div>
+                    
+                    {/* Day Notes Display */}
+                    {selectedGroupForDetails.dayNotes?.[selectedGroupForDetails.currentDay.toString()] && (
+                      <div className="mt-4 space-y-3 border-t pt-4">
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="h-4 w-4 text-primary" />
+                          <h4 className="font-semibold text-sm">Дневна информация</h4>
+                        </div>
+                        
+                        {selectedGroupForDetails.dayNotes[selectedGroupForDetails.currentDay.toString()].description && (
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Какво е взето в деня:</Label>
+                            <p className="text-sm bg-muted/50 p-2 rounded-md">
+                              {selectedGroupForDetails.dayNotes[selectedGroupForDetails.currentDay.toString()].description}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {selectedGroupForDetails.dayNotes[selectedGroupForDetails.currentDay.toString()].howItWent && (
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Как е минал денят:</Label>
+                            <p className="text-sm bg-muted/50 p-2 rounded-md">
+                              {selectedGroupForDetails.dayNotes[selectedGroupForDetails.currentDay.toString()].howItWent}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {selectedGroupForDetails.dayNotes[selectedGroupForDetails.currentDay.toString()].stages && 
+                         selectedGroupForDetails.dayNotes[selectedGroupForDetails.currentDay.toString()].stages!.length > 0 && (
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">Етапи през деня:</Label>
+                            <div className="space-y-2">
+                              {selectedGroupForDetails.dayNotes[selectedGroupForDetails.currentDay.toString()].stages!.map((stage, idx) => (
+                                <div key={stage.id} className="bg-muted/50 p-3 rounded-md border">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <Clock className="h-3 w-3 text-muted-foreground" />
+                                        <span className="font-medium text-sm">{stage.title}</span>
+                                      </div>
+                                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                        <span>{stage.startTime} - {stage.endTime}</span>
+                                        <span>•</span>
+                                        <span>{stage.duration} мин.</span>
+                                      </div>
+                                      {stage.description && (
+                                        <p className="text-xs text-muted-foreground mt-1">{stage.description}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
                     {canEdit && (
                       <div className="mt-3 space-y-2">
                         {/* Check if all trainees have completed intro */}
@@ -3547,6 +3462,266 @@ export const TrainingCalendar = ({
                   </Button>
                 </div>
               </form>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Day Notes Dialog */}
+        <Dialog open={isDayNotesDialogOpen} onOpenChange={setIsDayNotesDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5" />
+                Дневна информация - Ден {editingDayNotes?.day}
+              </DialogTitle>
+              <DialogDescription>
+                Опишете какво е взето в деня, как е минал денят и добавете етапи с часове.
+              </DialogDescription>
+            </DialogHeader>
+            {editingDayNotes && (
+              <div className="space-y-6 mt-4">
+                {/* Description */}
+                <div className="space-y-2">
+                  <Label htmlFor="day-description">Какво е взето в деня *</Label>
+                  <Textarea
+                    id="day-description"
+                    value={dayNotesData.description || ''}
+                    onChange={(e) => setDayNotesData({ ...dayNotesData, description: e.target.value })}
+                    placeholder="Опишете какво материали и теми са покрити в деня..."
+                    rows={4}
+                    className="resize-none"
+                  />
+                </div>
+
+                {/* How it went */}
+                <div className="space-y-2">
+                  <Label htmlFor="day-how-it-went">Как е минал денят</Label>
+                  <Textarea
+                    id="day-how-it-went"
+                    value={dayNotesData.howItWent || ''}
+                    onChange={(e) => setDayNotesData({ ...dayNotesData, howItWent: e.target.value })}
+                    placeholder="Опишете как е минал денят, какви са били реакциите на курсистите..."
+                    rows={4}
+                    className="resize-none"
+                  />
+                </div>
+
+                {/* Stages */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Етапи през деня</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newStage: TrainingDayStage = {
+                          id: `stage-${Date.now()}`,
+                          title: '',
+                          startTime: '09:00',
+                          endTime: '10:00',
+                          duration: 60,
+                          description: ''
+                        };
+                        setDayNotesData({
+                          ...dayNotesData,
+                          stages: [...(dayNotesData.stages || []), newStage]
+                        });
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Добави етап
+                    </Button>
+                  </div>
+
+                  {dayNotesData.stages && dayNotesData.stages.length > 0 ? (
+                    <div className="space-y-3 border rounded-lg p-4">
+                      {dayNotesData.stages.map((stage, index) => (
+                        <div key={stage.id} className="space-y-3 p-3 border rounded-md bg-card">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-muted-foreground">Етап {index + 1}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setDayNotesData({
+                                  ...dayNotesData,
+                                  stages: dayNotesData.stages?.filter(s => s.id !== stage.id) || []
+                                });
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label htmlFor={`stage-title-${stage.id}`}>Заглавие *</Label>
+                              <Input
+                                id={`stage-title-${stage.id}`}
+                                value={stage.title}
+                                onChange={(e) => {
+                                  const updatedStages = dayNotesData.stages?.map(s =>
+                                    s.id === stage.id ? { ...s, title: e.target.value } : s
+                                  ) || [];
+                                  setDayNotesData({ ...dayNotesData, stages: updatedStages });
+                                }}
+                                placeholder="Например: Встъпителна лекция"
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label htmlFor={`stage-duration-${stage.id}`}>Продължителност (минути)</Label>
+                              <Input
+                                id={`stage-duration-${stage.id}`}
+                                type="number"
+                                min="1"
+                                value={stage.duration}
+                                onChange={(e) => {
+                                  const duration = parseInt(e.target.value) || 0;
+                                  const updatedStages = dayNotesData.stages?.map(s =>
+                                    s.id === stage.id ? { ...s, duration } : s
+                                  ) || [];
+                                  setDayNotesData({ ...dayNotesData, stages: updatedStages });
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label htmlFor={`stage-start-${stage.id}`}>Начален час</Label>
+                              <Input
+                                id={`stage-start-${stage.id}`}
+                                type="time"
+                                value={stage.startTime}
+                                onChange={(e) => {
+                                  const updatedStages = dayNotesData.stages?.map(s =>
+                                    s.id === stage.id ? { ...s, startTime: e.target.value } : s
+                                  ) || [];
+                                  setDayNotesData({ ...dayNotesData, stages: updatedStages });
+                                }}
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label htmlFor={`stage-end-${stage.id}`}>Краен час</Label>
+                              <Input
+                                id={`stage-end-${stage.id}`}
+                                type="time"
+                                value={stage.endTime}
+                                onChange={(e) => {
+                                  const updatedStages = dayNotesData.stages?.map(s =>
+                                    s.id === stage.id ? { ...s, endTime: e.target.value } : s
+                                  ) || [];
+                                  setDayNotesData({ ...dayNotesData, stages: updatedStages });
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor={`stage-desc-${stage.id}`}>Описание</Label>
+                            <Textarea
+                              id={`stage-desc-${stage.id}`}
+                              value={stage.description || ''}
+                              onChange={(e) => {
+                                const updatedStages = dayNotesData.stages?.map(s =>
+                                  s.id === stage.id ? { ...s, description: e.target.value } : s
+                                ) || [];
+                                setDayNotesData({ ...dayNotesData, stages: updatedStages });
+                              }}
+                              placeholder="Допълнителни бележки за етапа..."
+                              rows={2}
+                              className="resize-none"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground border rounded-lg">
+                      <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>Няма добавени етапи. Кликнете "Добави етап" за да добавите първия етап.</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-4 border-t">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setIsDayNotesDialogOpen(false);
+                      setEditingDayNotes(null);
+                      setDayNotesData({ description: '', howItWent: '', stages: [] });
+                    }}
+                  >
+                    Отказ
+                  </Button>
+                  <Button
+                    type="button"
+                    className="flex-1"
+                    onClick={async () => {
+                      if (!editingDayNotes || !dayNotesData.description) {
+                        toast({
+                          title: 'Грешка',
+                          description: 'Моля, попълнете поне описанието на деня.',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+
+                      try {
+                        const dayKey = editingDayNotes.day.toString();
+                        const updatedDayNotes = {
+                          ...(editingDayNotes.group.dayNotes || {}),
+                          [dayKey]: dayNotesData
+                        };
+
+                        await supabaseApi.updateTrainingGroup(editingDayNotes.group.id, {
+                          dayNotes: updatedDayNotes
+                        });
+
+                        const updatedGroups = groups.map(g =>
+                          g.id === editingDayNotes.group.id
+                            ? { ...g, dayNotes: updatedDayNotes }
+                            : g
+                        );
+                        onUpdateGroups?.(updatedGroups);
+
+                        setSelectedGroupForDetails((prev) =>
+                          prev && prev.id === editingDayNotes.group.id
+                            ? { ...prev, dayNotes: updatedDayNotes }
+                            : prev
+                        );
+
+                        toast({
+                          title: 'Дневна информация запазена',
+                          description: `Информацията за Ден ${editingDayNotes.day} е успешно запазена.`,
+                        });
+
+                        setIsDayNotesDialogOpen(false);
+                        setEditingDayNotes(null);
+                        setDayNotesData({ description: '', howItWent: '', stages: [] });
+                      } catch (error) {
+                        console.error('Error saving day notes:', error);
+                        toast({
+                          title: 'Грешка',
+                          description: 'Неуспешно запазване на дневна информация.',
+                          variant: 'destructive',
+                        });
+                      }
+                    }}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Запази
+                  </Button>
+                </div>
+              </div>
             )}
           </DialogContent>
         </Dialog>

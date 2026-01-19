@@ -12,13 +12,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
-import { NotificationCenter } from '@/components/NotificationCenter';
-import { Settings, Sparkles, Download } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { LogOut, TrendingUp, Users, Target, CheckCircle2, XCircle, BookOpen, Menu, Zap, Award, BarChart3 } from 'lucide-react';
+import { TrendingUp, Users, Target, CheckCircle2, XCircle, BookOpen, Zap, Award, BarChart3 } from 'lucide-react';
 import { exportKPIData, exportDeals, exportDiagnoses, exportTrainingProgress } from '@/lib/export';
-import logo from '@/assets/logo.jpeg';
 import { trainingStructure, calculateTrainingProgress, TrainingSection } from '@/data/trainingStructure';
 import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
 import { TopologySidebar } from '@/components/TopologySidebar';
@@ -31,6 +28,8 @@ import { WeeklyBuyerSchedule } from '@/components/realtor/WeeklyBuyerSchedule';
 import { Chat } from '@/components/Chat';
 import { Crown, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AppLayout } from '@/components/layouts/AppLayout';
+import { StatBadge } from '@/components/StatBadge';
 
 interface RealtorData {
   id: string;
@@ -85,7 +84,14 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
   const [trainingData, setTrainingData] = useState<TrainingSection[]>(trainingStructure);
   const [trainingProgress, setTrainingProgress] = useState(0);
   const [topologyOffices, setTopologyOffices] = useState<Office[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem('sidebarOpen');
+    return saved !== null ? saved === 'true' : false; // Default to closed
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sidebarOpen', String(sidebarOpen));
+  }, [sidebarOpen]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatUserId, setChatUserId] = useState<string | null>(null);
@@ -452,6 +458,29 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
     );
   }
 
+  const customNavbarContent = (
+    <div className="flex items-center gap-1.5 sm:gap-2 ml-2 sm:ml-4">
+      <StatBadge
+        icon={Users}
+        value={diagnoses.length}
+        title="Диагнози"
+        colorScheme="blue"
+      />
+      <StatBadge
+        icon={TrendingUp}
+        value={deals.length}
+        title="Сделки"
+        colorScheme="green"
+      />
+      <StatBadge
+        icon={BarChart3}
+        value={`${calculateSuccessRate()}%`}
+        title="Успеваемост"
+        colorScheme="purple"
+      />
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10 flex">
       <TopologySidebar
@@ -461,150 +490,33 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
         onToggle={() => setSidebarOpen(!sidebarOpen)}
         onChatClick={handleOpenChat}
         mode="realtor"
+        showQuickActions={true}
+        onTrainingCalendarClick={() => navigate('/training-calendar')}
+        onTrainingListClick={() => navigate('/training-list')}
+        onExportClick={() => {
+          if (realtorData) {
+            const kpiData = {
+              diagnoses: diagnoses.length,
+              deals: deals.length,
+              successRate: calculateSuccessRate(),
+              realtors: 1,
+            };
+            exportKPIData(kpiData, `kpi-${realtorData.user.fullName}-${new Date().toISOString().split('T')[0]}`);
+            toast.success('KPI данните са експортирани');
+          }
+        }}
+        teamName={realtorData ? (() => {
+          const { displayName } = formatNameWithoutElevenEleven(realtorData.user.fullName);
+          return `${displayName} - Ниво ${realtorData.level}`;
+        })() : undefined}
       />
       
-      <div className="flex-1 flex flex-col">
-        {/* Modern Header with Gradient and Statistics */}
-        <header className="sticky top-0 z-50 backdrop-blur-lg bg-card/80 border-b border-border/50 shadow-sm">
-          <div className="container mx-auto px-4 sm:px-6 py-4">
-            {/* Top Row - Logo, Name, Statistics (center), Settings */}
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSidebarOpen(!sidebarOpen)}
-                  className="p-2 hover:bg-accent/50 transition-colors"
-                >
-                  <Menu className="h-5 w-5" />
-                </Button>
-                <button 
-                  onClick={() => navigate('/dashboard')} 
-                  className="hover:opacity-80 transition-all hover:scale-105 cursor-pointer"
-                >
-                  <img src={logo} alt="Logo" className="h-10 w-10 sm:h-12 sm:w-12 object-contain" />
-                </button>
-                <div className="min-w-0">
-                  {(() => {
-                    const { displayName } = formatNameWithoutElevenEleven(realtorData.user.fullName);
-                    return (
-                      <div className="flex items-center gap-2">
-                        <h1 className="text-sm sm:text-base lg:text-lg font-bold text-foreground break-words">
-                          {displayName}
-                        </h1>
-                        <Badge variant="secondary" className="text-xs">
-                          Ниво {realtorData.level}
-                        </Badge>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* Statistics - Center with modern design */}
-              <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 flex-1 justify-center">
-                {/* Диагнози */}
-                <div className="group relative flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-gradient-to-r from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20 border border-blue-200/50 dark:border-blue-800/50 hover:border-blue-400 dark:hover:border-blue-600 transition-all duration-300 hover:shadow-md hover:scale-105">
-                  <div className="p-1.5 rounded-md bg-blue-500/20 dark:bg-blue-500/30 group-hover:bg-blue-500/30 dark:group-hover:bg-blue-500/40 transition-colors">
-                    <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <div className="text-base sm:text-lg font-bold text-blue-700 dark:text-blue-300 leading-tight">{diagnoses.length}</div>
-                    <div className="text-[9px] sm:text-[10px] text-muted-foreground leading-tight font-medium">Диагнози</div>
-                  </div>
-                </div>
-
-                {/* Сделки */}
-                <div className="group relative flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10 dark:from-green-500/20 dark:to-emerald-500/20 border border-green-200/50 dark:border-green-800/50 hover:border-green-400 dark:hover:border-green-600 transition-all duration-300 hover:shadow-md hover:scale-105">
-                  <div className="p-1.5 rounded-md bg-green-500/20 dark:bg-green-500/30 group-hover:bg-green-500/30 dark:group-hover:bg-green-500/40 transition-colors">
-                    <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div>
-                    <div className="text-base sm:text-lg font-bold text-green-700 dark:text-green-300 leading-tight">{deals.length}</div>
-                    <div className="text-[9px] sm:text-[10px] text-muted-foreground leading-tight font-medium">Сделки</div>
-                  </div>
-                </div>
-
-                {/* Успеваемост */}
-                <div className="group relative flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-gradient-to-r from-purple-500/10 to-pink-500/10 dark:from-purple-500/20 dark:to-pink-500/20 border border-purple-200/50 dark:border-purple-800/50 hover:border-purple-400 dark:hover:border-purple-600 transition-all duration-300 hover:shadow-md hover:scale-105">
-                  <div className="p-1.5 rounded-md bg-purple-500/20 dark:bg-purple-500/30 group-hover:bg-purple-500/30 dark:group-hover:bg-purple-500/40 transition-colors">
-                    <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div>
-                    <div className="text-base sm:text-lg font-bold text-purple-700 dark:text-purple-300 leading-tight">{calculateSuccessRate()}%</div>
-                    <div className="text-[9px] sm:text-[10px] text-muted-foreground leading-tight font-medium">Успеваемост</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="hover:bg-accent/50 transition-colors">
-                      <Download className="h-4 w-4 mr-2" />
-                      <span className="hidden sm:inline">Експорт</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Експорт на данни</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => {
-                      const kpiData = {
-                        diagnoses: diagnoses.length,
-                        deals: deals.length,
-                        successRate: calculateSuccessRate(),
-                        realtors: 1,
-                      };
-                      exportKPIData(kpiData, `kpi-${realtorData.user.fullName}-${new Date().toISOString().split('T')[0]}`);
-                      toast.success('KPI данните са експортирани');
-                    }}>
-                      <BarChart3 className="h-4 w-4 mr-2" />
-                      KPI данни
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => {
-                      exportDeals(deals, `deals-${new Date().toISOString().split('T')[0]}`);
-                      toast.success('Сделките са експортирани');
-                    }}>
-                      <TrendingUp className="h-4 w-4 mr-2" />
-                      Сделки
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => {
-                      exportDiagnoses(diagnoses, `diagnoses-${new Date().toISOString().split('T')[0]}`);
-                      toast.success('Диагнозите са експортирани');
-                    }}>
-                      <Users className="h-4 w-4 mr-2" />
-                      Диагнози
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={async () => {
-                      try {
-                        const progress = await supabaseApi.getTrainingProgress();
-                        exportTrainingProgress(progress, `training-${new Date().toISOString().split('T')[0]}`);
-                        toast.success('Обучението е експортирано');
-                      } catch (error) {
-                        toast.error('Грешка при експорт на обучение');
-                      }
-                    }}>
-                      <BookOpen className="h-4 w-4 mr-2" />
-                      Обучение
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <NotificationCenter />
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setAccountSettingsOpen(true)}
-                  className="hover:bg-accent/50 transition-colors"
-                >
-                  <Settings className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Настройки</span>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <main className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+      <AppLayout
+        showSidebar={false}
+        customNavbarContent={customNavbarContent}
+        onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+      >
+        <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
           {/* Personal Goals */}
           {realtorData && (
             <PersonalGoalsCard
@@ -782,7 +694,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
               ))}
             </div>
           </div>
-        </main>
+        </div>
 
         {/* Account Settings Dialog */}
         {realtorData && (
@@ -793,7 +705,6 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
               fullName: realtorData.user.fullName,
               email: realtorData.user.email,
             }}
-            onLogout={handleLogout}
             onUpdate={async () => {
               try {
                 const realtor = await supabaseApi.getCurrentRealtor();
@@ -820,21 +731,21 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
             }}
           />
         )}
-      </div>
 
-      {/* Chat Component */}
-      {chatOpen && chatUserId && (
-        <Chat
-          userId={chatUserId}
-          userName={chatUserName}
-          isOpen={chatOpen}
-          onClose={() => {
-            setChatOpen(false);
-            setChatUserId(null);
-            setChatUserName('');
-          }}
-        />
-      )}
+        {/* Chat Component */}
+        {chatOpen && chatUserId && (
+          <Chat
+            userId={chatUserId}
+            userName={chatUserName}
+            isOpen={chatOpen}
+            onClose={() => {
+              setChatOpen(false);
+              setChatUserId(null);
+              setChatUserName('');
+            }}
+          />
+        )}
+      </AppLayout>
     </div>
   );
 };

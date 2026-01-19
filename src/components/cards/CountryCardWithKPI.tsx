@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { memo } from 'react';
 import { CountryCard } from './CountryCard';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { KPIMetrics } from '@/utils/kpiCalculations';
+import { useQuery } from '@tanstack/react-query';
 
 interface CountryCardWithKPIProps {
   country: {
@@ -12,31 +13,21 @@ interface CountryCardWithKPIProps {
   onClick?: () => void;
 }
 
-export const CountryCardWithKPI = ({ country, onClick }: CountryCardWithKPIProps) => {
-  const [metrics, setMetrics] = useState<KPIMetrics>({
+export const CountryCardWithKPI = memo(({ country, onClick }: CountryCardWithKPIProps) => {
+  const { data: metrics = {
     realtors: 0,
     deals: 0,
     diagnoses: 0,
     successRate: 0,
     totalDealValue: 0,
     levelDistribution: {}
+  } } = useQuery({
+    queryKey: ['country-kpi', country.id],
+    queryFn: () => supabaseApi.getCountryKPI(country.id),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchKPI = async () => {
-      try {
-        const kpi = await supabaseApi.getCountryKPI(country.id);
-        setMetrics(kpi);
-      } catch (error) {
-        console.error('Error fetching country KPI:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchKPI();
-  }, [country.id]);
 
   return <CountryCard country={country} metrics={metrics} onClick={onClick} />;
-};
+});
 

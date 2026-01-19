@@ -456,6 +456,22 @@ export const calculateTrainingProgress = (structure: TrainingSection[]): number 
   return totalRows > 0 ? Math.round((completedRows / totalRows) * 100) : 0;
 };
 
+// Функция за проверка дали обучението е напълно завършено (всички изпити са минати)
+export const isTrainingFullyCompleted = (structure: TrainingSection[]): boolean => {
+  return structure.every((section) =>
+    section.subsections.every((subsection) => subsection.progress.exam === true)
+  );
+};
+
+// Функция за проверка дали е завършено вътрешно обучение (първата секция "Работа с купувач")
+export const hasCompletedIntroductoryTraining = (structure: TrainingSection[]): boolean => {
+  const firstSection = structure.find(section => section.id === 'work-with-buyer');
+  if (!firstSection) return false;
+  
+  // Проверяваме дали всички подсекции в първата секция имат минат изпит
+  return firstSection.subsections.every((subsection) => subsection.progress.exam === true);
+};
+
 // Функция за проверка дали ред е завършен
 export const isRowCompleted = (progress: TrainingSubsection['progress']): boolean => {
   return (

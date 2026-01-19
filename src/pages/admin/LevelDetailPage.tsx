@@ -82,8 +82,7 @@ const LevelDetailPage = ({
                 Начало
               </Button>
               <Button onClick={onBack} variant="outline" size="sm">
-                <ChevronLeft className="h-4 w-4 mr-2" />
-                Назад
+                <ChevronLeft className="h-4 w-4" />
               </Button>
               <Button onClick={handleLogout} variant="outline" size="sm">
                 <LogOut className="h-4 w-4 mr-2" />

@@ -12,7 +12,7 @@ import { formatNameWithEmoji } from '@/utils/nameEmojis';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { toast } from 'sonner';
-import { Plus, Trash2, Pencil, Search } from 'lucide-react';
+import { Plus, Trash2, Pencil, Search, ArrowUp, ArrowDown } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -54,12 +54,14 @@ export const UserManagementDialog = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showPromoteDialog, setShowPromoteDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [promoteToRole, setPromoteToRole] = useState<string>('');
   const [newUser, setNewUser] = useState({
     fullName: '',
     email: '',
     password: '',
-    role: 'realtor',
+    role: 'trainee', // Default to trainee for new recruits
   });
 
   useEffect(() => {
@@ -160,16 +162,40 @@ export const UserManagementDialog = ({
         .from('user_roles')
         .insert({
           user_id: newUserId,
-          role: newUser.role as 'admin' | 'realtor',
+          role: newUser.role as 'admin' | 'realtor' | 'trainee' | 'team_leader' | 'office_manager' | 'regional_manager',
         });
 
       if (roleError && !roleError.message.includes('duplicate')) {
         throw roleError;
       }
 
-      toast.success('Потребителят е създаден успешно');
+      // If creating a trainee or realtor, create a realtor record for training progress tracking
+      if (newUser.role === 'trainee' || newUser.role === 'realtor') {
+        const { error: realtorError } = await supabaseApi.supabase
+          .from('realtors')
+          .insert({
+            user_id: newUserId,
+            team_id: null,
+            level: newUser.role === 'trainee' ? 1 : 3, // Trainees start at level 1, realtors at level 3
+          });
+
+        // Ignore duplicate errors (realtor might already exist)
+        if (realtorError && !realtorError.message.includes('duplicate') && !realtorError.message.includes('unique')) {
+          console.warn('Warning: Could not create realtor record:', realtorError);
+          // Don't throw - role assignment succeeded, realtor record is optional
+        }
+      }
+
+      const roleDisplay = 
+        newUser.role === 'admin' ? 'Администратор' :
+        newUser.role === 'regional_manager' ? 'Регионален мениджър' :
+        newUser.role === 'office_manager' ? 'Офис мениджър' :
+        newUser.role === 'team_leader' ? 'Лидер на екип' :
+        newUser.role === 'realtor' ? 'Реализатор' :
+        newUser.role === 'trainee' ? 'Курсист' : newUser.role;
+      toast.success(`Потребителят е създаден успешно като ${roleDisplay}`);
       setShowCreateDialog(false);
-      setNewUser({ fullName: '', email: '', password: '', role: 'realtor' });
+      setNewUser({ fullName: '', email: '', password: '', role: 'trainee' }); // Default to trainee for new recruits
       fetchUsers();
       onUpdate();
     } catch (error: unknown) {
@@ -202,6 +228,79 @@ export const UserManagementDialog = ({
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error(message || 'Грешка при изтриване на потребител');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePromoteUser = async () => {
+    if (!selectedUser || !promoteToRole) return;
+
+    setLoading(true);
+    try {
+      // Update user role
+      const { error: roleError } = await supabaseApi.supabase
+        .from('user_roles')
+        .upsert({
+          user_id: selectedUser.id,
+          role: promoteToRole as 'admin' | 'realtor' | 'trainee' | 'team_leader' | 'office_manager' | 'regional_manager',
+        }, {
+          onConflict: 'user_id'
+        });
+      
+      if (roleError) throw roleError;
+
+      // If promoting to realtor or trainee, update realtor level
+      if (promoteToRole === 'realtor' || promoteToRole === 'trainee') {
+        // Check if realtor record exists
+        const { data: existingRealtor } = await supabaseApi.supabase
+          .from('realtors')
+          .select('id, level')
+          .eq('user_id', selectedUser.id)
+          .maybeSingle();
+
+        if (existingRealtor) {
+          // Update level based on new role
+          const newLevel = promoteToRole === 'trainee' ? 1 : 3;
+          const { error: realtorError } = await supabaseApi.supabase
+            .from('realtors')
+            .update({ level: newLevel })
+            .eq('id', existingRealtor.id);
+          
+          if (realtorError) throw realtorError;
+        } else {
+          // Create realtor record if it doesn't exist
+          const { error: createRealtorError } = await supabaseApi.supabase
+            .from('realtors')
+            .insert({
+              user_id: selectedUser.id,
+              team_id: null,
+              level: promoteToRole === 'trainee' ? 1 : 3,
+            });
+          
+          if (createRealtorError && !createRealtorError.message.includes('duplicate') && !createRealtorError.message.includes('unique')) {
+            throw createRealtorError;
+          }
+        }
+      }
+
+      const roleDisplay = 
+        promoteToRole === 'admin' ? 'Администратор' :
+        promoteToRole === 'regional_manager' ? 'Регионален мениджър' :
+        promoteToRole === 'office_manager' ? 'Офис мениджър' :
+        promoteToRole === 'team_leader' ? 'Лидер на екип' :
+        promoteToRole === 'realtor' ? 'Реализатор' :
+        promoteToRole === 'trainee' ? 'Курсист' : promoteToRole;
+      toast.success(`Потребителят е повишен до ${roleDisplay}`);
+      setShowPromoteDialog(false);
+      setSelectedUser(null);
+      setPromoteToRole('');
+      fetchUsers();
+      onUpdate();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(message || 'Грешка при повишаване на потребител');
       console.error(error);
     } finally {
       setLoading(false);
@@ -264,10 +363,28 @@ export const UserManagementDialog = ({
                         <p className="font-medium truncate">{formatNameWithEmoji(user.fullName)}</p>
                         <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Роля: {user.role === 'admin' ? 'Администратор' : user.role === 'realtor' ? 'Реализатор' : 'Няма роля'}
+                          Роля: {user.role === 'admin' ? 'Администратор' : 
+                                 user.role === 'regional_manager' ? 'Регионален мениджър' :
+                                 user.role === 'office_manager' ? 'Офис мениджър' :
+                                 user.role === 'team_leader' ? 'Лидер на екип' :
+                                 user.role === 'realtor' ? 'Реализатор' : 
+                                 user.role === 'trainee' ? 'Курсист' : 'Няма роля'}
                         </p>
                       </div>
                       <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setPromoteToRole('');
+                            setShowPromoteDialog(true);
+                          }}
+                          className="text-primary hover:text-primary"
+                          title="Повиши акаунт"
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -339,10 +456,17 @@ export const UserManagementDialog = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="trainee">Курсист (Новобранец)</SelectItem>
                   <SelectItem value="realtor">Реализатор</SelectItem>
+                  <SelectItem value="team_leader">Лидер на екип</SelectItem>
+                  <SelectItem value="office_manager">Офис мениджър</SelectItem>
+                  <SelectItem value="regional_manager">Регионален мениджър</SelectItem>
                   <SelectItem value="admin">Администратор</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                За новобранци изберете "Курсист (Новобранец)"
+              </p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -355,6 +479,71 @@ export const UserManagementDialog = ({
             </Button>
             <Button onClick={handleCreateUser} disabled={loading} className="flex-1">
               {loading ? 'Създаване...' : 'Създай'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Promote User Dialog */}
+      <Dialog open={showPromoteDialog} onOpenChange={setShowPromoteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Повиши акаунт</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Потребител</Label>
+              <div className="p-3 border rounded-md bg-muted/50">
+                <p className="font-medium">{selectedUser ? formatNameWithEmoji(selectedUser.fullName) : ''}</p>
+                <p className="text-sm text-muted-foreground">{selectedUser?.email}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Текуща роля: {selectedUser?.role === 'admin' ? 'Администратор' : 
+                                 selectedUser?.role === 'regional_manager' ? 'Регионален мениджър' :
+                                 selectedUser?.role === 'office_manager' ? 'Офис мениджър' :
+                                 selectedUser?.role === 'team_leader' ? 'Лидер на екип' :
+                                 selectedUser?.role === 'realtor' ? 'Реализатор' : 
+                                 selectedUser?.role === 'trainee' ? 'Курсист' : selectedUser?.role || 'Няма роля'}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="promote-role">Нова роля *</Label>
+              <Select
+                value={promoteToRole}
+                onValueChange={setPromoteToRole}
+              >
+                <SelectTrigger id="promote-role">
+                  <SelectValue placeholder="Избери роля" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="trainee">Курсист</SelectItem>
+                  <SelectItem value="realtor">Реализатор</SelectItem>
+                  <SelectItem value="team_leader">Ръководител на екип</SelectItem>
+                  <SelectItem value="office_manager">Мениджър на офис</SelectItem>
+                  <SelectItem value="regional_manager">Регионален мениджър</SelectItem>
+                  <SelectItem value="admin">Администратор</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPromoteDialog(false);
+                setSelectedUser(null);
+                setPromoteToRole('');
+              }}
+              className="flex-1"
+            >
+              Отказ
+            </Button>
+            <Button
+              onClick={handlePromoteUser}
+              disabled={loading || !promoteToRole}
+              className="flex-1"
+            >
+              {loading ? 'Повишаване...' : 'Повиши'}
             </Button>
           </div>
         </DialogContent>

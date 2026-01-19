@@ -5,12 +5,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, Plus, Home } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
 import { bg } from 'date-fns/locale';
 import { toast } from 'sonner';
-import logo from '@/assets/logo.jpeg';
+import { AppLayout } from '@/components/layouts/AppLayout';
 
 interface Interview {
   id: string;
@@ -23,7 +22,6 @@ interface Interview {
 }
 
 const Interviews = () => {
-  const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -88,25 +86,14 @@ const Interviews = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card shadow-sm">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <img src={logo} alt="HRCO Logo" className="h-16 w-16 object-contain" />
-              <h1 className="text-3xl font-bold text-foreground">Календар за интервюта</h1>
-            </div>
-            <Button onClick={() => navigate('/dashboard')} variant="outline" size="sm">
-              <Home className="h-4 w-4 mr-2" />
-              Начало
-            </Button>
-          </div>
+    <AppLayout
+      customNavbarContent={
+        <div>
+          <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground">Календар за интервюта</h1>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      }
+    >
+      <div className="container mx-auto px-4 py-8">
         <Card className="p-6">
           {/* Calendar Header */}
           <div className="flex items-center justify-between mb-6">
@@ -165,7 +152,7 @@ const Interviews = () => {
             })}
           </div>
         </Card>
-      </main>
+      </div>
 
       {/* Add Interview Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -239,16 +226,7 @@ const Interviews = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Footer */}
-      <footer className="border-t border-border bg-card mt-12">
-        <div className="container mx-auto px-4 py-6">
-          <p className="text-center text-sm text-muted-foreground">
-            Разработено от Octa Investment Group
-          </p>
-        </div>
-      </footer>
-    </div>
+    </AppLayout>
   );
 };
 

@@ -21,9 +21,9 @@ export const TeamLeaderCard = ({ leader, onClick }: TeamLeaderCardProps) => {
       <div className="space-y-4">
         <div className="flex items-center gap-4">
           <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-lg border-2 border-primary/30 flex-shrink-0">
-            {leader.name
-              .split(' ')
-              .map((n) => n[0])
+              {leader.name
+                .split(' ')
+                .map((n) => n[0])
               .join('')
               .slice(0, 2)
               .toUpperCase()}

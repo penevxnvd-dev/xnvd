@@ -35,12 +35,15 @@ import {
 } from '@/components/ui/dropdown-menu';
 // Avatar removed - using modern design with initials badges instead
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
-import { NotificationCenter } from '@/components/NotificationCenter';
-import { Settings, Users, Download, BarChart3, Menu, ChevronDown, ChevronLeft, Home, Calendar, CheckCircle2, FileText, Target, XCircle, Award, TrendingUp } from 'lucide-react';
+import { UserManagementDialog } from '@/components/UserManagementDialog';
+import { useUserRole } from '@/hooks/useUserRole';
+import { hasPermission } from '@/utils/permissions';
+import { Settings, Users, Download, BarChart3, ChevronLeft, Calendar, CheckCircle2, FileText, Target, XCircle, Award, TrendingUp } from 'lucide-react';
 import { exportKPIData, exportDeals, exportDiagnoses } from '@/lib/export';
 import { TopologySidebar } from '@/components/TopologySidebar';
 import { transformOffices } from '@/utils/dataTransform';
 import { Office as UIOffice } from '@/types';
+import { AppLayout } from '@/components/layouts/AppLayout';
 import { toast } from 'sonner';
 import {
   calculateCityKPI,
@@ -56,12 +59,12 @@ import { TeamCardWithKPI } from '@/components/cards/TeamCardWithKPI';
 import { RealizatorCardWithKPI } from '@/components/cards/RealizatorCardWithKPI';
 import { TrainingManagementDialog } from '@/components/TrainingManagementDialog';
 import { formatNameWithEmoji, formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
-import { trainingStructure, calculateTrainingProgress, TrainingSection } from '@/data/trainingStructure';
+import { trainingStructure, calculateTrainingProgress, TrainingSection, isTrainingFullyCompleted } from '@/data/trainingStructure';
 import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
 import { Progress } from '@/components/ui/progress';
 import { BookOpen } from 'lucide-react';
-import logo from '@/assets/logo.jpeg';
-import { LogOut, GraduationCap } from 'lucide-react';
+import { GraduationCap } from 'lucide-react';
+import { StatBadge } from '@/components/StatBadge';
 
 type ViewLevel = 'cities' | 'offices' | 'teams' | 'realtors' | 'realtor-detail';
 
@@ -137,6 +140,7 @@ const SortableCard = ({ id, children, className }: { id: string; children: React
 
 const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => {
   const navigate = useNavigate();
+  const { role } = useUserRole();
   const [currentView, setCurrentView] = useState<ViewLevel>('cities');
   const [userInfo, setUserInfo] = useState<{fullName: string; email: string; role: string} | null>(null);
   const [cities, setCities] = useState<City[]>([]);
@@ -154,8 +158,16 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
   const [selectedRealtorTrainingData, setSelectedRealtorTrainingData] = useState<TrainingSection[]>(trainingStructure);
   const [selectedRealtorTrainingProgress, setSelectedRealtorTrainingProgress] = useState(0);
   const [topologyOffices, setTopologyOffices] = useState<UIOffice[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem('sidebarOpen');
+    return saved !== null ? saved === 'true' : false; // Default to closed
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sidebarOpen', String(sidebarOpen));
+  }, [sidebarOpen]);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [userManagementOpen, setUserManagementOpen] = useState(false);
   const [trainingDialogOpen, setTrainingDialogOpen] = useState(false);
   const [selectedRealtorForTraining, setSelectedRealtorForTraining] = useState<{ id: string; name: string } | null>(null);
 
@@ -163,6 +175,7 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
   const [kpiMetrics, setKpiMetrics] = useState<KPIMetrics | null>(null);
   const [showKPI, setShowKPI] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [realtorFilter, setRealtorFilter] = useState<'all' | 'trainees' | 'realtors'>('all');
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -423,14 +436,6 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
     }
   };
 
-  const handleHome = () => {
-    setCurrentView('cities');
-    setSelectedCity(null);
-    setSelectedOffice(null);
-    setSelectedTeam(null);
-    setShowKPI(false);
-    fetchCities();
-  };
 
   const handleTrainingProgressUpdate = async (
     sectionId: string,
@@ -499,6 +504,18 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
           examCompleted: subsection.progress.exam,
         });
 
+        // Check if training is fully completed and promote trainee to realtor
+        if (isTrainingFullyCompleted(updatedData) && selectedRealtor.userId) {
+          try {
+            const { supabaseApi } = await import('@/lib/supabaseApi');
+            await supabaseApi.promoteTraineeToRealtor(selectedRealtor.userId, selectedRealtor.teamId || undefined);
+            toast.success('🎉 Обучението е завършено! Курсистът е повишен до Реализатор.');
+          } catch (error) {
+            console.error('Error promoting trainee:', error);
+            // Don't show error to user, just log it
+          }
+        }
+
         // Show success message
         if (field === 'exam' && checked) {
           toast.success('Изпитът е минат! Подточката е завършена.');
@@ -527,6 +544,16 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
     }
     return parts.join(' / ');
   };
+
+  // Filter realtors based on selected filter
+  const filteredRealtors = useMemo(() => {
+    if (realtorFilter === 'trainees') {
+      return realtors.filter(r => r.level === 1);
+    } else if (realtorFilter === 'realtors') {
+      return realtors.filter(r => r.level > 1);
+    }
+    return realtors;
+  }, [realtors, realtorFilter]);
 
   const handleTopologyOfficeClick = async (office: UIOffice) => {
     // Find the city for this office
@@ -563,7 +590,7 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
             <p className="text-muted-foreground">
               Не сте назначени като регионален мениджър на градове.
             </p>
-            <Button onClick={handleLogout} className="mt-4 w-full" variant="outline">
+            <Button onClick={() => navigate('/auth')} className="mt-4 w-full" variant="outline">
               Изход
             </Button>
           </CardContent>
@@ -582,189 +609,126 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
         mode="admin"
+        showQuickActions={true}
+        onTrainingCalendarClick={selectedCity ? () => navigate(`/training-calendar?cityId=${selectedCity.id}`) : undefined}
+        onTrainingListClick={() => navigate('/training-list')}
+        onBackClick={handleBack}
+        showBackButton={currentView !== 'cities'}
+        onExportClick={() => {
+          if (kpiMetrics) {
+            exportKPIData(kpiMetrics, `kpi-regional-${new Date().toISOString().split('T')[0]}`);
+            toast.success('KPI данните са експортирани');
+          }
+        }}
+        teamName="Регионален мениджър"
+        breadcrumb={getBreadcrumb()}
       />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-      <header className="border-b border-border bg-card/95 backdrop-blur-lg shadow-sm sticky top-0 z-30">
-        <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4">
-          {/* Top row - Logo, Title, Actions */}
-          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="h-8 w-8 sm:h-9 sm:w-9"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-              <button 
-                onClick={handleHome} 
-                className="hover:opacity-80 transition-opacity cursor-pointer flex-shrink-0"
-              >
-                <img src={logo} alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 object-contain" />
-              </button>
-              <div className="min-w-0 flex-1">
-                <h1 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground truncate">Регионален мениджър</h1>
-                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{getBreadcrumb()}</p>
-              </div>
-              {/* Compact KPI Cards after title */}
-              {showKPI && kpiMetrics && (
-                <div className="flex items-center gap-1.5 sm:gap-2 ml-2 sm:ml-4">
-                  <div 
-                    className="group cursor-pointer rounded-md px-2 py-1 sm:px-2.5 sm:py-1.5 bg-gradient-to-br from-blue-500/10 to-blue-500/5 hover:from-blue-500/20 hover:to-blue-500/10 border border-blue-500/20 hover:border-blue-500/40 transition-all duration-300 hover:scale-105"
-                    title="Диагнози"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <Users className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                      <span className="text-xs sm:text-sm font-bold text-blue-700 dark:text-blue-300">{kpiMetrics.diagnoses || 0}</span>
-                    </div>
-                  </div>
-                  
-                  <div 
-                    className="group cursor-pointer rounded-md px-2 py-1 sm:px-2.5 sm:py-1.5 bg-gradient-to-br from-green-500/10 to-green-500/5 hover:from-green-500/20 hover:to-green-500/10 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 hover:scale-105"
-                    title="Сделки"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <TrendingUp className="h-3 w-3 text-green-600 dark:text-green-400" />
-                      <span className="text-xs sm:text-sm font-bold text-green-700 dark:text-green-300">{kpiMetrics.deals || 0}</span>
-                    </div>
-                  </div>
-                  
-                  <div 
-                    className="group cursor-pointer rounded-md px-2 py-1 sm:px-2.5 sm:py-1.5 bg-gradient-to-br from-purple-500/10 to-purple-500/5 hover:from-purple-500/20 hover:to-purple-500/10 border border-purple-500/20 hover:border-purple-500/40 transition-all duration-300 hover:scale-105"
-                    title="Успеваемост"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <Award className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-                      <span className="text-xs sm:text-sm font-bold text-purple-700 dark:text-purple-300">
-                        {formatSuccessRate(kpiMetrics.successRate || 0)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
+      {/* Main Content with AppLayout navbar */}
+      <AppLayout
+        showSidebar={false}
+        onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+        customNavbarContent={
+          showKPI && kpiMetrics ? (
+            <div className="flex items-center gap-1.5 sm:gap-2 ml-2 sm:ml-4">
+              <StatBadge
+                icon={Users}
+                value={kpiMetrics.diagnoses || 0}
+                title="Диагнози"
+                colorScheme="blue"
+              />
+              <StatBadge
+                icon={TrendingUp}
+                value={kpiMetrics.deals || 0}
+                title="Сделки"
+                colorScheme="green"
+              />
+              <StatBadge
+                icon={Award}
+                value={formatSuccessRate(kpiMetrics.successRate || 0)}
+                title="Успеваемост"
+                colorScheme="purple"
+              />
             </div>
-            <div className="flex gap-2">
-              {selectedCity && (
-                <Button onClick={() => navigate(`/training-calendar?cityId=${selectedCity.id}`)} variant="outline" size="sm" className="text-xs sm:text-sm">
-                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Календар</span>
-                </Button>
-              )}
-              <Button onClick={() => navigate('/training-progress')} variant="outline" size="sm" className="text-xs sm:text-sm">
-                <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Обучение</span>
-              </Button>
-              {currentView !== 'cities' && (
-                <Button onClick={handleBack} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
-                  <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                  <span>Назад</span>
-                </Button>
-              )}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-                    <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    <span className="hidden sm:inline">Експорт</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Експорт на данни</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {selectedRealtorKPI && (
-                    <>
-                      <DropdownMenuItem onClick={() => {
-                        exportKPIData(selectedRealtorKPI, `kpi-realtor-${selectedRealtor?.user.fullName}-${new Date().toISOString().split('T')[0]}`);
-                        toast.success('KPI данните са експортирани');
-                      }}>
-                        <BarChart3 className="h-4 w-4 mr-2" />
-                        KPI данни (Реализатор)
-                      </DropdownMenuItem>
-                      {selectedRealtorDeals.length > 0 && (
-                        <DropdownMenuItem onClick={() => {
-                          exportDeals(selectedRealtorDeals, `deals-${selectedRealtor?.user.fullName}-${new Date().toISOString().split('T')[0]}`);
-                          toast.success('Сделките са експортирани');
-                        }}>
-                          <TrendingUp className="h-4 w-4 mr-2" />
-                          Сделки (Реализатор)
-                        </DropdownMenuItem>
-                      )}
-                      {selectedRealtorDiagnoses.length > 0 && (
-                        <DropdownMenuItem onClick={() => {
-                          exportDiagnoses(selectedRealtorDiagnoses, `diagnoses-${selectedRealtor?.user.fullName}-${new Date().toISOString().split('T')[0]}`);
-                          toast.success('Диагнозите са експортирани');
-                        }}>
-                          <Users className="h-4 w-4 mr-2" />
-                          Диагнози (Реализатор)
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
-                  {kpiMetrics && (
-                    <DropdownMenuItem onClick={() => {
-                      exportKPIData(kpiMetrics, `kpi-regional-${new Date().toISOString().split('T')[0]}`);
-                      toast.success('KPI данните са експортирани');
-                    }}>
-                      <BarChart3 className="h-4 w-4 mr-2" />
-                      KPI данни ({currentView === 'offices' ? 'Град' : currentView === 'teams' ? 'Офис' : 'Регион'})
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem disabled>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Експорт на всички данни (скоро)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <NotificationCenter />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-[10px] sm:text-xs border border-primary/30">
-                        {userInfo?.fullName?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U'}
-                      </div>
-                      <span className="hidden sm:inline">{userInfo?.fullName || 'Акаунт'}</span>
-                      <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
-                    </div>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium">{userInfo?.fullName || 'Потребител'}</p>
-                      <p className="text-xs text-muted-foreground">{userInfo?.email || ''}</p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">
-                    Роля: {userInfo?.role || 'Неизвестна'}
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
-                    <Settings className="h-4 w-4 mr-2" />
-                    Настройки на акаунта
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Изход
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
+          ) : undefined
+        }
+      >
+        <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
         {loading ? (
           <div className="text-center text-muted-foreground">Зареждане...</div>
         ) : (
           <>
+            {/* Statistics and Filters for Realtors View */}
+            {currentView === 'realtors' && (
+              <div className="space-y-4">
+                {/* Statistics Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Card>
+                    <CardHeader className="p-4">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Всички
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0">
+                      <div className="text-2xl font-bold">{realtors.length}</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="p-4">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <GraduationCap className="h-4 w-4 text-blue-500" />
+                        Нови курсисти
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {realtors.filter(r => r.level === 1).length}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="p-4">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Award className="h-4 w-4 text-green-500" />
+                        Завършили
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0">
+                      <div className="text-2xl font-bold text-green-600">
+                        {realtors.filter(r => r.level > 1).length}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Filter Tabs */}
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant={realtorFilter === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setRealtorFilter('all')}
+                  >
+                    Всички ({realtors.length})
+                  </Button>
+                  <Button
+                    variant={realtorFilter === 'trainees' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setRealtorFilter('trainees')}
+                  >
+                    Нови курсисти ({realtors.filter(r => r.level === 1).length})
+                  </Button>
+                  <Button
+                    variant={realtorFilter === 'realtors' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setRealtorFilter('realtors')}
+                  >
+                    Завършили ({realtors.filter(r => r.level > 1).length})
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -776,7 +740,7 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
                   currentView === 'cities' ? cities.map(c => c.id) :
                   currentView === 'offices' ? offices.map(o => o.id) :
                   currentView === 'teams' ? teams.map(t => t.id) :
-                  currentView === 'realtors' ? realtors.map(r => r.id) : []
+                  currentView === 'realtors' ? filteredRealtors.map(r => r.id) : []
                 }
                 strategy={rectSortingStrategy}
               >
@@ -808,7 +772,7 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
                     </SortableCard>
                   ))}
 
-                  {currentView === 'realtors' && realtors.map((realtor) => (
+                  {currentView === 'realtors' && filteredRealtors.map((realtor) => (
                     realtor.user && (
                       <SortableCard key={realtor.id} id={realtor.id}>
                         <div className="relative group">
@@ -832,18 +796,17 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
                                   successMindset: false,
                                 });
                                 
-                                const kpi = await api.getRealtorKPI(realtor.userId);
+                                // Parallelize all API calls
+                                const [kpi, deals, diagnoses, trainingProgress] = await Promise.all([
+                                  api.getRealtorKPI(realtor.userId),
+                                  api.getRealtorDeals(realtor.id),
+                                  api.getRealtorDiagnoses(realtor.id),
+                                  api.getRealtorTrainingProgress(realtor.id)
+                                ]);
+                                
                                 setSelectedRealtorKPI(kpi);
-                                
-                                // Fetch deals and diagnoses
-                                const deals = await api.getRealtorDeals(realtor.id);
-                                const diagnoses = await api.getRealtorDiagnoses(realtor.id);
-                                
                                 setSelectedRealtorDeals(deals as Array<Record<string, unknown>>);
                                 setSelectedRealtorDiagnoses(diagnoses as Array<Record<string, unknown>>);
-                                
-                                // Fetch training progress
-                                const trainingProgress = await api.getRealtorTrainingProgress(realtor.id);
                                 
                                 if (trainingProgress && trainingProgress.length > 0) {
                                   const updatedTrainingData = trainingStructure.map((section) => ({
@@ -1115,28 +1078,35 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
             </div>
           </div>
         )}
-      </main>
-      </div>
+        </div>
 
-      {/* Account Settings Dialog */}
-      {userInfo && (
-        <AccountSettingsDialog
-          open={accountSettingsOpen}
-          onOpenChange={setAccountSettingsOpen}
-          userInfo={userInfo}
+        {/* Account Settings Dialog */}
+        {userInfo && (
+          <AccountSettingsDialog
+            open={accountSettingsOpen}
+            onOpenChange={setAccountSettingsOpen}
+            userInfo={userInfo}
+            onUpdate={fetchUserInfo}
+          />
+        )}
+
+        {/* Training Management Dialog */}
+        {selectedRealtorForTraining && (
+          <TrainingManagementDialog
+            open={trainingDialogOpen}
+            onOpenChange={setTrainingDialogOpen}
+            realtorId={selectedRealtorForTraining.id}
+            realtorName={selectedRealtorForTraining.name}
+          />
+        )}
+
+        {/* User Management Dialog */}
+        <UserManagementDialog
+          open={userManagementOpen}
+          onOpenChange={setUserManagementOpen}
           onUpdate={fetchUserInfo}
         />
-      )}
-
-      {/* Training Management Dialog */}
-      {selectedRealtorForTraining && (
-        <TrainingManagementDialog
-          open={trainingDialogOpen}
-          onOpenChange={setTrainingDialogOpen}
-          realtorId={selectedRealtorForTraining.id}
-          realtorName={selectedRealtorForTraining.name}
-        />
-      )}
+      </AppLayout>
     </div>
   );
 };

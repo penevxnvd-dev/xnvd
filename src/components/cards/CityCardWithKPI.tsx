@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { memo } from 'react';
 import { CityCard } from './CityCard';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { KPIMetrics } from '@/utils/kpiCalculations';
+import { useQuery } from '@tanstack/react-query';
 
 interface CityCardWithKPIProps {
   city: {
@@ -12,28 +13,21 @@ interface CityCardWithKPIProps {
   onClick?: () => void;
 }
 
-export const CityCardWithKPI = ({ city, onClick }: CityCardWithKPIProps) => {
-  const [metrics, setMetrics] = useState<KPIMetrics>({
+export const CityCardWithKPI = memo(({ city, onClick }: CityCardWithKPIProps) => {
+  const { data: metrics = {
     realtors: 0,
     deals: 0,
     diagnoses: 0,
     successRate: 0,
     totalDealValue: 0,
     levelDistribution: {}
+  } } = useQuery({
+    queryKey: ['city-kpi', city.id],
+    queryFn: () => supabaseApi.getCityKPI(city.id),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
-  useEffect(() => {
-    const fetchKPI = async () => {
-      try {
-        const kpi = await supabaseApi.getCityKPI(city.id);
-        setMetrics(kpi);
-      } catch (error) {
-        console.error('Error fetching city KPI:', error);
-      }
-    };
-    fetchKPI();
-  }, [city.id]);
-
   return <CityCard city={city} metrics={metrics} onClick={onClick} />;
-};
+});
 

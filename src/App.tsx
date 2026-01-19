@@ -15,10 +15,10 @@ import Auth from "./pages/Auth";
 import TrainingPage from "./pages/realtor/TrainingPage";
 import TrainingCalendarPage from "./pages/realtor/TrainingCalendarPage";
 import TrainingProgressPage from "./pages/realtor/TrainingProgressPage";
+import TrainingListPage from "./pages/realtor/TrainingListPage";
 import { analytics } from "@/lib/analytics";
 import { SearchDialog } from "@/components/SearchDialog";
 import { useState, useEffect } from "react";
-import { syncService } from "@/lib/syncService";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,13 +37,6 @@ const App = () => {
   useEffect(() => {
     // Track page views
     analytics.trackPageView(window.location.pathname);
-    
-    // Initialize sync service (checks for local backup availability)
-    syncService.startAutoSync();
-    
-    return () => {
-      syncService.stopAutoSync();
-    };
   }, []);
 
   return (
@@ -70,6 +63,7 @@ const App = () => {
                   <Route path="/training" element={<TrainingPage />} />
                   <Route path="/training-calendar" element={<TrainingCalendarPage />} />
                   <Route path="/training-progress" element={<TrainingProgressPage />} />
+                  <Route path="/training-list" element={<TrainingListPage />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

@@ -77,7 +77,12 @@ export default defineConfig(({ mode }) => ({
           'charts': ['recharts'],
           'supabase': ['@supabase/supabase-js'],
           'forms': ['react-hook-form', '@hookform/resolvers', 'zod'],
+          'query': ['@tanstack/react-query'],
         },
+        // Optimize chunk names for better caching
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
       },
     },
     chunkSizeWarningLimit: 1000,
@@ -85,7 +90,13 @@ export default defineConfig(({ mode }) => ({
     terserOptions: {
       compress: {
         drop_console: mode === 'production',
+        drop_debugger: mode === 'production',
+        pure_funcs: mode === 'production' ? ['console.log', 'console.info'] : [],
       },
     },
+    // Enable source maps only in development
+    sourcemap: mode === 'development',
+    // Optimize asset inlining
+    assetsInlineLimit: 4096, // 4kb
   },
 }));

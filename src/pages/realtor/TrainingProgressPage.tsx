@@ -1,32 +1,242 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabaseApi } from '@/lib/supabaseApi';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { LogOut, BookOpen, ArrowLeft, CheckCircle2, Circle, GraduationCap } from 'lucide-react';
-import logo from '@/assets/logo.jpeg';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { BookOpen, CheckCircle2, Circle, GraduationCap, Users, User } from 'lucide-react';
 import { trainingStructure, calculateTrainingProgress, TrainingSection } from '@/data/trainingStructure';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useUserRole } from '@/hooks/useUserRole';
+import { formatNameWithEmoji } from '@/utils/nameEmojis';
+import { AppLayout } from '@/components/layouts/AppLayout';
+
+interface TraineeOption {
+  id: string;
+  name: string;
+  email: string;
+  realtorId?: string;
+  userId?: string;
+}
 
 const TrainingProgressPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { role } = useUserRole();
   const [userId, setUserId] = useState<string | null>(null);
   const [realtorId, setRealtorId] = useState<string | null>(null);
+  const [selectedTraineeEmail, setSelectedTraineeEmail] = useState<string | null>(null);
+  const [selectedTraineeId, setSelectedTraineeId] = useState<string | null>(null);
+  const [selectedTraineeRealtorId, setSelectedTraineeRealtorId] = useState<string | null>(null);
+  const [availableTrainees, setAvailableTrainees] = useState<TraineeOption[]>([]);
+  const [loadingTrainees, setLoadingTrainees] = useState(false);
   const [trainingData, setTrainingData] = useState<TrainingSection[]>(trainingStructure);
   const [progress, setProgress] = useState(0);
   const [loading, setLoading] = useState(true);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [canEdit, setCanEdit] = useState(false);
+  const loadingTraineeRef = useRef<string | null>(null);
+
+  // Check if user can edit (admin, managers, team leaders)
+  useEffect(() => {
+    const canUserEdit = role === 'admin' || 
+                       role === 'regional_manager' || 
+                       role === 'office_manager' || 
+                       role === 'team_leader';
+    setCanEdit(canUserEdit);
+  }, [role]);
+
+  const fetchAvailableTrainees = useCallback(async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:53',message:'fetchAvailableTrainees called',data:{realtorId,selectedTraineeEmail},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
+    setLoadingTrainees(true);
+    try {
+      // Get all training groups
+      const groups = await supabaseApi.getAllTrainingGroups();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:57',message:'getAllTrainingGroups result',data:{groupsCount:groups?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+      
+      // Extract all unique trainees
+      const traineesMap = new Map<string, TraineeOption>();
+      
+      groups.forEach(group => {
+        group.trainees.forEach(trainee => {
+          if (trainee.email && !traineesMap.has(trainee.email)) {
+            traineesMap.set(trainee.email, {
+              id: trainee.id,
+              name: trainee.name,
+              email: trainee.email,
+            });
+          }
+        });
+      });
+
+      // Also add current user if they're a realtor
+      if (realtorId) {
+        const { user } = await api.getCurrentUser();
+        if (user?.email) {
+          traineesMap.set(user.email, {
+            id: user.id,
+            name: user.full_name || user.email,
+            email: user.email,
+            realtorId: realtorId,
+            userId: user.id,
+          });
+        }
+      }
+
+      const trainees = Array.from(traineesMap.values());
+      setAvailableTrainees(trainees);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:89',message:'setAvailableTrainees called',data:{traineesCount:trainees.length,selectedTraineeEmail},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+      
+      // If no trainee is selected and we have trainees, select the first one
+      if (!selectedTraineeEmail && trainees.length > 0) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:92',message:'auto-selecting first trainee',data:{firstTraineeEmail:trainees[0].email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+        setSelectedTraineeEmail(trainees[0].email);
+      }
+    } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:96',message:'fetchAvailableTrainees error',data:{error:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+      console.error('Error fetching available trainees:', error);
+      toast.error('Грешка при зареждане на курсисти');
+    } finally {
+      setLoadingTrainees(false);
+    }
+  }, [realtorId, selectedTraineeEmail]);
+
+  const loadTraineeData = useCallback(async (email: string) => {
+    // Prevent concurrent calls for the same email
+    if (loadingTraineeRef.current === email) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:103',message:'loadTraineeData skipped - already loading',data:{email},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      return;
+    }
+    
+    loadingTraineeRef.current = email;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:103',message:'loadTraineeData called',data:{email,selectedTraineeEmail,selectedTraineeId,selectedTraineeRealtorId},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    try {
+      // Find profile by email
+      const { data: profile } = await supabaseApi.supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (!profile) {
+        toast.error('Профилът на курсиста не е намерен.');
+        loadingTraineeRef.current = null;
+        return;
+      }
+
+      setSelectedTraineeId(profile.id);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:145',message:'setSelectedTraineeId called',data:{profileId:profile.id,email},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+
+      // Get realtor by user_id
+      const { data: realtor } = await supabaseApi.supabase
+        .from('realtors')
+        .select('id')
+        .eq('user_id', profile.id)
+        .single();
+
+      if (!realtor) {
+        toast.error('Курсистът все още няма профил като реализатор.');
+        return;
+      }
+
+      setSelectedTraineeRealtorId(realtor.id);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:162',message:'setSelectedTraineeRealtorId called',data:{realtorId:realtor.id,profileId:profile.id,email},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+
+      // Get training progress
+      const progressData = await supabaseApi.getTrainingProgress(profile.id);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:168',message:'getTrainingProgress result',data:{progressDataLength:progressData?.length||0,profileId:profile.id},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+
+      // Update training structure with progress
+      const updatedData = trainingStructure.map((section) => ({
+        ...section,
+        subsections: section.subsections.map((subsection) => {
+          const progressItem = progressData.find(
+            (p: { section?: string; subsection?: string }) => p.section === section.id && p.subsection === subsection.id
+          );
+          return {
+            ...subsection,
+            progress: progressItem
+              ? {
+                  lecture: (progressItem as { lecture_completed?: boolean }).lecture_completed || false,
+                  video: (progressItem as { video_completed?: boolean }).video_completed || false,
+                  practical: (progressItem as { practical_completed?: boolean }).practical_completed || false,
+                  handover: (progressItem as { handover_completed?: boolean }).handover_completed || false,
+                  exam: (progressItem as { exam_completed?: boolean }).exam_completed || false,
+                }
+              : subsection.progress,
+          };
+        }),
+      }));
+
+      setTrainingData(updatedData);
+      setProgress(calculateTrainingProgress(updatedData));
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:162',message:'loadTraineeData completed',data:{email},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+    } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:164',message:'loadTraineeData error',data:{error:error instanceof Error?error.message:String(error),email},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+      console.error('Error loading trainee data:', error);
+      toast.error('Грешка при зареждане на данни за обучение.');
+    } finally {
+      // Clear the loading ref if this was the current email
+      if (loadingTraineeRef.current === email) {
+        loadingTraineeRef.current = null;
+      }
+    }
+  }, []); // No dependencies - email is passed as parameter, state updates are handled by the function itself
 
   const fetchTrainingProgress = useCallback(async () => {
-    if (!realtorId) return;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:166',message:'fetchTrainingProgress called',data:{selectedTraineeRealtorId,realtorId,selectedTraineeId,userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    const targetRealtorId = selectedTraineeRealtorId || realtorId;
+    if (!targetRealtorId) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:168',message:'fetchTrainingProgress early return - no realtorId',data:{targetRealtorId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      return;
+    }
 
     try {
-      const progressData = await supabaseApi.getTrainingProgress();
+      const targetUserId = selectedTraineeId || userId;
+      if (!targetUserId) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:172',message:'fetchTrainingProgress early return - no userId',data:{targetUserId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        return;
+      }
+
+      const progressData = await supabaseApi.getTrainingProgress(targetUserId);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:174',message:'fetchTrainingProgress API result',data:{progressDataLength:progressData?.length||0,targetUserId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
 
       if (progressData) {
         // Обновяване на структурата с данни от базата
@@ -35,17 +245,17 @@ const TrainingProgressPage = () => {
             ...section,
             subsections: section.subsections.map((subsection) => {
               const progressItem = progressData.find(
-                (p: { section: string; subsection: string }) => p.section === section.id && p.subsection === subsection.id
+                (p: { section?: string; subsection?: string }) => p.section === section.id && p.subsection === subsection.id
               );
               return {
                 ...subsection,
                 progress: progressItem
                   ? {
-                      lecture: progressItem.lecture_completed,
-                      video: progressItem.video_completed,
-                      practical: progressItem.practical_completed,
-                      handover: progressItem.handover_completed,
-                      exam: progressItem.exam_completed,
+                      lecture: (progressItem as { lecture_completed?: boolean }).lecture_completed || false,
+                      video: (progressItem as { video_completed?: boolean }).video_completed || false,
+                      practical: (progressItem as { practical_completed?: boolean }).practical_completed || false,
+                      handover: (progressItem as { handover_completed?: boolean }).handover_completed || false,
+                      exam: (progressItem as { exam_completed?: boolean }).exam_completed || false,
                     }
                   : subsection.progress,
               };
@@ -56,33 +266,55 @@ const TrainingProgressPage = () => {
         });
       }
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:203',message:'fetchTrainingProgress error',data:{error:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       console.error('Error fetching training progress:', error);
     }
-  }, [realtorId]);
+  }, [selectedTraineeRealtorId, realtorId, selectedTraineeId, userId]);
+
+  // Get trainee email from URL params
+  useEffect(() => {
+    const traineeEmail = searchParams.get('traineeEmail');
+    if (traineeEmail) {
+      setSelectedTraineeEmail(traineeEmail);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     fetchUserData();
   }, []);
 
   useEffect(() => {
-    if (realtorId) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:287',message:'useEffect triggered - fetchAvailableTrainees',data:{canEdit,realtorId},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
+    if (canEdit && realtorId) {
+      fetchAvailableTrainees();
+    }
+  }, [canEdit, realtorId, fetchAvailableTrainees]);
+
+  useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:232',message:'useEffect triggered - trainee selection',data:{selectedTraineeEmail,realtorId},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    if (selectedTraineeEmail) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:234',message:'calling loadTraineeData',data:{selectedTraineeEmail},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      loadTraineeData(selectedTraineeEmail);
+    } else if (realtorId && !selectedTraineeEmail) {
+      // Only fetch own progress if no trainee is selected
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/afab9161-da85-4096-948d-ddd71db07ca9',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TrainingProgressPage.tsx:237',message:'calling fetchTrainingProgress',data:{realtorId},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       fetchTrainingProgress();
     }
-  }, [realtorId, fetchTrainingProgress]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTraineeEmail, realtorId]); // Only depend on selectedTraineeEmail and realtorId - loadTraineeData and fetchTrainingProgress are stable
 
   const fetchUserData = async () => {
     try {
-      // Check if userId is provided in query params (for viewing other user's progress)
-      const queryUserId = searchParams.get('userId');
-      
-      if (queryUserId) {
-        // Viewing another user's progress
-        setUserId(queryUserId);
-        const realtor = await supabaseApi.getCurrentRealtor(queryUserId);
-        if (realtor) {
-          setRealtorId(realtor.id);
-        }
-      } else {
         // Viewing own progress
         const { user } = await supabaseApi.getCurrentUser();
         if (user) {
@@ -90,7 +322,6 @@ const TrainingProgressPage = () => {
           const realtor = await supabaseApi.getCurrentRealtor();
           if (realtor) {
             setRealtorId(realtor.id);
-          }
         }
       }
     } catch (error) {
@@ -106,7 +337,8 @@ const TrainingProgressPage = () => {
     field: 'lecture' | 'video' | 'practical' | 'handover' | 'exam',
     checked: boolean
   ) => {
-    if (!realtorId) return;
+    const targetRealtorId = selectedTraineeRealtorId || realtorId;
+    if (!targetRealtorId || !canEdit) return;
 
     // Обновяване на локалното състояние
     const updatedData = trainingData.map((section) => {
@@ -154,14 +386,18 @@ const TrainingProgressPage = () => {
         ?.subsections.find((ss) => ss.id === subsectionId);
 
       if (subsection) {
+        const targetRealtorId = selectedTraineeRealtorId || realtorId;
+        if (!targetRealtorId) return;
+
         await supabaseApi.updateTrainingProgress({
+          realtorId: targetRealtorId,
           section: sectionId,
           subsection: subsectionId,
-          lecture_completed: subsection.progress.lecture,
-          video_completed: subsection.progress.video,
-          practical_completed: subsection.progress.practical,
-          handover_completed: subsection.progress.handover,
-          exam_completed: subsection.progress.exam,
+          lectureCompleted: subsection.progress.lecture,
+          videoCompleted: subsection.progress.video,
+          practicalCompleted: subsection.progress.practical,
+          handoverCompleted: subsection.progress.handover,
+          examCompleted: subsection.progress.exam,
         });
 
         // Ако изпитът е минат, показваме съобщение
@@ -187,10 +423,6 @@ const TrainingProgressPage = () => {
     setExpandedSections(newExpanded);
   };
 
-  const handleLogout = async () => {
-    await supabaseApi.logout();
-    navigate('/auth');
-  };
 
   if (loading) {
     return (
@@ -201,37 +433,66 @@ const TrainingProgressPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card shadow-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => navigate('/dashboard')} 
-                className="hover:opacity-80 transition-opacity cursor-pointer"
-              >
-                <img src={logo} alt="Logo" className="h-12 w-12 object-contain" />
-              </button>
-              <div>
-                <h1 className="text-lg font-semibold text-foreground">Отбелязване на обучение</h1>
-                <p className="text-xs text-muted-foreground">Маркирайте завършени подточки и изпити</p>
-              </div>
-            </div>
-            <div className="flex gap-1.5 sm:gap-2 flex-wrap">
-              <Button onClick={() => navigate('/dashboard')} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
-                <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                <span>Назад</span>
-              </Button>
-              <Button onClick={handleLogout} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
-                <LogOut className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                <span>Изход</span>
-              </Button>
-            </div>
-          </div>
+    <AppLayout
+      customNavbarContent={
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Отбелязване на обучение</h1>
+          <p className="text-xs text-muted-foreground hidden sm:block">Маркирайте завършени подточки и изпити</p>
         </div>
-      </header>
+      }
+    >
+      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
+        {/* Trainee Selector - Only for managers/leaders */}
+        {canEdit && availableTrainees.length > 0 && (
+          <Card className="border-2 border-primary/20 shadow-lg">
+            <CardHeader className="p-4 sm:p-6">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary border-2 border-primary/30">
+                  <Users className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Избор на курсист
+                  </CardTitle>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                    Изберете курсист за преглед на прогреса му
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <Select
+                value={selectedTraineeEmail || ''}
+                onValueChange={(email) => {
+                  setSelectedTraineeEmail(email);
+                  navigate(`/training-progress?traineeEmail=${encodeURIComponent(email)}`, { replace: true });
+                }}
+                disabled={loadingTrainees}
+              >
+                <SelectTrigger className="w-full h-11">
+                  <SelectValue placeholder={loadingTrainees ? "Зареждане..." : "Изберете курсист"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTrainees.map((trainee) => (
+                    <SelectItem key={trainee.email} value={trainee.email}>
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-xs border-2 border-primary/30">
+                          {trainee.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-medium">{formatNameWithEmoji(trainee.name)}</p>
+                          <p className="text-xs text-muted-foreground">{trainee.email}</p>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+        )}
 
-      <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
         {/* Прогрес бар */}
         <Card>
           <CardHeader className="p-3 sm:p-6">
@@ -458,8 +719,8 @@ const TrainingProgressPage = () => {
             );
           })}
         </div>
-      </main>
-    </div>
+      </div>
+    </AppLayout>
   );
 };
 

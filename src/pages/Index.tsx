@@ -160,7 +160,14 @@ const Index = () => {
   const [selectedTrainingGroup, setSelectedTrainingGroup] = useState<TrainingGroup | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [trainingDialogOpen, setTrainingDialogOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem('sidebarOpen');
+    return saved !== null ? saved === 'true' : true; // Default to open
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sidebarOpen', String(sidebarOpen));
+  }, [sidebarOpen]);
   const [userInfo, setUserInfo] = useState<{fullName: string; email: string; role: string} | null>(null);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [trainingGroups, setTrainingGroups] = useState<TrainingGroup[]>([]);
@@ -233,6 +240,7 @@ const Index = () => {
         selectedAgentId={selectedAgent?.id}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
+        showQuickActions={false}
       />
 
       {/* Main Content Area */}
@@ -315,8 +323,7 @@ const Index = () => {
                       <span className="hidden sm:inline">Начало</span>
                     </Button>
                     <Button onClick={handleBack} variant="outline" size="sm" className="text-xs sm:text-sm">
-                      <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                      <span className="hidden sm:inline">Назад</span>
+                      <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
                     </Button>
                   </>}
               </div>

@@ -1,9 +1,4 @@
 import { useUserRole } from '@/hooks/useUserRole';
-import AdminDashboard from './admin/AdminDashboard';
-import RealtorDashboard from './realtor/RealtorDashboard';
-import TeamLeaderDashboard from './team-leader/TeamLeaderDashboard';
-import OfficeManagerDashboard from './office-manager/OfficeManagerDashboard';
-import RegionalManagerDashboard from './regional-manager/RegionalManagerDashboard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -11,7 +6,14 @@ import { useNavigate } from 'react-router-dom';
 import { LogOut, AlertCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 import logo from '@/assets/logo.jpeg';
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
+
+// Lazy load dashboards for code splitting
+const AdminDashboard = lazy(() => import('./admin/AdminDashboard'));
+const RealtorDashboard = lazy(() => import('./realtor/RealtorDashboard'));
+const TeamLeaderDashboard = lazy(() => import('./team-leader/TeamLeaderDashboard'));
+const OfficeManagerDashboard = lazy(() => import('./office-manager/OfficeManagerDashboard'));
+const RegionalManagerDashboard = lazy(() => import('./regional-manager/RegionalManagerDashboard'));
 
 const Dashboard = () => {
   const { role, loading, userId } = useUserRole();
@@ -68,23 +70,43 @@ const Dashboard = () => {
   }
 
   if (role === 'admin') {
-    return <AdminDashboard userId={userId!} />;
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><div className="text-muted-foreground">Зареждане...</div></div>}>
+        <AdminDashboard userId={userId!} />
+      </Suspense>
+    );
   }
 
   if (role === 'realtor') {
-    return <RealtorDashboard userId={userId!} />;
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><div className="text-muted-foreground">Зареждане...</div></div>}>
+        <RealtorDashboard userId={userId!} />
+      </Suspense>
+    );
   }
 
   if (role === 'team_leader') {
-    return <TeamLeaderDashboard userId={userId!} />;
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><div className="text-muted-foreground">Зареждане...</div></div>}>
+        <TeamLeaderDashboard userId={userId!} />
+      </Suspense>
+    );
   }
 
   if (role === 'office_manager') {
-    return <OfficeManagerDashboard userId={userId!} />;
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><div className="text-muted-foreground">Зареждане...</div></div>}>
+        <OfficeManagerDashboard userId={userId!} />
+      </Suspense>
+    );
   }
 
   if (role === 'regional_manager') {
-    return <RegionalManagerDashboard userId={userId!} />;
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><div className="text-muted-foreground">Зареждане...</div></div>}>
+        <RegionalManagerDashboard userId={userId!} />
+      </Suspense>
+    );
   }
 
   return null;

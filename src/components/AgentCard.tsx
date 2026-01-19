@@ -33,9 +33,9 @@ export const AgentCard = ({ agent, onClick }: AgentCardProps) => {
     >
       <div className="flex items-start gap-4">
         <div className="h-14 w-14 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-base border-2 border-primary/30 flex-shrink-0">
-          {agent.name
-            .split(' ')
-            .map((n) => n[0])
+            {agent.name
+              .split(' ')
+              .map((n) => n[0])
             .join('')
             .slice(0, 2)
             .toUpperCase()}

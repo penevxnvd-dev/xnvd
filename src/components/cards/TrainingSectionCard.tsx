@@ -17,14 +17,27 @@ interface TrainingSectionCardProps {
     checked: boolean
   ) => void;
   editable?: boolean;
+  isExpanded?: boolean;
+  onToggleExpanded?: (sectionId: string) => void;
 }
 
 export const TrainingSectionCard = ({
   section,
   onProgressUpdate,
-  editable = true
+  editable = true,
+  isExpanded: controlledIsOpen,
+  onToggleExpanded
 }: TrainingSectionCardProps) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
+  
+  const handleToggle = (open: boolean) => {
+    if (onToggleExpanded) {
+      onToggleExpanded(section.id);
+    } else {
+      setInternalIsOpen(open);
+    }
+  };
 
   // Calculate section progress
   const totalSubsections = section.subsections.length;
@@ -45,7 +58,7 @@ export const TrainingSectionCard = ({
         ? "border-success/50 bg-gradient-to-br from-success/10 to-success/5 shadow-success/20" 
         : "border-border/50 hover:border-primary/30 bg-gradient-to-br from-card to-card/50"
     )}>
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Collapsible open={isOpen} onOpenChange={handleToggle}>
         <CardHeader className="p-3 sm:p-6">
           <CollapsibleTrigger className="w-full">
             <div className="flex items-center justify-between flex-wrap gap-2">

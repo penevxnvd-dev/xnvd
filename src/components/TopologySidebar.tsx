@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
@@ -13,12 +14,26 @@ import {
   ChevronUp,
   Menu,
   Crown,
-  MessageCircle
+  MessageCircle,
+  Calendar,
+  CheckCircle2,
+  Download,
+  Plus,
+  Sparkles,
+  Search,
+  X,
+  Home,
+  GraduationCap,
+  BarChart3,
+  Briefcase
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Office, TeamLeader, Agent } from '@/types';
 import { api } from '@/lib/api';
 import { formatNameWithEmoji, formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface TopologySidebarProps {
   offices: Office[];
@@ -31,7 +46,20 @@ interface TopologySidebarProps {
   selectedAgentId?: string;
   isOpen: boolean;
   onToggle: () => void;
-  mode?: 'admin' | 'realtor'; // 'admin' shows full topology, 'realtor' shows only team
+  mode?: 'admin' | 'realtor';
+  showQuickActions?: boolean;
+  onTrainingCalendarClick?: () => void;
+  onTrainingListClick?: () => void;
+  onExportClick?: () => void;
+  onBackClick?: () => void;
+  showBackButton?: boolean;
+  onAddClick?: () => void;
+  showAddButton?: boolean;
+  onAddPersonClick?: () => void;
+  showAddPersonButton?: boolean;
+  role?: string;
+  teamName?: string;
+  breadcrumb?: string;
 }
 
 interface CountryData {
@@ -57,7 +85,20 @@ export const TopologySidebar = ({
   selectedAgentId,
   isOpen,
   onToggle,
-  mode = 'admin', // Default to admin mode (full topology)
+  mode = 'admin',
+  showQuickActions = true,
+  onTrainingCalendarClick,
+  onTrainingListClick,
+  onExportClick,
+  onBackClick,
+  showBackButton = false,
+  onAddClick,
+  showAddButton = false,
+  onAddPersonClick,
+  showAddPersonButton = false,
+  role,
+  teamName,
+  breadcrumb,
 }: TopologySidebarProps) => {
   const [expandedCountries, setExpandedCountries] = useState<Set<string>>(new Set());
   const [expandedCities, setExpandedCities] = useState<Set<string>>(new Set());
@@ -71,19 +112,20 @@ export const TopologySidebar = ({
     members: Array<{ id: string; name: string; level: string }>;
     teamName: string;
   } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Sidebar is always open, no navigation effects needed
 
   useEffect(() => {
-    // Only fetch team data for realtor mode
     if (mode !== 'realtor') return;
     
-    // Fetch current realtor's team from REMOTE Supabase
     const fetchCurrentRealtorTeam = async () => {
       try {
-        // Verify we're using remote Supabase
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         console.log('🔍 Loading team data from Supabase:', supabaseUrl);
         
-        // Step 1: Get current realtor's profile and team ID from Prisma (via API)
         console.log('📥 Fetching current realtor from Prisma (via API)...');
         const realtor = await api.getCurrentRealtor();
         if (!realtor) {
@@ -95,14 +137,12 @@ export const TopologySidebar = ({
         const teamId = realtor.team_id;
         console.log('✅ Current realtor found. TeamId:', teamId);
         
-        // Step 2: Get all offices with teams from Prisma (via API)
         console.log('📥 Fetching all offices with teams from Prisma (via API)...');
         const offices = await api.getAllOfficesFull();
         console.log(`✅ Loaded ${offices.length} offices from Prisma`);
         let foundTeam = null;
         let foundOffice = null;
         
-        // Step 3: Find the team by teamId
         if (teamId) {
           for (const office of offices) {
             for (const team of office.teams || []) {
@@ -116,7 +156,6 @@ export const TopologySidebar = ({
           }
         }
         
-        // Step 4: If no team found by teamId, try to find Краси Кътев's team as fallback
         if (!foundTeam) {
           console.log('⚠️ Team not found by teamId, trying to find Краси Кътев team as fallback');
           for (const office of offices) {
@@ -135,11 +174,9 @@ export const TopologySidebar = ({
           }
         }
         
-        // Step 5: If team found, fetch complete team data using getOfficeFull from Prisma (via API)
         if (foundTeam && foundOffice) {
           try {
             console.log(`📥 Fetching full team data from Prisma (via API) for office: ${foundOffice.id}`);
-            // Use getOfficeFull to get complete team data with all realtors from Prisma
             const fullOffice = await api.getOfficeFull(foundOffice.id);
             const fullTeam = fullOffice.teams?.find((t: { id: string }) => t.id === foundTeam.id);
             if (fullTeam) {
@@ -151,7 +188,6 @@ export const TopologySidebar = ({
           }
         }
         
-        // Step 6: If still no realtors, fetch them directly using getRealtorsByTeam from Prisma (via API)
         if (foundTeam && (!foundTeam.realtors || foundTeam.realtors.length === 0)) {
           try {
             console.log(`📥 Fetching realtors directly from Prisma (via API) for team: ${foundTeam.id}`);
@@ -166,7 +202,6 @@ export const TopologySidebar = ({
         }
         
         if (foundTeam) {
-          // Extract leader information from Supabase profile data
           const leader = foundTeam.leader ? {
             id: foundTeam.leader.id,
             name: formatNameWithEmoji(foundTeam.leader.full_name),
@@ -177,10 +212,7 @@ export const TopologySidebar = ({
             userId: foundTeam.leader.id
           } : null;
 
-          // Extract ALL realtors from Supabase team data (same structure as admin dashboard)
-          // This includes all team members with their profile data from Supabase
           const allRealtors = (foundTeam.realtors || []).map((r: { id: string; user_id?: string; level?: number; profile?: { full_name?: string; id?: string } }) => {
-            // Handle both direct profile and nested profile structures from Supabase
             const profile = r.profile || {};
             return {
               id: r.id,
@@ -193,7 +225,6 @@ export const TopologySidebar = ({
             };
           });
 
-          // Filter out leader from members if they appear in realtors list
           const members = allRealtors.filter((r: { userId?: string }) => {
             const realtorUserId = r.userId;
             const leaderId = foundTeam.leader?.id;
@@ -225,7 +256,6 @@ export const TopologySidebar = ({
   }, [mode]);
 
   useEffect(() => {
-    // Fetch teams data for all offices
     const fetchTeamsData = async () => {
       try {
         const dbOffices = await api.getAllOfficesFull();
@@ -280,7 +310,6 @@ export const TopologySidebar = ({
   }, [offices]);
 
   useEffect(() => {
-    // Fetch full office data with city and country info
     const fetchTopology = async () => {
       try {
         const dbOffices = await api.getAllOfficesFull();
@@ -291,7 +320,6 @@ export const TopologySidebar = ({
           const country = city?.country;
           
           if (!country || !city) {
-            // Fallback to location string parsing
             const countryName = dbOffice.address?.split(', ').pop() || 'Неизвестна';
             const cityName = dbOffice.address?.split(', ')[0] || dbOffice.name || 'Неизвестен';
             
@@ -315,7 +343,6 @@ export const TopologySidebar = ({
               countryData.cities.push(cityData);
             }
 
-            // Find matching office from transformed offices
             const matchingOffice = offices.find((o) => o.id === dbOffice.id);
             if (matchingOffice) {
               cityData.offices.push(matchingOffice);
@@ -344,7 +371,6 @@ export const TopologySidebar = ({
               countryData.cities.push(cityData);
             }
 
-            // Find matching office from transformed offices
             const matchingOffice = offices.find((o) => o.id === dbOffice.id);
             if (matchingOffice) {
               cityData.offices.push(matchingOffice);
@@ -355,7 +381,6 @@ export const TopologySidebar = ({
             setTopology(Array.from(countryMap.values()));
       } catch (error) {
         console.error('Error fetching topology:', error);
-        // Fallback to simple organization by location string
         const countryMap = new Map<string, CountryData>();
         offices.forEach((office) => {
           const countryName = office.location.split(', ').pop() || 'Неизвестна';
@@ -389,7 +414,6 @@ export const TopologySidebar = ({
 
     fetchTopology();
     
-    // Auto-expand selected items
     if (selectedOfficeId) {
       const office = offices.find((o) => o.id === selectedOfficeId);
       if (office) {
@@ -478,55 +502,302 @@ export const TopologySidebar = ({
     });
   };
 
+  const filteredTopology = topology.map(country => ({
+    ...country,
+    cities: country.cities.map(city => ({
+      ...city,
+      offices: city.offices.filter(office => 
+        !searchQuery || 
+        office.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        city.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        country.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    })).filter(city => city.offices.length > 0)
+  })).filter(country => country.cities.length > 0);
+
   return (
     <>
-      {/* Sidebar */}
+      {/* Modern Sidebar */}
       <aside
         className={cn(
-          "fixed left-0 top-0 h-screen bg-card border-r border-border shadow-lg z-40 transition-all duration-300 overflow-hidden",
-          isOpen ? "w-64" : "w-0 -translate-x-full"
+          "fixed left-0 top-0 h-screen bg-gradient-to-b from-card via-card to-muted/5 border-r border-border/50 shadow-xl z-40 transition-transform duration-300 overflow-hidden backdrop-blur-sm w-72 sm:w-80",
+          !isOpen && "-translate-x-full"
         )}
       >
         <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="p-3 border-b border-border">
-            <h2 className="text-base font-semibold flex items-center gap-2">
-              <Globe className="h-4 w-4" />
-              {mode === 'realtor' ? 'Мой екип' : 'Топология'}
-            </h2>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
-              {mode === 'realtor' ? 'Екип и членове' : 'Бърза навигация'}
-            </p>
+          {/* Modern Header */}
+          <div className="p-4 border-b border-border/50 bg-gradient-to-r from-primary/5 via-transparent to-primary/5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="p-1.5 rounded-lg bg-primary/10">
+                <Sparkles className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-foreground">Навигация</h2>
+                {teamName && (
+                  <p className="text-xs text-muted-foreground truncate max-w-[180px]">{teamName}</p>
+                )}
+              </div>
+            </div>
+            
+            {/* Search Bar */}
+            {(mode === 'admin' && topology.length > 0) && (
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Търсене..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-8 pl-8 pr-8 text-xs bg-background/50 border-border/50 focus:border-primary/50"
+                />
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-0.5 top-1/2 -translate-y-1/2 h-6 w-6"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
+
+          {/* Navigation Section */}
+          <div className="p-3 border-b border-border/50 bg-muted/20">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <Sparkles className="h-3 w-3" />
+              Навигация
+            </h3>
+            <div className="space-y-1.5">
+              {/* Dashboard Button */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={() => {
+                        navigate('/dashboard');
+                      }}
+                      variant={location.pathname === '/dashboard' ? 'default' : 'outline'}
+                      size="sm"
+                      className={cn(
+                        "w-full h-9 text-xs justify-start gap-2 transition-all",
+                        location.pathname === '/dashboard'
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                          : "hover:bg-primary/10 hover:border-primary/50"
+                      )}
+                    >
+                      <Home className="h-3.5 w-3.5" />
+                      <span className="truncate">Начало</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Начална страница</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+            </div>
+          </div>
+
+          {/* Page Navigation Links */}
+          <div className="p-3 border-b border-border/50 bg-muted/20">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <Sparkles className="h-3 w-3" />
+              Страници
+            </h3>
+            <div className="space-y-1.5">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={() => navigate('/analytics')}
+                      variant={location.pathname === '/analytics' ? 'default' : 'outline'}
+                      size="sm"
+                      className={cn(
+                        "w-full h-9 text-xs justify-start gap-2 transition-all",
+                        location.pathname === '/analytics'
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                          : "hover:bg-primary/10 hover:border-primary/50"
+                      )}
+                    >
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      <span className="truncate">Аналитика</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Аналитика и статистики</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={() => navigate('/interviews')}
+                      variant={location.pathname === '/interviews' ? 'default' : 'outline'}
+                      size="sm"
+                      className={cn(
+                        "w-full h-9 text-xs justify-start gap-2 transition-all",
+                        location.pathname === '/interviews'
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                          : "hover:bg-primary/10 hover:border-primary/50"
+                      )}
+                    >
+                      <Briefcase className="h-3.5 w-3.5" />
+                      <span className="truncate">Интервюта</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Календар за интервюта</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+
+          {/* Quick Actions Section */}
+          {showQuickActions && (
+            <div className="p-3 border-b border-border/50 bg-muted/20">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                <GraduationCap className="h-3 w-3" />
+                Обучение
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                {onTrainingCalendarClick && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={() => {
+                            if (onTrainingCalendarClick) {
+                              onTrainingCalendarClick();
+                            } else {
+                              navigate('/training-calendar');
+                            }
+                          }}
+                          variant={location.pathname.includes('/training-calendar') ? 'default' : 'outline'}
+                          size="sm"
+                          className={cn(
+                            "h-9 text-xs justify-start gap-2 transition-all",
+                            location.pathname.includes('/training-calendar')
+                              ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                              : "hover:bg-primary/10 hover:border-primary/50"
+                          )}
+                        >
+                          <Calendar className="h-3.5 w-3.5" />
+                          <span className="truncate">Календар</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Календар на обученията</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {onTrainingListClick && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={() => {
+                            if (onTrainingListClick) {
+                              onTrainingListClick();
+                            } else {
+                              navigate('/training-list');
+                            }
+                          }}
+                          variant={location.pathname.includes('/training-list') ? 'default' : 'outline'}
+                          size="sm"
+                          className={cn(
+                            "h-9 text-xs justify-start gap-2 transition-all",
+                            location.pathname.includes('/training-list')
+                              ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                              : "hover:bg-primary/10 hover:border-primary/50"
+                          )}
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          <span className="truncate">Обучение</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Списък с курсисти</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {onExportClick && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={() => {
+                            if (onExportClick) {
+                              onExportClick();
+                            }
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="h-9 text-xs justify-start gap-2 hover:bg-primary/10 hover:border-primary/50 transition-all col-span-2"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          <span className="truncate">Експорт данни</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Експортиране на данни</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {showAddButton && onAddClick && (
+                  <Button
+                    onClick={onAddClick}
+                    size="sm"
+                    className="h-9 text-xs gap-2 col-span-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Добави</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Content */}
           <ScrollArea className="flex-1">
-            <div className="p-1.5 space-y-0.5">
-              {/* Krasi Kutev Team Section - Always show at top */}
+            <div className="p-2 space-y-1">
+              {/* Team Section - Modern Design */}
               {currentTeam ? (
-                <div className="mb-4 pb-4 border-b border-border">
-                  <div className="px-2 py-1.5 mb-2">
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                      ЕКИП
+                <div className="mb-4 pb-4 border-b border-border/50">
+                  <div className="px-2 py-2 mb-2">
+                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                      <Users className="h-3.5 w-3.5 text-primary" />
+                      Мой екип
                     </h3>
                   </div>
                   
-                  {/* Team Leader */}
+                  {/* Team Leader Card */}
                   {currentTeam.leader && (
                     <div 
                       className={cn(
-                        "px-2 py-1.5 mb-2 rounded-md bg-accent/50 cursor-pointer transition-colors",
-                        onChatClick && "hover:bg-accent"
+                        "group relative px-3 py-2.5 mb-2 rounded-lg bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/20 hover:border-primary/40 cursor-pointer transition-all duration-200 hover:shadow-md",
+                        onChatClick && "hover:bg-primary/15"
                       )}
                       onClick={() => onChatClick && onChatClick(currentTeam.leader!.id, currentTeam.leader!.name)}
                     >
-                      <div className="flex items-center gap-2">
-                        <Crown className="h-3 w-3 text-yellow-600 flex-shrink-0" />
+                      <div className="flex items-center gap-2.5">
+                        <div className="relative">
+                          <div className="p-1.5 rounded-lg bg-gradient-to-br from-yellow-400/20 to-yellow-500/10 border border-yellow-400/30">
+                            <Crown className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
+                          </div>
+                          <div className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-green-500 border-2 border-card" />
+                        </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs font-medium truncate">Краси Кътев</div>
+                          <div className="text-sm font-semibold text-foreground truncate">{currentTeam.leader.name}</div>
+                          <div className="text-xs text-muted-foreground">Ръководител</div>
                         </div>
                         {onChatClick && (
-                          <MessageCircle className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onChatClick(currentTeam.leader!.id, currentTeam.leader!.name);
+                            }}
+                          >
+                            <MessageCircle className="h-3.5 w-3.5" />
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -534,24 +805,41 @@ export const TopologySidebar = ({
 
                   {/* Team Members */}
                   {currentTeam.members.length > 0 && (
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       {currentTeam.members.map((member) => (
                         <div
                           key={member.id}
                           className={cn(
-                            "px-2 py-1.5 rounded-md transition-colors cursor-pointer",
-                            onChatClick ? "hover:bg-accent/50" : "hover:bg-accent/30"
+                            "group relative px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer",
+                            onChatClick ? "hover:bg-accent/50 border border-transparent hover:border-accent" : "hover:bg-accent/30"
                           )}
                           onClick={() => onChatClick && onChatClick((member as { userId?: string; id: string }).userId || member.id, member.name)}
                         >
-                          <div className="flex items-center gap-2">
-                            <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                          <div className="flex items-center gap-2.5">
+                            <div className="relative">
+                              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center">
+                                <User className="h-4 w-4 text-primary" />
+                              </div>
+                              <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-card" />
+                            </div>
                             <div className="flex-1 min-w-0">
-                              <div className="text-xs font-medium truncate">{member.name}</div>
-                              <div className="text-[10px] text-muted-foreground">{member.level}</div>
+                              <div className="text-sm font-medium text-foreground truncate">{member.name}</div>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 mt-0.5">
+                                {member.level}
+                              </Badge>
                             </div>
                             {onChatClick && (
-                              <MessageCircle className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onChatClick((member as { userId?: string; id: string }).userId || member.id, member.name);
+                                }}
+                              >
+                                <MessageCircle className="h-3.5 w-3.5" />
+                              </Button>
                             )}
                           </div>
                         </div>
@@ -560,178 +848,185 @@ export const TopologySidebar = ({
                   )}
                 </div>
               ) : mode === 'realtor' ? (
-                <div className="mb-4 pb-4 border-b border-border">
-                  <div className="px-2 py-1.5 mb-2">
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                      Екип
-                    </h3>
+                <div className="mb-4 pb-4 border-b border-border/50">
+                  <div className="px-2 py-2 mb-2">
+                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-2">Екип</h3>
                     <p className="text-xs text-muted-foreground">Зареждане...</p>
                   </div>
                 </div>
               ) : null}
 
-              {/* Full Topology Section - Only show for admin mode */}
-              {mode === 'admin' && topology.length > 0 && (
-                topology.map((country) => (
-                  <div key={country.id} className="space-y-1">
-                    {/* Country */}
-                    <button
-                      onClick={() => toggleCountry(country.id)}
-                      className={cn(
-                        "w-full flex items-center justify-between px-2 py-1.5 rounded-md text-xs font-medium transition-colors hover:bg-accent",
-                        expandedCountries.has(country.id) && "bg-accent"
-                      )}
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <Globe className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                        <span className="truncate">{country.name}</span>
-                        <span className="text-[10px] text-muted-foreground flex-shrink-0">
-                          ({country.cities.length})
-                        </span>
-                      </div>
-                      {expandedCountries.has(country.id) ? (
-                        <ChevronDown className="h-3 w-3 flex-shrink-0" />
-                      ) : (
-                        <ChevronRight className="h-3 w-3 flex-shrink-0" />
-                      )}
-                    </button>
-
-                    {/* Cities */}
-                    {expandedCountries.has(country.id) && (
-                      <div className="ml-4 space-y-1">
-                        {country.cities.map((city) => (
-                          <div key={city.id} className="space-y-1">
-                            <button
-                              onClick={() => toggleCity(city.id)}
-                              className={cn(
-                                "w-full flex items-center justify-between px-2 py-1 rounded-md text-xs transition-colors hover:bg-accent/50",
-                                expandedCities.has(city.id) && "bg-accent/50"
-                              )}
-                            >
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                                <span className="truncate">{city.name}</span>
-                                <span className="text-[10px] text-muted-foreground flex-shrink-0">
-                                  ({city.offices.length})
-                                </span>
-                              </div>
-                              {expandedCities.has(city.id) ? (
-                                <ChevronDown className="h-2.5 w-2.5 flex-shrink-0" />
-                              ) : (
-                                <ChevronRight className="h-2.5 w-2.5 flex-shrink-0" />
-                              )}
-                            </button>
-
-                            {/* Offices */}
-                            {expandedCities.has(city.id) && (
-                              <div className="ml-4 space-y-1">
-                                {city.offices.map((office) => (
-                                  <div key={office.id} className="space-y-1">
-                                    <button
-                                      onClick={() => {
-                                        toggleOffice(office.id);
-                                        onOfficeClick?.(office);
-                                      }}
-                                      className={cn(
-                                        "w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] transition-colors hover:bg-accent/50",
-                                        expandedOffices.has(office.id) && "bg-accent/50",
-                                        selectedOfficeId === office.id && "bg-primary/10 text-primary font-medium"
-                                      )}
-                                    >
-                                      <div className="flex items-center gap-1.5 min-w-0">
-                                        <Building2 className="h-2.5 w-2.5 text-muted-foreground flex-shrink-0" />
-                                        <span className="truncate">{office.name}</span>
-                                        <span className="text-[10px] text-muted-foreground flex-shrink-0">
-                                          ({teamsData.get(office.id)?.length || 0})
-                                        </span>
-                                      </div>
-                                      {expandedOffices.has(office.id) ? (
-                                        <ChevronDown className="h-2.5 w-2.5 flex-shrink-0" />
-                                      ) : (
-                                        <ChevronRight className="h-2.5 w-2.5 flex-shrink-0" />
-                                      )}
-                                    </button>
-
-                                    {/* Teams */}
-                                    {expandedOffices.has(office.id) && (
-                                      <div className="ml-4 space-y-1">
-                                        {teamsData.get(office.id)?.map((team) => (
-                                          <div key={team.id} className="space-y-1">
-                                            <button
-                                              onClick={() => toggleTeam(team.id)}
-                                              className={cn(
-                                                "w-full flex items-center justify-between px-2 py-0.5 rounded-md text-[11px] transition-colors hover:bg-accent/50",
-                                                expandedTeams.has(team.id) && "bg-accent/50"
-                                              )}
-                                            >
-                                              <div className="flex items-center gap-1.5 min-w-0">
-                                                <Users className="h-2.5 w-2.5 text-muted-foreground flex-shrink-0" />
-                                                <span className="truncate">{team.name}</span>
-                                                <span className="text-[10px] text-muted-foreground flex-shrink-0">
-                                                  ({team.members.length})
-                                                </span>
-                                              </div>
-                                              {expandedTeams.has(team.id) ? (
-                                                <ChevronDown className="h-2.5 w-2.5 flex-shrink-0" />
-                                              ) : (
-                                                <ChevronRight className="h-2.5 w-2.5 flex-shrink-0" />
-                                              )}
-                                            </button>
-
-                                            {/* Team Members */}
-                                            {expandedTeams.has(team.id) && (
-                                              <div className="ml-4 space-y-1">
-                                                {team.members.length > 0 ? (
-                                                  team.members.map((member) => (
-                                                    <button
-                                                      key={member.id}
-                                                      onClick={() => onAgentClick?.(member)}
-                                                      className={cn(
-                                                        "w-full flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] transition-colors hover:bg-accent/50",
-                                                        selectedAgentId === member.id && "bg-primary/10 text-primary font-medium"
-                                                      )}
-                                                    >
-                                                      <User className="h-2.5 w-2.5 text-muted-foreground flex-shrink-0" />
-                                                      <span className="truncate flex-1">{member.name}</span>
-                                                      <span className="text-[10px] text-muted-foreground flex-shrink-0">
-                                                        {member.level}
-                                                      </span>
-                                                    </button>
-                                                  ))
-                                                ) : (
-                                                  <div className="text-[10px] text-muted-foreground px-2 py-1">
-                                                    Няма хора в екипа
-                                                  </div>
-                                                )}
-                                              </div>
-                                            )}
-                                          </div>
-                                        )) || (
-                                          <div className="text-[10px] text-muted-foreground px-2 py-1">
-                                            Няма екипи
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+              {/* Topology Tree - Modern Design */}
+              {mode === 'admin' && filteredTopology.length > 0 && (
+                <div className="space-y-1">
+                  {filteredTopology.map((country) => (
+                    <div key={country.id} className="space-y-1">
+                      {/* Country */}
+                      <button
+                        onClick={() => toggleCountry(country.id)}
+                        className={cn(
+                          "group w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200",
+                          expandedCountries.has(country.id) 
+                            ? "bg-primary/10 text-primary border border-primary/20" 
+                            : "hover:bg-accent/50 text-foreground"
+                        )}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="p-1 rounded-md bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                            <Globe className="h-4 w-4 text-primary flex-shrink-0" />
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))
+                          <span className="truncate">{country.name}</span>
+                          <Badge variant="secondary" className="text-[10px] px-1.5">
+                            {country.cities.length}
+                          </Badge>
+                        </div>
+                        <ChevronDown className={cn(
+                          "h-4 w-4 transition-transform duration-200",
+                          expandedCountries.has(country.id) ? "rotate-180" : ""
+                        )} />
+                      </button>
+
+                      {/* Cities */}
+                      {expandedCountries.has(country.id) && (
+                        <div className="ml-4 space-y-1 border-l-2 border-border/30 pl-2">
+                          {country.cities.map((city) => (
+                            <div key={city.id} className="space-y-1">
+                              <button
+                                onClick={() => toggleCity(city.id)}
+                                className={cn(
+                                  "group w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-all duration-200",
+                                  expandedCities.has(city.id) 
+                                    ? "bg-accent/50 text-foreground font-medium" 
+                                    : "hover:bg-accent/30 text-muted-foreground"
+                                )}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <MapPin className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                  <span className="truncate">{city.name}</span>
+                                  <Badge variant="outline" className="text-[10px] px-1">
+                                    {city.offices.length}
+                                  </Badge>
+                                </div>
+                                <ChevronDown className={cn(
+                                  "h-3 w-3 transition-transform duration-200",
+                                  expandedCities.has(city.id) ? "rotate-180" : ""
+                                )} />
+                              </button>
+
+                              {/* Offices */}
+                              {expandedCities.has(city.id) && (
+                                <div className="ml-3 space-y-1 border-l-2 border-border/20 pl-2">
+                                  {city.offices.map((office) => (
+                                    <div key={office.id} className="space-y-1">
+                                      <button
+                                        onClick={() => {
+                                          toggleOffice(office.id);
+                                          onOfficeClick?.(office);
+                                        }}
+                                        className={cn(
+                                          "group w-full flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-all duration-200",
+                                          expandedOffices.has(office.id) && "bg-accent/30",
+                                          selectedOfficeId === office.id 
+                                            ? "bg-primary/15 text-primary font-semibold border border-primary/30" 
+                                            : "hover:bg-accent/20 text-foreground"
+                                        )}
+                                      >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <Building2 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                          <span className="truncate">{office.name}</span>
+                                          <Badge variant="outline" className="text-[10px] px-1">
+                                            {teamsData.get(office.id)?.length || 0}
+                                          </Badge>
+                                        </div>
+                                        <ChevronDown className={cn(
+                                          "h-3 w-3 transition-transform duration-200",
+                                          expandedOffices.has(office.id) ? "rotate-180" : ""
+                                        )} />
+                                      </button>
+
+                                      {/* Teams */}
+                                      {expandedOffices.has(office.id) && (
+                                        <div className="ml-3 space-y-1 border-l-2 border-border/10 pl-2">
+                                          {teamsData.get(office.id)?.map((team) => (
+                                            <div key={team.id} className="space-y-1">
+                                              <button
+                                                onClick={() => toggleTeam(team.id)}
+                                                className={cn(
+                                                  "group w-full flex items-center justify-between px-2 py-1 rounded-md text-xs transition-all duration-200",
+                                                  expandedTeams.has(team.id) 
+                                                    ? "bg-accent/20 text-foreground" 
+                                                    : "hover:bg-accent/10 text-muted-foreground"
+                                                )}
+                                              >
+                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                  <Users className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                                  <span className="truncate">{team.name}</span>
+                                                  <Badge variant="outline" className="text-[10px] px-1">
+                                                    {team.members.length}
+                                                  </Badge>
+                                                </div>
+                                                <ChevronDown className={cn(
+                                                  "h-2.5 w-2.5 transition-transform duration-200",
+                                                  expandedTeams.has(team.id) ? "rotate-180" : ""
+                                                )} />
+                                              </button>
+
+                                              {/* Team Members */}
+                                              {expandedTeams.has(team.id) && (
+                                                <div className="ml-3 space-y-0.5">
+                                                  {team.members.length > 0 ? (
+                                                    team.members.map((member) => (
+                                                      <button
+                                                        key={member.id}
+                                                        onClick={() => onAgentClick?.(member)}
+                                                        className={cn(
+                                                          "group w-full flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-all duration-200",
+                                                          selectedAgentId === member.id 
+                                                            ? "bg-primary/10 text-primary font-medium" 
+                                                            : "hover:bg-accent/10 text-muted-foreground"
+                                                        )}
+                                                      >
+                                                        <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                                        <span className="truncate flex-1 text-left">{member.name}</span>
+                                                        <Badge variant="secondary" className="text-[10px] px-1">
+                                                          {member.level}
+                                                        </Badge>
+                                                      </button>
+                                                    ))
+                                                  ) : (
+                                                    <div className="text-[10px] text-muted-foreground px-2 py-1">
+                                                      Няма членове
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
+                                          )) || (
+                                            <div className="text-[10px] text-muted-foreground px-2 py-1">
+                                              Няма екипи
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </ScrollArea>
         </div>
       </aside>
 
-      {/* Spacer for main content */}
-      {isOpen && <div className="w-64" />}
+      {/* Spacer for main content - pushes content when sidebar is open */}
+      {isOpen && <div className="w-72 sm:w-80 flex-shrink-0" />}
     </>
   );
 };
-

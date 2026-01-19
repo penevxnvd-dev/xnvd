@@ -33,14 +33,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
 import { UserManagementDialog } from '@/components/UserManagementDialog';
-import { NotificationCenter } from '@/components/NotificationCenter';
 import { Settings, Users, Download } from 'lucide-react';
-import { LogOut, ChevronLeft, Home, Plus, Pencil, Trash2, Calendar, Menu, User, ChevronDown, FileText, Target, CheckCircle2, XCircle, Award, TrendingUp, GraduationCap } from 'lucide-react';
+import { ChevronLeft, Plus, Pencil, Trash2, Calendar, FileText, Target, CheckCircle2, XCircle, Award, TrendingUp, GraduationCap } from 'lucide-react';
 import { exportKPIData, exportDeals, exportDiagnoses } from '@/lib/export';
-import logo from '@/assets/logo.jpeg';
 import { CreateEditDialog } from '@/components/admin/CreateEditDialog';
 import { AddPersonToTeamDialog } from '@/components/admin/AddPersonToTeamDialog';
 import { CountryCardWithKPI } from '@/components/cards/CountryCardWithKPI';
@@ -52,6 +49,7 @@ import { TrainingManagementDialog } from '@/components/TrainingManagementDialog'
 import { TopologySidebar } from '@/components/TopologySidebar';
 import { transformOffices } from '@/utils/dataTransform';
 import { Office as UIOffice, TeamLeader, Agent } from '@/types';
+import { AppLayout } from '@/components/layouts/AppLayout';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,11 +70,12 @@ import {
   KPIMetrics,
   formatSuccessRate,
 } from '@/utils/kpiCalculations';
-import { trainingStructure, calculateTrainingProgress, TrainingSection } from '@/data/trainingStructure';
+import { trainingStructure, calculateTrainingProgress, TrainingSection, isTrainingFullyCompleted } from '@/data/trainingStructure';
 import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
 import { Progress } from '@/components/ui/progress';
 import { BookOpen } from 'lucide-react';
 import { formatNameWithEmoji, formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
+import { useMemo } from 'react';
 
 type ViewLevel = 'countries' | 'cities' | 'offices' | 'teams' | 'realtors' | 'realtor-detail';
 
@@ -180,7 +179,14 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const [selectedRealtorTrainingData, setSelectedRealtorTrainingData] = useState<TrainingSection[]>(trainingStructure);
   const [selectedRealtorTrainingProgress, setSelectedRealtorTrainingProgress] = useState(0);
   const [topologyOffices, setTopologyOffices] = useState<UIOffice[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem('sidebarOpen');
+    return saved !== null ? saved === 'true' : false; // Default to closed
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sidebarOpen', String(sidebarOpen));
+  }, [sidebarOpen]);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [userManagementOpen, setUserManagementOpen] = useState(false);
   const [trainingDialogOpen, setTrainingDialogOpen] = useState(false);
@@ -196,6 +202,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; [key: string]: unknown } | null>(null);
   const [parentOptions, setParentOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [realtorFilter, setRealtorFilter] = useState<'all' | 'trainees' | 'realtors'>('all');
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -472,8 +479,13 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const handleCountryClick = (country: Country) => {
     setSelectedCountry(country);
     setCurrentView('cities');
-    fetchCities(country.id);
-    fetchCountryKPI(country.id);
+    // Parallelize API calls
+    Promise.all([
+      fetchCities(country.id),
+      fetchCountryKPI(country.id)
+    ]).catch(error => {
+      console.error('Error loading country data:', error);
+    });
   };
 
   const fetchCityKPI = async (cityId: string) => {
@@ -490,8 +502,13 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const handleCityClick = (city: City) => {
     setSelectedCity(city);
     setCurrentView('offices');
-    fetchOffices(city.id);
-    fetchCityKPI(city.id);
+    // Parallelize API calls
+    Promise.all([
+      fetchOffices(city.id),
+      fetchCityKPI(city.id)
+    ]).catch(error => {
+      console.error('Error loading city data:', error);
+    });
   };
 
   const fetchOfficeKPI = async (officeId: string) => {
@@ -508,8 +525,13 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const handleOfficeClick = (office: Office) => {
     setSelectedOffice(office);
     setCurrentView('teams');
-    fetchTeams(office.id);
-    fetchOfficeKPI(office.id);
+    // Parallelize API calls
+    Promise.all([
+      fetchTeams(office.id),
+      fetchOfficeKPI(office.id)
+    ]).catch(error => {
+      console.error('Error loading office data:', error);
+    });
   };
 
   const handleTeamClick = (team: Team) => {
@@ -627,6 +649,18 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
           examCompleted: subsection.progress.exam,
         });
 
+        // Check if training is fully completed and promote trainee to realtor
+        if (isTrainingFullyCompleted(updatedData) && selectedRealtor.userId) {
+          try {
+            const { supabaseApi } = await import('@/lib/supabaseApi');
+            await supabaseApi.promoteTraineeToRealtor(selectedRealtor.userId, selectedRealtor.teamId || undefined);
+            toast.success('🎉 Обучението е завършено! Курсистът е повишен до Реализатор.');
+          } catch (error) {
+            console.error('Error promoting trainee:', error);
+            // Don't show error to user, just log it
+          }
+        }
+
         // Show success message
         if (field === 'exam' && checked) {
           toast.success('Изпитът е минат! Подточката е завършена.');
@@ -657,6 +691,16 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     }
     return parts.join(' / ');
   };
+
+  // Filter realtors based on selected filter
+  const filteredRealtors = useMemo(() => {
+    if (realtorFilter === 'trainees') {
+      return realtors.filter(r => r.level === 1);
+    } else if (realtorFilter === 'realtors') {
+      return realtors.filter(r => r.level > 1);
+    }
+    return realtors;
+  }, [realtors, realtorFilter]);
 
   const handleCreate = () => {
     if (currentView === 'countries') {
@@ -815,7 +859,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Topology Sidebar */}
+      {/* Topology Sidebar - Custom for Admin */}
       <TopologySidebar
         offices={topologyOffices}
         onOfficeClick={handleTopologyOfficeClick}
@@ -826,161 +870,110 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
         mode="admin"
+        showQuickActions={true}
+        onTrainingCalendarClick={() => navigate('/training-calendar')}
+        onTrainingListClick={() => navigate('/training-list')}
+        onBackClick={handleBack}
+        showBackButton={currentView !== 'countries'}
+        onAddClick={handleCreate}
+        showAddButton={currentView !== 'realtors' && currentView !== 'realtor-detail'}
+        onAddPersonClick={() => setAddPersonDialogOpen(true)}
+        showAddPersonButton={currentView === 'realtors' && selectedTeam !== null}
+        onExportClick={() => {
+          if (selectedRealtorKPI) {
+            exportKPIData(selectedRealtorKPI, `kpi-realtor-${selectedRealtor?.user.fullName}-${new Date().toISOString().split('T')[0]}`);
+            toast.success('KPI данните са експортирани');
+          } else if (kpiMetrics) {
+            exportKPIData(kpiMetrics, `kpi-admin-${new Date().toISOString().split('T')[0]}`);
+            toast.success('KPI данните са експортирани');
+          }
+        }}
+        role="admin"
+        teamName="Админ Панел"
+        breadcrumb={getBreadcrumb()}
       />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-      <header className="border-b border-border bg-card shadow-sm sticky top-0 z-30">
-        <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="h-8 w-8 sm:h-9 sm:w-9"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-              <button 
-                onClick={handleHome} 
-                className="hover:opacity-80 transition-opacity cursor-pointer flex-shrink-0"
-              >
-                <img src={logo} alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 object-contain" />
-              </button>
-              <div className="min-w-0">
-                <h1 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground truncate">Админ Панел</h1>
-                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{getBreadcrumb()}</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={() => navigate('/training-calendar')} variant="outline" size="sm" className="text-xs sm:text-sm">
-                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Календар</span>
-              </Button>
-              <Button onClick={() => navigate('/training-progress')} variant="outline" size="sm" className="text-xs sm:text-sm">
-                <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Обучение</span>
-              </Button>
-              {currentView !== 'countries' && (
-                <>
-                  <Button onClick={handleBack} variant="outline" size="sm" className="text-[10px] sm:text-xs md:text-sm">
-                    <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    <span>Назад</span>
-                  </Button>
-                </>
-              )}
-              {currentView !== 'realtors' && currentView !== 'realtor-detail' && (
-                <Button onClick={handleCreate} variant="default" size="sm" className="text-xs sm:text-sm">
-                  <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Добави</span>
-                </Button>
-              )}
-              {currentView === 'realtors' && selectedTeam && (
-                <Button onClick={() => setAddPersonDialogOpen(true)} variant="default" size="sm" className="text-xs sm:text-sm">
-                  <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Добави човек</span>
-                </Button>
-              )}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-                    <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    <span className="hidden sm:inline">Експорт</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Експорт на данни</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {selectedRealtorKPI && (
-                    <>
-                      <DropdownMenuItem onClick={() => {
-                        exportKPIData(selectedRealtorKPI, `kpi-realtor-${selectedRealtor?.user.fullName}-${new Date().toISOString().split('T')[0]}`);
-                        toast.success('KPI данните са експортирани');
-                      }}>
-                        <BarChart3 className="h-4 w-4 mr-2" />
-                        KPI данни (Реализатор)
-                      </DropdownMenuItem>
-                      {selectedRealtorDeals.length > 0 && (
-                        <DropdownMenuItem onClick={() => {
-                          exportDeals(selectedRealtorDeals, `deals-${selectedRealtor?.user.fullName}-${new Date().toISOString().split('T')[0]}`);
-                          toast.success('Сделките са експортирани');
-                        }}>
-                          <TrendingUp className="h-4 w-4 mr-2" />
-                          Сделки (Реализатор)
-                        </DropdownMenuItem>
-                      )}
-                      {selectedRealtorDiagnoses.length > 0 && (
-                        <DropdownMenuItem onClick={() => {
-                          exportDiagnoses(selectedRealtorDiagnoses, `diagnoses-${selectedRealtor?.user.fullName}-${new Date().toISOString().split('T')[0]}`);
-                          toast.success('Диагнозите са експортирани');
-                        }}>
-                          <Users className="h-4 w-4 mr-2" />
-                          Диагнози (Реализатор)
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
-                  <DropdownMenuItem disabled>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Експорт на всички данни (скоро)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <NotificationCenter />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6 sm:h-7 sm:w-7">
-                        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userInfo?.email || 'user'}`} />
-                        <AvatarFallback className="text-[10px] sm:text-xs">
-                          {userInfo?.fullName?.split(' ').map(n => n[0]).join('') || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="hidden sm:inline">{userInfo?.fullName || 'Акаунт'}</span>
-                      <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
-                    </div>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium">{userInfo?.fullName || 'Потребител'}</p>
-                      <p className="text-xs text-muted-foreground">{userInfo?.email || ''}</p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">
-                    Роля: {userInfo?.role || 'Неизвестна'}
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
-                    <Settings className="h-4 w-4 mr-2" />
-                    Настройки на акаунта
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setUserManagementOpen(true)}>
-                    <Users className="h-4 w-4 mr-2" />
-                    Управление на акаунти
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
-                <LogOut className="h-4 w-4 mr-2" />
-                Изход
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
+      {/* Main Content with AppLayout navbar */}
+      <AppLayout
+        showSidebar={false}
+        onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+      >
+        <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
         {loading ? (
           <div className="text-center text-muted-foreground">Зареждане...</div>
         ) : (
           <>
+            {/* Statistics and Filters for Realtors View */}
+            {currentView === 'realtors' && (
+              <div className="space-y-4">
+                {/* Statistics Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Card>
+                    <CardHeader className="p-4">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Всички
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0">
+                      <div className="text-2xl font-bold">{realtors.length}</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="p-4">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <GraduationCap className="h-4 w-4 text-blue-500" />
+                        Нови курсисти
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {realtors.filter(r => r.level === 1).length}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="p-4">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Award className="h-4 w-4 text-green-500" />
+                        Завършили
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0">
+                      <div className="text-2xl font-bold text-green-600">
+                        {realtors.filter(r => r.level > 1).length}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Filter Tabs */}
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant={realtorFilter === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setRealtorFilter('all')}
+                  >
+                    Всички ({realtors.length})
+                  </Button>
+                  <Button
+                    variant={realtorFilter === 'trainees' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setRealtorFilter('trainees')}
+                  >
+                    Нови курсисти ({realtors.filter(r => r.level === 1).length})
+                  </Button>
+                  <Button
+                    variant={realtorFilter === 'realtors' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setRealtorFilter('realtors')}
+                  >
+                    Завършили ({realtors.filter(r => r.level > 1).length})
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -993,7 +986,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                 currentView === 'cities' ? cities.map(c => c.id) :
                 currentView === 'offices' ? offices.map(o => o.id) :
                 currentView === 'teams' ? teams.map(t => t.id) :
-                currentView === 'realtors' ? realtors.map(r => r.id) : []
+                currentView === 'realtors' ? filteredRealtors.map(r => r.id) : []
               }
               strategy={rectSortingStrategy}
             >
@@ -1130,7 +1123,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                   </SortableCard>
             ))}
 
-            {currentView === 'realtors' && realtors.map((realtor) => (
+            {currentView === 'realtors' && filteredRealtors.map((realtor) => (
               realtor.user && (
                 <SortableCard key={realtor.id} id={realtor.id}>
                 <div className="relative group">
@@ -1156,18 +1149,17 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                           successMindset: false,
                         });
                         
-                        const kpi = await api.getRealtorKPI(realtor.userId);
+                        // Parallelize all API calls
+                        const [kpi, deals, diagnoses, trainingProgress] = await Promise.all([
+                          api.getRealtorKPI(realtor.userId),
+                          api.getRealtorDeals(realtor.id),
+                          api.getRealtorDiagnoses(realtor.id),
+                          api.getRealtorTrainingProgress(realtor.id)
+                        ]);
+                        
                         setSelectedRealtorKPI(kpi);
-                        
-                        // Fetch deals and diagnoses
-                        const deals = await api.getRealtorDeals(realtor.id);
-                        const diagnoses = await api.getRealtorDiagnoses(realtor.id);
-                        
                         setSelectedRealtorDeals(deals as Array<Record<string, unknown>>);
                         setSelectedRealtorDiagnoses(diagnoses as Array<Record<string, unknown>>);
-                        
-                        // Fetch training progress
-                        const trainingProgress = await api.getRealtorTrainingProgress(realtor.id);
                         
                         if (trainingProgress && trainingProgress.length > 0) {
                           const updatedTrainingData = trainingStructure.map((section) => ({
@@ -1447,9 +1439,9 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
             </CardContent>
           </Card>
         )}
-      </main>
+        </div>
 
-      {/* Create Dialog */}
+        {/* Create Dialog */}
       <CreateEditDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
@@ -1514,16 +1506,16 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
         onUpdate={fetchUserInfo}
       />
 
-      {/* Training Management Dialog */}
-      {selectedRealtorForTraining && (
-        <TrainingManagementDialog
-          open={trainingDialogOpen}
-          onOpenChange={setTrainingDialogOpen}
-          realtorId={selectedRealtorForTraining.id}
-          realtorName={selectedRealtorForTraining.name}
-        />
-      )}
-      </div>
+        {/* Training Management Dialog */}
+        {selectedRealtorForTraining && (
+          <TrainingManagementDialog
+            open={trainingDialogOpen}
+            onOpenChange={setTrainingDialogOpen}
+            realtorId={selectedRealtorForTraining.id}
+            realtorName={selectedRealtorForTraining.name}
+          />
+        )}
+      </AppLayout>
     </div>
   );
 };
