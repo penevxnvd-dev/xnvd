@@ -39,7 +39,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const searchResults = [
     { id: '1', title: 'Реализатори', type: 'section', action: () => navigate('/dashboard') },
     { id: '2', title: 'Сделки', type: 'section', action: () => navigate('/dashboard') },
-    { id: '3', title: 'Обучение', type: 'section', action: () => navigate('/training') },
+    { id: '3', title: 'Обучение', type: 'section', action: () => navigate('/training-list') },
   ].filter(item => 
     item.title.toLowerCase().includes(searchQuery.toLowerCase())
   );

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { Button } from '@/components/ui/button';
@@ -18,9 +18,6 @@ import { TrendingUp, Users, Target, CheckCircle2, XCircle, BookOpen, Zap, Award,
 import { exportKPIData, exportDeals, exportDiagnoses, exportTrainingProgress } from '@/lib/export';
 import { trainingStructure, calculateTrainingProgress, TrainingSection } from '@/data/trainingStructure';
 import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
-import { TopologySidebar } from '@/components/TopologySidebar';
-import { transformOffices } from '@/utils/dataTransform';
-import { Office, Agent } from '@/types';
 import { toast } from 'sonner';
 import { formatNameWithEmoji, formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
 import { PersonalGoalsCard } from '@/components/realtor/PersonalGoalsCard';
@@ -74,7 +71,8 @@ interface TrainingProgress {
   examCompleted: boolean;
 }
 
-const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
+// Мемоизирай компонента за да предотвратиш ненужни ре-рендери
+const RealtorDashboard = memo(({ userId }: RealtorDashboardProps) => {
   const navigate = useNavigate();
   const [realtorData, setRealtorData] = useState<RealtorData | null>(null);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
@@ -83,15 +81,6 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
   const [loading, setLoading] = useState(true);
   const [trainingData, setTrainingData] = useState<TrainingSection[]>(trainingStructure);
   const [trainingProgress, setTrainingProgress] = useState(0);
-  const [topologyOffices, setTopologyOffices] = useState<Office[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    const saved = localStorage.getItem('sidebarOpen');
-    return saved !== null ? saved === 'true' : false; // Default to closed
-  });
-
-  useEffect(() => {
-    localStorage.setItem('sidebarOpen', String(sidebarOpen));
-  }, [sidebarOpen]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatUserId, setChatUserId] = useState<string | null>(null);
@@ -102,34 +91,19 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
     teamName: string;
   } | null>(null);
 
+  // Използвай ref за да предотвратиш повторно зареждане на данни
+  const hasFetchedData = useRef(false);
+  const previousUserId = useRef<string | null>(null);
+
   useEffect(() => {
-    fetchRealtorData();
+    // Зареждай данни само ако userId се е променил или ако не е заредено преди
+    if (userId && (userId !== previousUserId.current || !hasFetchedData.current)) {
+      previousUserId.current = userId;
+      hasFetchedData.current = true;
+      fetchRealtorData();
+    }
   }, [userId]);
 
-  const fetchTopologyData = useCallback(async () => {
-    try {
-      console.log('📥 Fetching topology data from Supabase...');
-      const dbOffices = await supabaseApi.getAllOfficesFull();
-      console.log(`✅ Loaded ${dbOffices.length} offices from Supabase`);
-      const transformedOffices = transformOffices(dbOffices);
-      setTopologyOffices(transformedOffices);
-      
-      if (realtorData?.user?.email) {
-        for (const office of transformedOffices) {
-          for (const leader of office.teamLeaders) {
-            const agent = leader.teamMembers.find((a: Agent) => a.email === realtorData.user.email);
-            if (agent) {
-              setSelectedAgentId(agent.id);
-              break;
-            }
-          }
-          if (selectedAgentId) break;
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching topology data:', error);
-    }
-  }, [realtorData?.user?.email]);
 
   const fetchCurrentTeam = useCallback(async () => {
     try {
@@ -234,7 +208,7 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
       fetchTopologyData();
       fetchCurrentTeam();
     }
-  }, [realtorData?.id, realtorData?.user?.email, realtorData?.team_id, fetchTrainingProgress, fetchTopologyData, fetchCurrentTeam]);
+  }, [realtorData?.id, realtorData?.user?.email, realtorData?.team_id, fetchTrainingProgress, fetchCurrentTeam]);
 
   const fetchRealtorData = async () => {
     setLoading(true);
@@ -482,40 +456,9 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10 flex">
-      <TopologySidebar
-        offices={topologyOffices}
-        selectedAgentId={selectedAgentId || undefined}
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        onChatClick={handleOpenChat}
-        mode="realtor"
-        showQuickActions={true}
-        onTrainingCalendarClick={() => navigate('/training-calendar')}
-        onTrainingListClick={() => navigate('/training-list')}
-        onExportClick={() => {
-          if (realtorData) {
-            const kpiData = {
-              diagnoses: diagnoses.length,
-              deals: deals.length,
-              successRate: calculateSuccessRate(),
-              realtors: 1,
-            };
-            exportKPIData(kpiData, `kpi-${realtorData.user.fullName}-${new Date().toISOString().split('T')[0]}`);
-            toast.success('KPI данните са експортирани');
-          }
-        }}
-        teamName={realtorData ? (() => {
-          const { displayName } = formatNameWithoutElevenEleven(realtorData.user.fullName);
-          return `${displayName} - Ниво ${realtorData.level}`;
-        })() : undefined}
-      />
-      
       <AppLayout
-        showSidebar={false}
         customNavbarContent={customNavbarContent}
-        onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
-      >
+                >
         <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
           {/* Personal Goals */}
           {realtorData && (
@@ -732,22 +675,24 @@ const RealtorDashboard = ({ userId }: RealtorDashboardProps) => {
           />
         )}
 
-        {/* Chat Component */}
-        {chatOpen && chatUserId && (
-          <Chat
-            userId={chatUserId}
-            userName={chatUserName}
-            isOpen={chatOpen}
-            onClose={() => {
-              setChatOpen(false);
-              setChatUserId(null);
-              setChatUserName('');
-            }}
-          />
-        )}
+      {/* Chat Component */}
+      {chatOpen && chatUserId && (
+        <Chat
+          userId={chatUserId}
+          userName={chatUserName}
+          isOpen={chatOpen}
+          onClose={() => {
+            setChatOpen(false);
+            setChatUserId(null);
+            setChatUserName('');
+          }}
+        />
+      )}
       </AppLayout>
-    </div>
   );
-};
+});
+
+// Задай displayName за по-лесно дебъгване
+RealtorDashboard.displayName = 'RealtorDashboard';
 
 export default RealtorDashboard;

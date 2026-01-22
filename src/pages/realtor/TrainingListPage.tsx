@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ interface TraineeProgress {
 
 const TrainingListPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { role } = useUserRole();
   const [trainees, setTrainees] = useState<TraineeProgress[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +50,40 @@ const TrainingListPage = () => {
   useEffect(() => {
     fetchAllTrainees();
   }, []);
+
+  // Deep-link support:
+  // - /training-list?traineeEmail=...  -> filter list by email
+  // - /training-list?userId=...        -> lookup profile email and filter list
+  useEffect(() => {
+    const applyDeepLink = async () => {
+      const traineeEmail = searchParams.get('traineeEmail');
+      if (traineeEmail) {
+        setSearchQuery(traineeEmail);
+        setActiveFilter('all');
+        return;
+      }
+
+      const userId = searchParams.get('userId');
+      if (userId) {
+        try {
+          const { data: profile } = await supabaseApi.supabase
+            .from('profiles')
+            .select('email')
+            .eq('id', userId)
+            .single();
+
+          if (profile?.email) {
+            setSearchQuery(profile.email);
+            setActiveFilter('all');
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+    };
+
+    applyDeepLink();
+  }, [searchParams]);
 
   // Fetch current user info
   useEffect(() => {
@@ -416,128 +451,128 @@ const TrainingListPage = () => {
 
   const customNavbarContent = (
     <>
-      <div className="min-w-0">
-        <h1 className="text-base font-semibold text-foreground truncate">Списък с курсисти и реализатори</h1>
+              <div className="min-w-0">
+                <h1 className="text-base font-semibold text-foreground truncate">Списък с курсисти и реализатори</h1>
         <p className="text-xs text-muted-foreground truncate hidden sm:block">Преглед на прогрес в обучението</p>
-      </div>
-      <div className="flex items-center gap-3 flex-1 justify-center min-w-0 hidden md:flex">
-        <div className="flex items-center gap-1.5 flex-wrap justify-center">
-          {loading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/50 animate-pulse">
-                <Skeleton className="h-3 w-3 rounded-full" />
-                <Skeleton className="h-3 w-6" />
               </div>
-            ))
-          ) : (
-            <>
-              {/* Общо курсисти */}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div 
-                      onClick={() => setActiveFilter('all')}
-                      className={cn(
-                        "group flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all duration-200 cursor-pointer",
-                        activeFilter === 'all' 
-                          ? "bg-gradient-to-br from-primary/20 to-primary/10 dark:from-primary/30 dark:to-primary/20 border-primary/40 dark:border-primary/50 shadow-md" 
-                          : "bg-gradient-to-br from-primary/10 to-primary/5 dark:from-primary/20 dark:to-primary/10 border-primary/20 dark:border-primary/30 hover:border-primary/30 dark:hover:border-primary/40 hover:shadow-sm"
-                      )}
-                    >
-                      <div className="p-0.5 rounded-full bg-primary/20 dark:bg-primary/30 group-hover:bg-primary/30 dark:group-hover:bg-primary/40 transition-colors">
-                        <Users className="h-3.5 w-3.5 text-primary group-hover:scale-110 transition-transform" />
-                      </div>
-                      <span className="text-sm font-bold text-primary">{totalTrainees}</span>
-                      <span className="text-[10px] font-medium text-primary/70 dark:text-primary/60 hidden lg:inline">Общо</span>
+      <div className="flex items-center gap-3 flex-1 justify-center min-w-0 hidden md:flex">
+              <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                {loading ? (
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/50 animate-pulse">
+                      <Skeleton className="h-3 w-3 rounded-full" />
+                      <Skeleton className="h-3 w-6" />
                     </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p className="font-medium">Общо курсисти: {totalTrainees}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+                  ))
+                ) : (
+                  <>
+                    {/* Общо курсисти */}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div 
+                            onClick={() => setActiveFilter('all')}
+                            className={cn(
+                              "group flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all duration-200 cursor-pointer",
+                              activeFilter === 'all' 
+                                ? "bg-gradient-to-br from-primary/20 to-primary/10 dark:from-primary/30 dark:to-primary/20 border-primary/40 dark:border-primary/50 shadow-md" 
+                                : "bg-gradient-to-br from-primary/10 to-primary/5 dark:from-primary/20 dark:to-primary/10 border-primary/20 dark:border-primary/30 hover:border-primary/30 dark:hover:border-primary/40 hover:shadow-sm"
+                            )}
+                          >
+                            <div className="p-0.5 rounded-full bg-primary/20 dark:bg-primary/30 group-hover:bg-primary/30 dark:group-hover:bg-primary/40 transition-colors">
+                              <Users className="h-3.5 w-3.5 text-primary group-hover:scale-110 transition-transform" />
+                            </div>
+                            <span className="text-sm font-bold text-primary">{totalTrainees}</span>
+                            <span className="text-[10px] font-medium text-primary/70 dark:text-primary/60 hidden lg:inline">Общо</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p className="font-medium">Общо курсисти: {totalTrainees}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
 
-              {/* Нови курсисти */}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div 
-                      onClick={() => setActiveFilter('trainees')}
-                      className={cn(
-                        "group flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all duration-200 cursor-pointer",
-                        activeFilter === 'trainees'
-                          ? "bg-gradient-to-br from-blue-100 to-blue-200/50 dark:from-blue-900/40 dark:to-blue-800/30 border-blue-400/60 dark:border-blue-600/50 shadow-md"
-                          : "bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 border-blue-200/60 dark:border-blue-800/40 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-sm"
-                      )}
-                    >
-                      <div className="p-0.5 rounded-full bg-blue-500/20 dark:bg-blue-400/20 group-hover:bg-blue-500/30 dark:group-hover:bg-blue-400/30 transition-colors">
-                        <GraduationCap className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
-                      </div>
-                      <span className="text-sm font-bold text-blue-700 dark:text-blue-300">{newTrainees}</span>
-                      <span className="text-[10px] font-medium text-blue-600/80 dark:text-blue-400/80 hidden lg:inline">Нови</span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p className="font-medium">Нови курсисти: {newTrainees}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+                    {/* Нови курсисти */}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div 
+                            onClick={() => setActiveFilter('trainees')}
+                            className={cn(
+                              "group flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all duration-200 cursor-pointer",
+                              activeFilter === 'trainees'
+                                ? "bg-gradient-to-br from-blue-100 to-blue-200/50 dark:from-blue-900/40 dark:to-blue-800/30 border-blue-400/60 dark:border-blue-600/50 shadow-md"
+                                : "bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 border-blue-200/60 dark:border-blue-800/40 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-sm"
+                            )}
+                          >
+                            <div className="p-0.5 rounded-full bg-blue-500/20 dark:bg-blue-400/20 group-hover:bg-blue-500/30 dark:group-hover:bg-blue-400/30 transition-colors">
+                              <GraduationCap className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
+                            </div>
+                            <span className="text-sm font-bold text-blue-700 dark:text-blue-300">{newTrainees}</span>
+                            <span className="text-[10px] font-medium text-blue-600/80 dark:text-blue-400/80 hidden lg:inline">Нови</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p className="font-medium">Нови курсисти: {newTrainees}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
 
-              {/* Завършили */}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div 
-                      onClick={() => setActiveFilter('completed')}
-                      className={cn(
-                        "group flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all duration-200 cursor-pointer",
-                        activeFilter === 'completed'
-                          ? "bg-gradient-to-br from-green-100 to-green-200/50 dark:from-green-900/40 dark:to-green-800/30 border-green-400/60 dark:border-green-600/50 shadow-md"
-                          : "bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/20 border-green-200/60 dark:border-green-800/40 hover:border-green-300 dark:hover:border-green-700 hover:shadow-sm"
-                      )}
-                    >
-                      <div className="p-0.5 rounded-full bg-green-500/20 dark:bg-green-400/20 group-hover:bg-green-500/30 dark:group-hover:bg-green-400/30 transition-colors">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400 group-hover:scale-110 transition-transform" />
-                      </div>
-                      <span className="text-sm font-bold text-green-700 dark:text-green-300">{completedTrainees}</span>
-                      <span className="text-[10px] font-medium text-green-600/80 dark:text-green-400/80 hidden lg:inline">Завършили</span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p className="font-medium">Завършили: {completedTrainees}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+                    {/* Завършили */}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div 
+                            onClick={() => setActiveFilter('completed')}
+                            className={cn(
+                              "group flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all duration-200 cursor-pointer",
+                              activeFilter === 'completed'
+                                ? "bg-gradient-to-br from-green-100 to-green-200/50 dark:from-green-900/40 dark:to-green-800/30 border-green-400/60 dark:border-green-600/50 shadow-md"
+                                : "bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/20 border-green-200/60 dark:border-green-800/40 hover:border-green-300 dark:hover:border-green-700 hover:shadow-sm"
+                            )}
+                          >
+                            <div className="p-0.5 rounded-full bg-green-500/20 dark:bg-green-400/20 group-hover:bg-green-500/30 dark:group-hover:bg-green-400/30 transition-colors">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400 group-hover:scale-110 transition-transform" />
+                            </div>
+                            <span className="text-sm font-bold text-green-700 dark:text-green-300">{completedTrainees}</span>
+                            <span className="text-[10px] font-medium text-green-600/80 dark:text-green-400/80 hidden lg:inline">Завършили</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p className="font-medium">Завършили: {completedTrainees}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
 
-              {/* В процес */}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div 
-                      onClick={() => setActiveFilter('in-progress')}
-                      className={cn(
-                        "group flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all duration-200 cursor-pointer",
-                        activeFilter === 'in-progress'
-                          ? "bg-gradient-to-br from-orange-100 to-orange-200/50 dark:from-orange-900/40 dark:to-orange-800/30 border-orange-400/60 dark:border-orange-600/50 shadow-md"
-                          : "bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/30 dark:to-orange-900/20 border-orange-200/60 dark:border-orange-800/40 hover:border-orange-300 dark:hover:border-orange-700 hover:shadow-sm"
-                      )}
-                    >
-                      <div className="p-0.5 rounded-full bg-orange-500/20 dark:bg-orange-400/20 group-hover:bg-orange-500/30 dark:group-hover:bg-orange-400/30 transition-colors">
-                        <PlayCircle className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400 group-hover:scale-110 transition-transform" />
-                      </div>
-                      <span className="text-sm font-bold text-orange-700 dark:text-orange-300">{inProgressTrainees}</span>
-                      <span className="text-[10px] font-medium text-orange-600/80 dark:text-orange-400/80 hidden lg:inline">В процес</span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p className="font-medium">В процес: {inProgressTrainees}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </>
-          )}
-        </div>
-      </div>
+                    {/* В процес */}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div 
+                            onClick={() => setActiveFilter('in-progress')}
+                            className={cn(
+                              "group flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all duration-200 cursor-pointer",
+                              activeFilter === 'in-progress'
+                                ? "bg-gradient-to-br from-orange-100 to-orange-200/50 dark:from-orange-900/40 dark:to-orange-800/30 border-orange-400/60 dark:border-orange-600/50 shadow-md"
+                                : "bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/30 dark:to-orange-900/20 border-orange-200/60 dark:border-orange-800/40 hover:border-orange-300 dark:hover:border-orange-700 hover:shadow-sm"
+                            )}
+                          >
+                            <div className="p-0.5 rounded-full bg-orange-500/20 dark:bg-orange-400/20 group-hover:bg-orange-500/30 dark:group-hover:bg-orange-400/30 transition-colors">
+                              <PlayCircle className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400 group-hover:scale-110 transition-transform" />
+                            </div>
+                            <span className="text-sm font-bold text-orange-700 dark:text-orange-300">{inProgressTrainees}</span>
+                            <span className="text-[10px] font-medium text-orange-600/80 dark:text-orange-400/80 hidden lg:inline">В процес</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p className="font-medium">В процес: {inProgressTrainees}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </>
+                )}
+              </div>
+            </div>
     </>
   );
 
@@ -824,7 +859,7 @@ const TrainingListPage = () => {
             )}
           </div>
         )}
-      </div>
+    </div>
     </AppLayout>
   );
 };

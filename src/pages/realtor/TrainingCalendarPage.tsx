@@ -234,13 +234,13 @@ const TrainingCalendarPage = () => {
 
   const customNavbarContent = (
     <>
-      <div className="min-w-0">
-        <h1 className="text-base font-semibold text-foreground truncate">Календар на обученията</h1>
+              <div className="min-w-0">
+                <h1 className="text-base font-semibold text-foreground truncate">Календар на обученията</h1>
         <p className="text-xs text-muted-foreground truncate hidden sm:block">График на новите групи</p>
-      </div>
+              </div>
       <div className="flex items-center gap-3 min-w-0 flex-1 justify-center">
-        {/* Statistics - Modern Compact Design */}
-        <div className="flex items-center gap-1.5 flex-wrap justify-center">
+              {/* Statistics - Modern Compact Design */}
+              <div className="flex items-center gap-1.5 flex-wrap justify-center">
                 {loadingTrainees ? (
                   // Loading skeleton for statistics
                   Array.from({ length: role === 'admin' ? 4 : 3 }).map((_, i) => (

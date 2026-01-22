@@ -600,8 +600,8 @@ const TrainingPage = () => {
   return (
     <AppLayout
       customNavbarContent={
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">Обучение</h1>
+              <div>
+                <h1 className="text-lg font-semibold text-foreground">Обучение</h1>
           <p className="text-xs text-muted-foreground hidden sm:block">Проследяване на обучителен прогрес</p>
         </div>
       }
@@ -757,7 +757,7 @@ const TrainingPage = () => {
             />
           ))}
         </div>
-      </div>
+    </div>
     </AppLayout>
   );
 };

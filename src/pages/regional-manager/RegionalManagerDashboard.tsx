@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DndContext,
@@ -40,9 +40,6 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { hasPermission } from '@/utils/permissions';
 import { Settings, Users, Download, BarChart3, ChevronLeft, Calendar, CheckCircle2, FileText, Target, XCircle, Award, TrendingUp } from 'lucide-react';
 import { exportKPIData, exportDeals, exportDiagnoses } from '@/lib/export';
-import { TopologySidebar } from '@/components/TopologySidebar';
-import { transformOffices } from '@/utils/dataTransform';
-import { Office as UIOffice } from '@/types';
 import { AppLayout } from '@/components/layouts/AppLayout';
 import { toast } from 'sonner';
 import {
@@ -138,12 +135,16 @@ const SortableCard = ({ id, children, className }: { id: string; children: React
   );
 };
 
-const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => {
+// Мемоизирай компонента за да предотвратиш ненужни ре-рендери
+const RegionalManagerDashboard = memo(({ userId }: RegionalManagerDashboardProps) => {
   const navigate = useNavigate();
   const { role } = useUserRole();
   const [currentView, setCurrentView] = useState<ViewLevel>('cities');
   const [userInfo, setUserInfo] = useState<{fullName: string; email: string; role: string} | null>(null);
   const [cities, setCities] = useState<City[]>([]);
+  
+  // Използвай ref за да предотвратиш повторно зареждане на данни
+  const hasFetchedData = useRef(false);
   const [offices, setOffices] = useState<Office[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [realtors, setRealtors] = useState<Realtor[]>([]);
@@ -157,15 +158,6 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
   const [selectedRealtorDiagnoses, setSelectedRealtorDiagnoses] = useState<Array<Record<string, unknown>>>([]);
   const [selectedRealtorTrainingData, setSelectedRealtorTrainingData] = useState<TrainingSection[]>(trainingStructure);
   const [selectedRealtorTrainingProgress, setSelectedRealtorTrainingProgress] = useState(0);
-  const [topologyOffices, setTopologyOffices] = useState<UIOffice[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    const saved = localStorage.getItem('sidebarOpen');
-    return saved !== null ? saved === 'true' : false; // Default to closed
-  });
-
-  useEffect(() => {
-    localStorage.setItem('sidebarOpen', String(sidebarOpen));
-  }, [sidebarOpen]);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [userManagementOpen, setUserManagementOpen] = useState(false);
   const [trainingDialogOpen, setTrainingDialogOpen] = useState(false);
@@ -199,21 +191,6 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
     }
   }, []);
 
-  const fetchTopologyData = useCallback(async () => {
-    try {
-      const dbOffices = await api.getAllOfficesFull();
-      const transformedOffices = transformOffices(dbOffices);
-      // Filter offices to only show cities where user is regional manager
-      const filteredOffices = transformedOffices.filter(office => {
-        // Check if office's city has this user as manager
-        return cities.some(city => city.id === office.city?.id);
-      });
-      setTopologyOffices(filteredOffices);
-    } catch (error) {
-      console.error('Error fetching topology data:', error);
-    }
-  }, [cities]);
-
   const fetchCities = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
@@ -244,12 +221,6 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
     fetchCities();
     fetchUserInfo();
   }, [fetchCities, fetchUserInfo]);
-
-  useEffect(() => {
-    if (cities.length > 0) {
-      fetchTopologyData();
-    }
-  }, [cities, fetchTopologyData]);
 
   const fetchOffices = async (cityId: string) => {
     setLoading(true);
@@ -555,18 +526,6 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
     return realtors;
   }, [realtors, realtorFilter]);
 
-  const handleTopologyOfficeClick = async (office: UIOffice) => {
-    // Find the city for this office
-    const city = cities.find(c => c.id === office.city?.id);
-    if (city) {
-      setSelectedCity(city);
-      fetchOffices(city.id);
-      fetchCityKPI(city.id);
-    }
-    setSelectedOffice({ id: office.id, name: office.name, city_id: office.city?.id || '', address: office.address || null });
-    fetchTeams(office.id);
-    setCurrentView('teams');
-  };
 
   if (loading && cities.length === 0) {
     return (
@@ -600,56 +559,29 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Topology Sidebar */}
-      <TopologySidebar
-        offices={topologyOffices}
-        onOfficeClick={handleTopologyOfficeClick}
-        selectedOfficeId={selectedOffice?.id}
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        mode="admin"
-        showQuickActions={true}
-        onTrainingCalendarClick={selectedCity ? () => navigate(`/training-calendar?cityId=${selectedCity.id}`) : undefined}
-        onTrainingListClick={() => navigate('/training-list')}
-        onBackClick={handleBack}
-        showBackButton={currentView !== 'cities'}
-        onExportClick={() => {
-          if (kpiMetrics) {
-            exportKPIData(kpiMetrics, `kpi-regional-${new Date().toISOString().split('T')[0]}`);
-            toast.success('KPI данните са експортирани');
-          }
-        }}
-        teamName="Регионален мениджър"
-        breadcrumb={getBreadcrumb()}
-      />
-
-      {/* Main Content with AppLayout navbar */}
       <AppLayout
-        showSidebar={false}
-        onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
         customNavbarContent={
           showKPI && kpiMetrics ? (
-            <div className="flex items-center gap-1.5 sm:gap-2 ml-2 sm:ml-4">
+                <div className="flex items-center gap-1.5 sm:gap-2 ml-2 sm:ml-4">
               <StatBadge
                 icon={Users}
                 value={kpiMetrics.diagnoses || 0}
-                title="Диагнози"
+                    title="Диагнози"
                 colorScheme="blue"
               />
               <StatBadge
                 icon={TrendingUp}
                 value={kpiMetrics.deals || 0}
-                title="Сделки"
+                    title="Сделки"
                 colorScheme="green"
               />
               <StatBadge
                 icon={Award}
                 value={formatSuccessRate(kpiMetrics.successRate || 0)}
-                title="Успеваемост"
+                    title="Успеваемост"
                 colorScheme="purple"
               />
-            </div>
+                    </div>
           ) : undefined
         }
       >
@@ -1078,37 +1010,45 @@ const RegionalManagerDashboard = ({ userId }: RegionalManagerDashboardProps) => 
             </div>
           </div>
         )}
-        </div>
+      </div>
 
-        {/* Account Settings Dialog */}
-        {userInfo && (
-          <AccountSettingsDialog
-            open={accountSettingsOpen}
-            onOpenChange={setAccountSettingsOpen}
-            userInfo={userInfo}
-            onUpdate={fetchUserInfo}
-          />
-        )}
-
-        {/* Training Management Dialog */}
-        {selectedRealtorForTraining && (
-          <TrainingManagementDialog
-            open={trainingDialogOpen}
-            onOpenChange={setTrainingDialogOpen}
-            realtorId={selectedRealtorForTraining.id}
-            realtorName={selectedRealtorForTraining.name}
-          />
-        )}
-
-        {/* User Management Dialog */}
-        <UserManagementDialog
-          open={userManagementOpen}
-          onOpenChange={setUserManagementOpen}
+      {/* Account Settings Dialog */}
+      {userInfo && (
+        <AccountSettingsDialog
+          open={accountSettingsOpen}
+          onOpenChange={setAccountSettingsOpen}
+          userInfo={userInfo}
           onUpdate={fetchUserInfo}
         />
+      )}
+
+      {/* Training Management Dialog */}
+      {selectedRealtorForTraining && (
+        <TrainingManagementDialog
+          open={trainingDialogOpen}
+          onOpenChange={setTrainingDialogOpen}
+          realtorId={selectedRealtorForTraining.id}
+          realtorName={selectedRealtorForTraining.name}
+        />
+      )}
+
+      {/* User Management Dialog */}
+      <UserManagementDialog
+        open={userManagementOpen}
+        onOpenChange={setUserManagementOpen}
+        onUpdate={() => {
+          fetchUserInfo();
+          if (selectedTeam) {
+            fetchRealtors(selectedTeam.id);
+          }
+        }}
+        teamId={selectedTeam?.id}
+      />
       </AppLayout>
-    </div>
   );
-};
+});
+
+// Задай displayName за по-лесно дебъгване
+RegionalManagerDashboard.displayName = 'RegionalManagerDashboard';
 
 export default RegionalManagerDashboard;

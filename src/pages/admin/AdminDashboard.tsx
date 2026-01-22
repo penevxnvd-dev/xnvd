@@ -1,5 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCountries } from '@/hooks/useCountries';
+import { useCities } from '@/hooks/useCities';
+import { useOffices } from '@/hooks/useOffices';
+import { useTeams } from '@/hooks/useTeams';
+import { useRealtors } from '@/hooks/useRealtors';
 import {
   DndContext,
   closestCenter,
@@ -46,9 +52,6 @@ import { OfficeCardWithKPI } from '@/components/cards/OfficeCardWithKPI';
 import { TeamCardWithKPI } from '@/components/cards/TeamCardWithKPI';
 import { RealizatorCardWithKPI } from '@/components/cards/RealizatorCardWithKPI';
 import { TrainingManagementDialog } from '@/components/TrainingManagementDialog';
-import { TopologySidebar } from '@/components/TopologySidebar';
-import { transformOffices } from '@/utils/dataTransform';
-import { Office as UIOffice, TeamLeader, Agent } from '@/types';
 import { AppLayout } from '@/components/layouts/AppLayout';
 import {
   AlertDialog,
@@ -75,7 +78,6 @@ import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
 import { Progress } from '@/components/ui/progress';
 import { BookOpen } from 'lucide-react';
 import { formatNameWithEmoji, formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
-import { useMemo } from 'react';
 
 type ViewLevel = 'countries' | 'cities' | 'offices' | 'teams' | 'realtors' | 'realtor-detail';
 
@@ -158,15 +160,22 @@ const SortableCard = ({ id, children, className }: { id: string; children: React
   );
 };
 
-const AdminDashboard = ({ userId }: AdminDashboardProps) => {
+// Мемоизирай компонента за да предотвратиш ненужни ре-рендери
+const AdminDashboard = memo(({ userId }: AdminDashboardProps) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [currentView, setCurrentView] = useState<ViewLevel>('countries');
   const [userInfo, setUserInfo] = useState<{fullName: string; email: string; role: string} | null>(null);
-  const [countries, setCountries] = useState<Country[]>([]);
-  const [cities, setCities] = useState<City[]>([]);
-  const [offices, setOffices] = useState<Office[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [realtors, setRealtors] = useState<Realtor[]>([]);
+  
+  // Използвай ref за да предотвратиш повторно зареждане на user info
+  const hasFetchedUserInfo = useRef(false);
+  
+  // Use React Query hooks for data fetching
+  const { data: countries = [], isLoading: countriesLoading } = useCountries();
+  const { data: cities = [], isLoading: citiesLoading } = useCities(selectedCountry?.id || null);
+  const { data: offices = [], isLoading: officesLoading } = useOffices(selectedCity?.id || null);
+  const { data: teams = [], isLoading: teamsLoading } = useTeams(selectedOffice?.id || null);
+  const { data: realtors = [], isLoading: realtorsLoading } = useRealtors(selectedTeam?.id || null);
   
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
@@ -178,21 +187,13 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const [selectedRealtorDiagnoses, setSelectedRealtorDiagnoses] = useState<Array<Record<string, unknown>>>([]);
   const [selectedRealtorTrainingData, setSelectedRealtorTrainingData] = useState<TrainingSection[]>(trainingStructure);
   const [selectedRealtorTrainingProgress, setSelectedRealtorTrainingProgress] = useState(0);
-  const [topologyOffices, setTopologyOffices] = useState<UIOffice[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    const saved = localStorage.getItem('sidebarOpen');
-    return saved !== null ? saved === 'true' : false; // Default to closed
-  });
-
-  useEffect(() => {
-    localStorage.setItem('sidebarOpen', String(sidebarOpen));
-  }, [sidebarOpen]);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [userManagementOpen, setUserManagementOpen] = useState(false);
   const [trainingDialogOpen, setTrainingDialogOpen] = useState(false);
   const [selectedRealtorForTraining, setSelectedRealtorForTraining] = useState<{ id: string; name: string } | null>(null);
 
-  const [loading, setLoading] = useState(true);
+  // Combined loading state
+  const loading = countriesLoading || citiesLoading || officesLoading || teamsLoading || realtorsLoading;
   const [kpiMetrics, setKpiMetrics] = useState<KPIMetrics | null>(null);
   const [showKPI, setShowKPI] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -226,150 +227,67 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     }
   }, []);
 
-  const fetchTopologyData = useCallback(async () => {
-    try {
-      const dbOffices = await api.getAllOfficesFull();
-      const transformedOffices = transformOffices(dbOffices);
-      setTopologyOffices(transformedOffices);
-    } catch (error) {
-      console.error('Error fetching topology data:', error);
-    }
-  }, []);
-
-  const fetchCountries = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await api.getCountries();
-      setCountries(data);
-    } catch (error) {
-      console.error('Error fetching countries:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchCountries();
-    fetchTopologyData();
-    fetchUserInfo();
-  }, [fetchCountries, fetchTopologyData, fetchUserInfo]);
-
-  const fetchCities = async (countryId: string) => {
-    setLoading(true);
-    try {
-      const data = await api.getCitiesByCountry(countryId);
-      const mapped = data.map((city: { id: string; name: string; countryId: string }) => ({
-        id: city.id,
-        name: city.name,
-        country_id: city.countryId
-      }));
-      setCities(mapped);
-    } catch (error) {
-      console.error('Error fetching cities:', error);
-    } finally {
-      setLoading(false);
+    // Зареждай user info само веднъж
+    if (!hasFetchedUserInfo.current) {
+      hasFetchedUserInfo.current = true;
+      fetchUserInfo();
     }
-  };
+  }, [fetchUserInfo]);
 
-  const fetchOffices = async (cityId: string) => {
-    setLoading(true);
-    try {
-      const data = await api.getOfficesByCity(cityId);
-      const mapped = data.map((office: { id: string; name: string; cityId: string; address?: string | null }) => ({
-        id: office.id,
-        name: office.name,
-        city_id: office.cityId,
-        address: office.address
-      }));
-      setOffices(mapped);
-    } catch (error) {
-      console.error('Error fetching offices:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Memoize mapped data
+  const mappedCities = useMemo(() => {
+    return cities.map((city: any) => ({
+      id: city.id,
+      name: city.name,
+      country_id: city.country_id
+    }));
+  }, [cities]);
 
-  const fetchTeams = async (officeId: string) => {
-    setLoading(true);
-    try {
-      const data = await api.getTeamsByOffice(officeId);
-      console.log(`[fetchTeams] Fetched ${data.length} teams for office ${officeId}`);
-      
-      // Мапване на данните - Supabase връща office_id, не officeId
-      const mapped = data.map((team: { 
-        id: string; 
-        name: string; 
-        office_id?: string; 
-        leader_id?: string | null; 
-        leader?: { full_name?: string } 
-      }) => {
-        // Проверка за правилен office_id
-        if (team.office_id && team.office_id !== officeId) {
-          console.warn(`[fetchTeams] Team ${team.id} (${team.name}) has wrong office_id: ${team.office_id} (expected ${officeId})`);
-        }
-        
-        return {
-          id: team.id,
-          name: team.name,
-          office_id: team.office_id || officeId,
-          leader_id: team.leader_id || null,
-          leaderName: team.leader?.full_name ? formatNameWithoutElevenEleven(team.leader.full_name).displayName : undefined
-        };
-      });
-      
-      // Стриктна дедупликация по ID (допълнителна защита)
-      const seenIds = new Set<string>();
-      const uniqueTeams = mapped.filter(team => {
-        if (seenIds.has(team.id)) {
-          console.warn(`[fetchTeams] Duplicate team ID in UI: ${team.id} (${team.name})`);
-          return false;
-        }
-        seenIds.add(team.id);
-        return true;
-      });
-      
-      console.log(`[fetchTeams] Setting ${uniqueTeams.length} unique teams for office ${officeId}`);
-      setTeams(uniqueTeams);
-    } catch (error) {
-      console.error('Error fetching teams:', error);
-      setTeams([]); // При грешка, изчистваме списъка
-    } finally {
-      setLoading(false);
-    }
-  };
+  const mappedOffices = useMemo(() => {
+    return offices.map((office: any) => ({
+      id: office.id,
+      name: office.name,
+      city_id: office.city_id,
+      address: office.address
+    }));
+  }, [offices]);
 
-  const fetchRealtors = async (teamId: string) => {
-    setLoading(true);
-    try {
-      const data = await api.getRealtorsByTeam(teamId);
-      const mapped = data.map((realtor: { id: string; user_id: string; team_id: string; level: number; profile?: { full_name?: string; email?: string } }) => ({
-        id: realtor.id,
-        userId: realtor.user_id,
-        teamId: realtor.team_id,
-        level: realtor.level,
-        user: {
-          fullName: realtor.user?.fullName || realtor.profile?.full_name || 'Неизвестен',
-          email: realtor.user?.email || realtor.profile?.email || ''
+  const mappedTeams = useMemo(() => {
+    return teams.map((team: any) => ({
+      id: team.id,
+      name: team.name,
+      office_id: team.office_id,
+      leader_id: team.leader_id,
+    }));
+  }, [teams]);
+
+  const mappedRealtors = useMemo(() => {
+    return realtors.map((realtor: any) => ({
+      id: realtor.id,
+      userId: realtor.userId,
+      teamId: realtor.teamId,
+      level: realtor.level,
+      user: realtor.user,
+    }));
+  }, [realtors]);
+
+  // Fetch KPI when team is selected
+  useEffect(() => {
+    const fetchTeamKPI = async () => {
+      if (selectedTeam?.id) {
+        try {
+          const kpi = await api.getTeamKPI(selectedTeam.id);
+          setKpiMetrics(kpi);
+          setShowKPI(true);
+        } catch (error) {
+          console.error('Error fetching team KPI:', error);
+          setShowKPI(false);
         }
-      }));
-      setRealtors(mapped);
-      
-      // Изчисляване на KPI за екипа
-      try {
-        const kpi = await api.getTeamKPI(teamId);
-        setKpiMetrics(kpi);
-        setShowKPI(true);
-      } catch (error) {
-        console.error('Error fetching team KPI:', error);
-        setShowKPI(false);
       }
-
-    } catch (error) {
-      console.error('Error fetching realtors:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+    fetchTeamKPI();
+  }, [selectedTeam?.id]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -479,13 +397,12 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const handleCountryClick = (country: Country) => {
     setSelectedCountry(country);
     setCurrentView('cities');
-    // Parallelize API calls
-    Promise.all([
-      fetchCities(country.id),
-      fetchCountryKPI(country.id)
-    ]).catch(error => {
-      console.error('Error loading country data:', error);
+    // Prefetch cities and KPI data
+    queryClient.prefetchQuery({
+      queryKey: ['cities', country.id],
+      queryFn: () => api.getCitiesByCountry(country.id),
     });
+    fetchCountryKPI(country.id);
   };
 
   const fetchCityKPI = async (cityId: string) => {
@@ -502,13 +419,12 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const handleCityClick = (city: City) => {
     setSelectedCity(city);
     setCurrentView('offices');
-    // Parallelize API calls
-    Promise.all([
-      fetchOffices(city.id),
-      fetchCityKPI(city.id)
-    ]).catch(error => {
-      console.error('Error loading city data:', error);
+    // Prefetch offices data
+    queryClient.prefetchQuery({
+      queryKey: ['offices', city.id],
+      queryFn: () => api.getOfficesByCity(city.id),
     });
+    fetchCityKPI(city.id);
   };
 
   const fetchOfficeKPI = async (officeId: string) => {
@@ -525,19 +441,22 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   const handleOfficeClick = (office: Office) => {
     setSelectedOffice(office);
     setCurrentView('teams');
-    // Parallelize API calls
-    Promise.all([
-      fetchTeams(office.id),
-      fetchOfficeKPI(office.id)
-    ]).catch(error => {
-      console.error('Error loading office data:', error);
+    // Prefetch teams data
+    queryClient.prefetchQuery({
+      queryKey: ['teams', office.id],
+      queryFn: () => api.getTeamsByOffice(office.id),
     });
+    fetchOfficeKPI(office.id);
   };
 
   const handleTeamClick = (team: Team) => {
     setSelectedTeam(team);
     setCurrentView('realtors');
-    fetchRealtors(team.id);
+    // Prefetch realtors data
+    queryClient.prefetchQuery({
+      queryKey: ['realtors', team.id],
+      queryFn: () => api.getRealtorsByTeam(team.id),
+    });
   };
 
   const handleBack = () => {
@@ -552,22 +471,24 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
     if (currentView === 'realtors') {
       setCurrentView('teams');
       setSelectedTeam(null);
-      fetchTeams(selectedOffice!.id);
-      fetchOfficeKPI(selectedOffice!.id);
+      if (selectedOffice) {
+        fetchOfficeKPI(selectedOffice.id);
+      }
     } else if (currentView === 'teams') {
       setCurrentView('offices');
       setSelectedOffice(null);
-      fetchOffices(selectedCity!.id);
-      fetchCityKPI(selectedCity!.id);
+      if (selectedCity) {
+        fetchCityKPI(selectedCity.id);
+      }
     } else if (currentView === 'offices') {
       setCurrentView('cities');
       setSelectedCity(null);
-      fetchCities(selectedCountry!.id);
-      fetchCountryKPI(selectedCountry!.id);
+      if (selectedCountry) {
+        fetchCountryKPI(selectedCountry.id);
+      }
     } else if (currentView === 'cities') {
       setCurrentView('countries');
       setSelectedCountry(null);
-      fetchCountries();
       setShowKPI(false);
     }
   };
@@ -695,12 +616,12 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   // Filter realtors based on selected filter
   const filteredRealtors = useMemo(() => {
     if (realtorFilter === 'trainees') {
-      return realtors.filter(r => r.level === 1);
+      return mappedRealtors.filter(r => r.level === 1);
     } else if (realtorFilter === 'realtors') {
-      return realtors.filter(r => r.level > 1);
+      return mappedRealtors.filter(r => r.level > 1);
     }
-    return realtors;
-  }, [realtors, realtorFilter]);
+    return mappedRealtors;
+  }, [mappedRealtors, realtorFilter]);
 
   const handleCreate = () => {
     if (currentView === 'countries') {
@@ -858,46 +779,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Topology Sidebar - Custom for Admin */}
-      <TopologySidebar
-        offices={topologyOffices}
-        onOfficeClick={handleTopologyOfficeClick}
-        onLeaderClick={handleTopologyLeaderClick}
-        onAgentClick={handleTopologyAgentClick}
-        selectedOfficeId={selectedOffice?.id}
-        selectedLeaderId={selectedTeam?.leader_id || undefined}
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        mode="admin"
-        showQuickActions={true}
-        onTrainingCalendarClick={() => navigate('/training-calendar')}
-        onTrainingListClick={() => navigate('/training-list')}
-        onBackClick={handleBack}
-        showBackButton={currentView !== 'countries'}
-        onAddClick={handleCreate}
-        showAddButton={currentView !== 'realtors' && currentView !== 'realtor-detail'}
-        onAddPersonClick={() => setAddPersonDialogOpen(true)}
-        showAddPersonButton={currentView === 'realtors' && selectedTeam !== null}
-        onExportClick={() => {
-          if (selectedRealtorKPI) {
-            exportKPIData(selectedRealtorKPI, `kpi-realtor-${selectedRealtor?.user.fullName}-${new Date().toISOString().split('T')[0]}`);
-            toast.success('KPI данните са експортирани');
-          } else if (kpiMetrics) {
-            exportKPIData(kpiMetrics, `kpi-admin-${new Date().toISOString().split('T')[0]}`);
-            toast.success('KPI данните са експортирани');
-          }
-        }}
-        role="admin"
-        teamName="Админ Панел"
-        breadcrumb={getBreadcrumb()}
-      />
-
-      {/* Main Content with AppLayout navbar */}
-      <AppLayout
-        showSidebar={false}
-        onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
-      >
+    <AppLayout>
         <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
         {loading ? (
           <div className="text-center text-muted-foreground">Зареждане...</div>
@@ -983,9 +865,9 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
             <SortableContext
               items={
                 currentView === 'countries' ? countries.map(c => c.id) :
-                currentView === 'cities' ? cities.map(c => c.id) :
-                currentView === 'offices' ? offices.map(o => o.id) :
-                currentView === 'teams' ? teams.map(t => t.id) :
+                currentView === 'cities' ? mappedCities.map(c => c.id) :
+                currentView === 'offices' ? mappedOffices.map(o => o.id) :
+                currentView === 'teams' ? mappedTeams.map(t => t.id) :
                 currentView === 'realtors' ? filteredRealtors.map(r => r.id) : []
               }
               strategy={rectSortingStrategy}
@@ -1024,7 +906,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                   </SortableCard>
             ))}
 
-            {currentView === 'cities' && cities.map((city) => (
+            {currentView === 'cities' && mappedCities.map((city) => (
               <SortableCard key={city.id} id={city.id}>
                 <CityCardWithKPI
                   city={{ ...city, countryName: selectedCountry?.name }}
@@ -1057,7 +939,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                   </SortableCard>
             ))}
 
-            {currentView === 'offices' && offices.map((office) => (
+            {currentView === 'offices' && mappedOffices.map((office) => (
               <SortableCard key={office.id} id={office.id}>
                 <OfficeCardWithKPI
                   office={office}
@@ -1090,7 +972,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
               </SortableCard>
             ))}
 
-            {currentView === 'teams' && teams.map((team) => (
+            {currentView === 'teams' && mappedTeams.map((team) => (
               <SortableCard key={team.id} id={team.id}>
                 <TeamCardWithKPI
                   team={team}
@@ -1441,7 +1323,7 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
         )}
         </div>
 
-        {/* Create Dialog */}
+      {/* Create Dialog */}
       <CreateEditDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
@@ -1503,21 +1385,29 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
       <UserManagementDialog
         open={userManagementOpen}
         onOpenChange={setUserManagementOpen}
-        onUpdate={fetchUserInfo}
+        onUpdate={() => {
+          fetchUserInfo();
+          if (selectedTeam) {
+            fetchRealtors(selectedTeam.id);
+          }
+        }}
+        teamId={selectedTeam?.id}
       />
 
-        {/* Training Management Dialog */}
-        {selectedRealtorForTraining && (
-          <TrainingManagementDialog
-            open={trainingDialogOpen}
-            onOpenChange={setTrainingDialogOpen}
-            realtorId={selectedRealtorForTraining.id}
-            realtorName={selectedRealtorForTraining.name}
-          />
-        )}
+      {/* Training Management Dialog */}
+      {selectedRealtorForTraining && (
+        <TrainingManagementDialog
+          open={trainingDialogOpen}
+          onOpenChange={setTrainingDialogOpen}
+          realtorId={selectedRealtorForTraining.id}
+          realtorName={selectedRealtorForTraining.name}
+        />
+      )}
       </AppLayout>
-    </div>
   );
-};
+});
+
+// Задай displayName за по-лесно дебъгване
+AdminDashboard.displayName = 'AdminDashboard';
 
 export default AdminDashboard;

@@ -3,13 +3,80 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type UserRole = 'admin' | 'realtor' | 'team_leader' | 'office_manager' | 'regional_manager' | null;
 
+const CACHE_KEY_ROLE = 'userRole';
+const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 часа
+
+interface CachedData {
+  role: UserRole;
+  userId: string;
+  permissions: {
+    canManageUsers: boolean;
+    canViewTraining: boolean;
+    canViewHierarchy: boolean;
+  };
+  timestamp: number;
+}
+
+const getCachedData = (): CachedData | null => {
+  if (typeof window === 'undefined') return null;
+  
+  try {
+    const cached = localStorage.getItem(CACHE_KEY_ROLE);
+    if (!cached) return null;
+    
+    const data: CachedData = JSON.parse(cached);
+    
+    // Провери дали кешът е изтекъл
+    if (Date.now() - data.timestamp > CACHE_EXPIRY) {
+      localStorage.removeItem(CACHE_KEY_ROLE);
+      return null;
+    }
+    
+    return data;
+  } catch {
+    return null;
+  }
+};
+
+const setCachedData = (role: UserRole, userId: string, permissions: CachedData['permissions']) => {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const data: CachedData = {
+      role,
+      userId,
+      permissions,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(CACHE_KEY_ROLE, JSON.stringify(data));
+  } catch (error) {
+    console.error('Error caching user data:', error);
+  }
+};
+
+const clearCache = () => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(CACHE_KEY_ROLE);
+};
+
+const calculatePermissions = (role: UserRole) => {
+  return {
+    canManageUsers: role === 'admin',
+    canViewTraining: !!role && ['admin', 'regional_manager', 'office_manager', 'team_leader', 'realtor'].includes(role),
+    canViewHierarchy: !!role && ['admin', 'regional_manager', 'office_manager', 'team_leader', 'realtor'].includes(role),
+  };
+};
+
 export const useUserRole = () => {
-  const [role, setRole] = useState<UserRole>(null);
+  // Зареди от кеш веднага при инициализация
+  const cached = getCachedData();
+  
+  const [role, setRole] = useState<UserRole>(cached?.role || null);
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(cached?.userId || null);
 
   useEffect(() => {
-    const fetchUserRole = async () => {
+    const fetchUserRoleFromDB = async () => {
       try {
         // Get current user from Supabase auth
         const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -17,7 +84,7 @@ export const useUserRole = () => {
         if (authError || !user) {
           setRole(null);
           setUserId(null);
-          setLoading(false);
+          clearCache();
           return;
         }
 
@@ -31,13 +98,13 @@ export const useUserRole = () => {
 
         if (rolesError) {
           console.error('Error fetching user roles:', rolesError);
-          // Don't return early - check realtors table as fallback
         }
+
+        let determinedRole: UserRole = null;
 
         if (roles && roles.length > 0) {
           // Priority: admin > regional_manager > office_manager > team_leader > realtor
           const rolePriority = ['admin', 'regional_manager', 'office_manager', 'team_leader', 'realtor'];
-          let determinedRole: UserRole = null;
           
           for (const priorityRole of rolePriority) {
             if (roles.some(r => r.role === priorityRole)) {
@@ -45,42 +112,63 @@ export const useUserRole = () => {
               break;
             }
           }
-          
-          if (determinedRole) {
-            console.log(`[useUserRole] Found role in user_roles: ${determinedRole}`);
-            setRole(determinedRole);
-          }
         } else {
           // If no role in user_roles, check if user is a realtor
-          console.log('[useUserRole] No role in user_roles, checking realtors table...');
           const { data: realtor, error: realtorError } = await supabase
             .from('realtors')
             .select('id')
             .eq('user_id', user.id)
             .single();
 
-          if (realtorError) {
-            if (realtorError.code === 'PGRST116') {
-              // No realtor found - this is expected if user is not a realtor
-              console.log('[useUserRole] User is not a realtor');
-            } else {
-              console.error('[useUserRole] Error checking realtor status:', realtorError);
-            }
+          if (realtorError && realtorError.code !== 'PGRST116') {
+            console.error('[useUserRole] Error checking realtor status:', realtorError);
           }
 
           if (realtor) {
-            // User is a realtor but doesn't have role in user_roles
-            console.log('[useUserRole] User is a realtor (found in realtors table)');
-            setRole('realtor');
-          } else {
-            console.log('[useUserRole] User has no role assigned');
-            setRole(null);
+            determinedRole = 'realtor';
           }
+        }
+
+        // Изчисли permissions
+        const permissions = calculatePermissions(determinedRole);
+
+        setRole(determinedRole);
+        
+        // Кеширай данните
+        if (determinedRole) {
+          setCachedData(determinedRole, user.id, permissions);
+        } else {
+          clearCache();
         }
       } catch (error) {
         console.error('Error fetching user role:', error);
         setRole(null);
         setUserId(null);
+        clearCache();
+      }
+    };
+
+    const fetchUserRole = async () => {
+      try {
+        // Ако има валиден кеш, използвай го и провери в background
+        const cached = getCachedData();
+        if (cached && cached.role && cached.userId) {
+          setRole(cached.role);
+          setUserId(cached.userId);
+          setLoading(false);
+          
+          // Провери в background дали ролята е актуална (без да блокира UI)
+          fetchUserRoleFromDB().catch(console.error);
+          return;
+        }
+
+        // Ако няма кеш, зареди от базата данни
+        await fetchUserRoleFromDB();
+      } catch (error) {
+        console.error('Error fetching user role:', error);
+        setRole(null);
+        setUserId(null);
+        clearCache();
       } finally {
         setLoading(false);
       }
@@ -93,8 +181,11 @@ export const useUserRole = () => {
       if (!session) {
         setRole(null);
         setUserId(null);
+        clearCache();
         setLoading(false);
       } else {
+        // При промяна на сесия, изчисти кеша и зареди отново
+        clearCache();
         fetchUserRole();
       }
     });

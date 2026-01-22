@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,32 +12,23 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
 import { NotificationCenter } from '@/components/NotificationCenter';
-import { TopologySidebar } from '@/components/TopologySidebar';
+import { HierarchySidebar } from '@/components/layouts/HierarchySidebar';
 import { useUserRole } from '@/hooks/useUserRole';
 import { hasPermission } from '@/utils/permissions';
-import { api } from '@/lib/api';
-import { transformOffices } from '@/utils/dataTransform';
-import { Office } from '@/types';
+import { supabaseApi } from '@/lib/supabaseApi';
 import { Menu, Settings, Users, LogOut, ChevronDown } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
 
 interface AppLayoutProps {
   children: React.ReactNode;
-  showSidebar?: boolean;
-  sidebarMode?: 'admin' | 'realtor' | 'team-leader';
   customNavbarContent?: React.ReactNode;
-  onSidebarToggle?: () => void; // Optional custom sidebar toggle for pages with custom sidebars
 }
 
 export const AppLayout = ({ 
   children, 
-  showSidebar = true,
-  sidebarMode = 'admin',
-  customNavbarContent,
-  onSidebarToggle
+  customNavbarContent
 }: AppLayoutProps) => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { role } = useUserRole();
   const [userInfo, setUserInfo] = useState<{fullName: string; email: string; role: string} | null>(null);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
@@ -44,48 +36,32 @@ export const AppLayout = ({
     const saved = localStorage.getItem('sidebarOpen');
     return saved !== null ? saved === 'true' : false;
   });
-  const [topologyOffices, setTopologyOffices] = useState<Office[]>([]);
 
   useEffect(() => {
     localStorage.setItem('sidebarOpen', String(sidebarOpen));
   }, [sidebarOpen]);
 
-  useEffect(() => {
-    const fetchUserInfo = async () => {
-      try {
-        const { user } = await api.getCurrentUser();
-        if (user) {
-          setUserInfo({
-            fullName: user.full_name || user.email,
-            email: user.email,
-            role: role || 'Потребител'
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching user info:', error);
+  const fetchUserInfo = useCallback(async () => {
+    try {
+      const { user } = await supabaseApi.getCurrentUser();
+      if (user) {
+        setUserInfo({
+          fullName: user.full_name || user.email,
+          email: user.email,
+          role: role || 'Потребител',
+        });
       }
-    };
-
-    fetchUserInfo();
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+    }
   }, [role]);
 
   useEffect(() => {
-    if (showSidebar) {
-      const fetchTopology = async () => {
-        try {
-          const dbOffices = await api.getAllOfficesFull();
-          const transformedOffices = transformOffices(dbOffices);
-          setTopologyOffices(transformedOffices);
-        } catch (error) {
-          console.error('Error fetching topology:', error);
-        }
-      };
-      fetchTopology();
-    }
-  }, [showSidebar]);
+    fetchUserInfo();
+  }, [fetchUserInfo]);
 
   const handleLogout = async () => {
-    await api.logout();
+    await supabaseApi.logout();
     navigate('/auth');
   };
 
@@ -95,59 +71,50 @@ export const AppLayout = ({
 
   return (
     <div className="min-h-screen bg-background flex flex-1">
-      {/* Sidebar with spacer - Push style */}
-      {showSidebar && (
-        <TopologySidebar
-          offices={topologyOffices}
-          onOfficeClick={() => {}}
-          onLeaderClick={() => {}}
-          onAgentClick={() => {}}
-          isOpen={sidebarOpen}
-          onToggle={() => setSidebarOpen(!sidebarOpen)}
-          mode={sidebarMode}
-          showQuickActions={true}
-          onTrainingCalendarClick={() => navigate('/training-calendar')}
-          onTrainingListClick={() => navigate('/training-list')}
-          role={role || undefined}
-        />
-      )}
+      {/* Hierarchy Sidebar - Always shown for authenticated users */}
+      <HierarchySidebar 
+        isOpen={sidebarOpen} 
+        onToggle={() => setSidebarOpen(!sidebarOpen)} 
+      />
 
-      {/* Main Content Area - Gets pushed by sidebar spacer */}
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 w-full">
         {/* Navbar */}
-        <header className="border-b border-border bg-card/95 backdrop-blur-lg shadow-sm sticky top-0 z-30 w-full">
-          <div className="container mx-auto px-2 sm:px-3 md:px-4 py-2 sm:py-3 md:py-4">
-            <div className="flex items-center justify-between flex-wrap gap-1.5 sm:gap-2 md:gap-3">
-              <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+        <header className={cn(
+          "border-b border-border bg-card/95 backdrop-blur-lg shadow-sm sticky top-0 z-30 w-full",
+          customNavbarContent && "py-2 sm:py-3"
+        )}>
+          <div className="container mx-auto px-2 sm:px-3 md:px-4">
+            <div className={cn(
+              "flex items-start justify-between flex-wrap gap-1.5 sm:gap-2 md:gap-3",
+              customNavbarContent && "flex-col sm:flex-row"
+            )}>
+              <div className={cn(
+                "flex items-start gap-2 sm:gap-4 min-w-0",
+                customNavbarContent && "flex-col sm:flex-row w-full sm:w-auto"
+              )}>
                 {/* Hamburger Button - Always visible */}
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => {
-                    if (showSidebar) {
-                      setSidebarOpen(!sidebarOpen);
-                    } else if (onSidebarToggle) {
-                      // Use custom toggle for pages with custom sidebars
-                      onSidebarToggle();
-                    }
-                  }}
-                  className="h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 relative z-10 hover:bg-accent"
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 relative z-10 hover:bg-accent mt-0.5"
                   aria-label="Toggle sidebar"
-                  title={showSidebar ? (sidebarOpen ? "Скрий страничната лента" : "Покажи страничната лента") : (onSidebarToggle ? "Превключи страничната лента" : "Меню")}
+                  title={sidebarOpen ? "Скрий страничната лента" : "Покажи страничната лента"}
                 >
                   <Menu className="h-5 w-5 text-foreground" />
                 </Button>
                 {/* Logo */}
                 <button 
                   onClick={handleHome} 
-                  className="hover:opacity-80 transition-opacity cursor-pointer flex-shrink-0"
+                  className="hover:opacity-80 transition-opacity cursor-pointer flex-shrink-0 mt-0.5"
                 >
                   <img src={logo} alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 object-contain" />
                 </button>
                 {/* Custom Navbar Content */}
                 {customNavbarContent}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-shrink-0">
                 <NotificationCenter />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -180,7 +147,7 @@ export const AppLayout = ({
                     {hasPermission(role, 'manage.users') && (
                       <>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                        <DropdownMenuItem onClick={() => navigate('/account-management')}>
                           <Users className="h-4 w-4 mr-2" />
                           Управление на акаунти
                         </DropdownMenuItem>
@@ -211,21 +178,6 @@ export const AppLayout = ({
           onOpenChange={setAccountSettingsOpen}
           userInfo={userInfo}
           onUpdate={() => {
-            // Refresh user info
-            const fetchUserInfo = async () => {
-              try {
-                const { user } = await api.getCurrentUser();
-                if (user) {
-                  setUserInfo({
-                    fullName: user.full_name || user.email,
-                    email: user.email,
-                    role: role || 'Потребител'
-                  });
-                }
-              } catch (error) {
-                console.error('Error fetching user info:', error);
-              }
-            };
             fetchUserInfo();
           }}
         />

@@ -277,7 +277,7 @@ const Index = () => {
                 </Button>
                 <Button onClick={() => navigate('/analytics')} variant="outline" size="sm" className="text-xs sm:text-sm">
                   <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Аналитика</span>
+                  <span className="hidden sm:inline">Калсация</span>
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

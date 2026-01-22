@@ -72,18 +72,21 @@ export type Database = {
           country_id: string
           created_at: string
           id: string
+          manager_id: string | null
           name: string
         }
         Insert: {
           country_id: string
           created_at?: string
           id?: string
+          manager_id?: string | null
           name: string
         }
         Update: {
           country_id?: string
           created_at?: string
           id?: string
+          manager_id?: string | null
           name?: string
         }
         Relationships: [
@@ -92,6 +95,13 @@ export type Database = {
             columns: ["country_id"]
             isOneToOne: false
             referencedRelation: "countries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cities_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -125,6 +135,8 @@ export type Database = {
           deal_date: string
           deal_value: number
           id: string
+          is_exclusive: boolean | null
+          is_key: boolean | null
           realtor_id: string
         }
         Insert: {
@@ -134,6 +146,8 @@ export type Database = {
           deal_date?: string
           deal_value: number
           id?: string
+          is_exclusive?: boolean | null
+          is_key?: boolean | null
           realtor_id: string
         }
         Update: {
@@ -143,6 +157,8 @@ export type Database = {
           deal_date?: string
           deal_value?: number
           id?: string
+          is_exclusive?: boolean | null
+          is_key?: boolean | null
           realtor_id?: string
         }
         Relationships: [
@@ -198,7 +214,7 @@ export type Database = {
           content: string
           created_at: string
           id: string
-          read: boolean
+          read: boolean | null
           receiver_id: string
           sender_id: string
         }
@@ -206,7 +222,7 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
-          read?: boolean
+          read?: boolean | null
           receiver_id: string
           sender_id: string
         }
@@ -214,7 +230,7 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
-          read?: boolean
+          read?: boolean | null
           receiver_id?: string
           sender_id?: string
         }
@@ -241,6 +257,7 @@ export type Database = {
           city_id: string
           created_at: string
           id: string
+          manager_id: string | null
           name: string
         }
         Insert: {
@@ -248,6 +265,7 @@ export type Database = {
           city_id: string
           created_at?: string
           id?: string
+          manager_id?: string | null
           name: string
         }
         Update: {
@@ -255,6 +273,7 @@ export type Database = {
           city_id?: string
           created_at?: string
           id?: string
+          manager_id?: string | null
           name?: string
         }
         Relationships: [
@@ -265,6 +284,13 @@ export type Database = {
             referencedRelation: "cities"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "offices_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -273,6 +299,8 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          inactivity_reason: string | null
+          status: string | null
           updated_at: string
         }
         Insert: {
@@ -280,6 +308,8 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          inactivity_reason?: string | null
+          status?: string | null
           updated_at?: string
         }
         Update: {
@@ -287,6 +317,8 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          inactivity_reason?: string | null
+          status?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -294,10 +326,10 @@ export type Database = {
       realtor_goals: {
         Row: {
           created_at: string
-          deals_goal: number
-          exclusives_goal: number
+          deals_goal: number | null
+          exclusives_goal: number | null
           id: string
-          keys_goal: number
+          keys_goal: number | null
           month: number
           realtor_id: string
           updated_at: string
@@ -305,10 +337,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          deals_goal?: number
-          exclusives_goal?: number
+          deals_goal?: number | null
+          exclusives_goal?: number | null
           id?: string
-          keys_goal?: number
+          keys_goal?: number | null
           month: number
           realtor_id: string
           updated_at?: string
@@ -316,10 +348,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          deals_goal?: number
-          exclusives_goal?: number
+          deals_goal?: number | null
+          exclusives_goal?: number | null
           id?: string
-          keys_goal?: number
+          keys_goal?: number | null
           month?: number
           realtor_id?: string
           updated_at?: string
@@ -428,6 +460,104 @@ export type Database = {
           },
         ]
       }
+      training_group_trainees: {
+        Row: {
+          created_at: string
+          email: string | null
+          group_id: string
+          id: string
+          intro_completed: boolean
+          level: string | null
+          name: string
+          phone: string | null
+          position: string | null
+          training_stage: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          group_id: string
+          id?: string
+          intro_completed?: boolean
+          level?: string | null
+          name: string
+          phone?: string | null
+          position?: string | null
+          training_stage?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          group_id?: string
+          id?: string
+          intro_completed?: boolean
+          level?: string | null
+          name?: string
+          phone?: string | null
+          position?: string | null
+          training_stage?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_group_trainees_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "training_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_groups: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          current_day: number
+          id: string
+          leader_id: string
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          current_day?: number
+          id?: string
+          leader_id: string
+          start_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          current_day?: number
+          id?: string
+          leader_id?: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_groups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_groups_leader_id_fkey"
+            columns: ["leader_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_progress: {
         Row: {
           exam_completed: boolean | null
@@ -517,9 +647,25 @@ export type Database = {
         }
         Returns: boolean
       }
+      setup_manager_account: {
+        Args: {
+          p_cities?: string[]
+          p_city_name?: string
+          p_email: string
+          p_full_name: string
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_team_name?: string
+        }
+        Returns: string
+      }
     }
     Enums: {
-      app_role: "admin" | "realtor" | "trainee" | "team_leader" | "office_manager" | "regional_manager"
+      app_role:
+        | "admin"
+        | "realtor"
+        | "team_leader"
+        | "office_manager"
+        | "regional_manager"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -647,7 +793,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "realtor", "trainee", "team_leader", "office_manager", "regional_manager"],
+      app_role: [
+        "admin",
+        "realtor",
+        "team_leader",
+        "office_manager",
+        "regional_manager",
+      ],
     },
   },
 } as const

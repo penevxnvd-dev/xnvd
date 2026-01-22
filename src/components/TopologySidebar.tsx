@@ -620,10 +620,10 @@ export const TopologySidebar = ({
                       )}
                     >
                       <BarChart3 className="h-3.5 w-3.5" />
-                      <span className="truncate">Аналитика</span>
+                      <span className="truncate">Калсация</span>
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Аналитика и статистики</TooltipContent>
+                  <TooltipContent>Калсация и статистики</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
 

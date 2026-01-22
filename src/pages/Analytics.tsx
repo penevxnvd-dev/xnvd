@@ -123,7 +123,7 @@ const Analytics = () => {
             officeDiagnoses += diagnoses.length;
           });
         });
-        
+
         const officeSuccessRate = officeDeals > 0 ? (officeDiagnoses / officeDeals) * 100 : 0;
         
         officeStatsMap.set(officeName, {
@@ -224,12 +224,12 @@ const Analytics = () => {
   );
 
   if (loading) {
-    return (
+  return (
       <AppLayout
         customNavbarContent={
           <div className="flex items-center gap-2">
-            <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground">Аналитика</h1>
-          </div>
+            <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground">Калсация</h1>
+            </div>
         }
       >
         <div className="container mx-auto px-4 py-8 space-y-8">
@@ -251,9 +251,9 @@ const Analytics = () => {
       customNavbarContent={
         <div className="flex items-center gap-3 min-w-0">
           <div className="min-w-0">
-            <h1 className="text-base sm:text-lg md:text-xl font-semibold text-foreground truncate">Аналитика</h1>
+            <h1 className="text-base sm:text-lg md:text-xl font-semibold text-foreground truncate">Калсация</h1>
             <p className="text-xs text-muted-foreground truncate hidden sm:block">Детайлен преглед на представянето</p>
-          </div>
+              </div>
           {customNavbarContent}
         </div>
       }
@@ -486,7 +486,7 @@ const Analytics = () => {
                     key={index} 
                     className="border-b border-border hover:bg-muted/50 transition-colors"
                   >
-                    <td className="py-3 px-4 font-medium text-foreground">{office.name}</td>
+                      <td className="py-3 px-4 font-medium text-foreground">{office.name}</td>
                     <td className="py-3 px-4 text-right text-foreground">{office.realtorsCount}</td>
                     <td className="py-3 px-4 text-right text-foreground">{office.dealsCount}</td>
                     <td className="py-3 px-4 text-right text-foreground">{office.diagnosesCount}</td>
@@ -497,13 +497,13 @@ const Analytics = () => {
                         <span className="text-muted-foreground text-sm">N/A</span>
                       )}
                     </td>
-                  </tr>
+                    </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </Card>
-      </div>
+        </div>
     </AppLayout>
   );
 };

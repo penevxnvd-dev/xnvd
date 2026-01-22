@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DndContext,
@@ -50,9 +50,6 @@ import {
 import { TeamCardWithKPI } from '@/components/cards/TeamCardWithKPI';
 import { RealizatorCardWithKPI } from '@/components/cards/RealizatorCardWithKPI';
 import { TrainingManagementDialog } from '@/components/TrainingManagementDialog';
-import { TopologySidebar } from '@/components/TopologySidebar';
-import { transformOffices } from '@/utils/dataTransform';
-import { Office as UIOffice } from '@/types';
 import { AppLayout } from '@/components/layouts/AppLayout';
 import { trainingStructure, calculateTrainingProgress, TrainingSection, isTrainingFullyCompleted } from '@/data/trainingStructure';
 import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
@@ -62,7 +59,6 @@ import { formatNameWithEmoji, formatNameWithoutElevenEleven } from '@/utils/name
 import { GraduationCap } from 'lucide-react';
 import { StatBadge } from '@/components/StatBadge';
 import { supabase } from '@/integrations/supabase/client';
-import { useMemo } from 'react';
 
 type ViewLevel = 'teams' | 'realtors' | 'realtor-detail';
 
@@ -138,12 +134,16 @@ const SortableCard = ({ id, children, className }: { id: string; children: React
   );
 };
 
-const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
+// Мемоизирай компонента за да предотвратиш ненужни ре-рендери
+const OfficeManagerDashboard = memo(({ userId }: OfficeManagerDashboardProps) => {
   const navigate = useNavigate();
   const { role } = useUserRole();
   const [currentView, setCurrentView] = useState<ViewLevel>('teams');
   const [userInfo, setUserInfo] = useState<{fullName: string; email: string; role: string} | null>(null);
   const [office, setOffice] = useState<Office | null>(null);
+  
+  // Използвай ref за да предотвратиш повторно зареждане на данни
+  const hasFetchedData = useRef(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [realtors, setRealtors] = useState<Realtor[]>([]);
   
@@ -154,15 +154,6 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
   const [selectedRealtorDiagnoses, setSelectedRealtorDiagnoses] = useState<Array<Record<string, unknown>>>([]);
   const [selectedRealtorTrainingData, setSelectedRealtorTrainingData] = useState<TrainingSection[]>(trainingStructure);
   const [selectedRealtorTrainingProgress, setSelectedRealtorTrainingProgress] = useState(0);
-  const [topologyOffices, setTopologyOffices] = useState<UIOffice[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    const saved = localStorage.getItem('sidebarOpen');
-    return saved !== null ? saved === 'true' : false; // Default to closed
-  });
-
-  useEffect(() => {
-    localStorage.setItem('sidebarOpen', String(sidebarOpen));
-  }, [sidebarOpen]);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [userManagementOpen, setUserManagementOpen] = useState(false);
   const [trainingDialogOpen, setTrainingDialogOpen] = useState(false);
@@ -482,26 +473,6 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
     }
   };
 
-  // Fetch topology data for sidebar
-  useEffect(() => {
-    const fetchTopology = async () => {
-      if (!office) return;
-      try {
-        const offices = await api.getAllOfficesFull();
-        // Filter to only show the managed office
-        const managedOffice = offices.find((o: { id?: string }) => o.id === office.id);
-        if (managedOffice) {
-          const transformed = transformOffices([managedOffice]);
-          setTopologyOffices(transformed);
-        }
-      } catch (error) {
-        console.error('Error fetching topology:', error);
-      }
-    };
-    if (office) {
-      fetchTopology();
-    }
-  }, [office]);
 
   if (loading && !office) {
     return (
@@ -535,59 +506,29 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Topology Sidebar */}
-      <TopologySidebar
-        offices={topologyOffices}
-        onOfficeClick={() => {}}
-        onLeaderClick={() => {}}
-        onAgentClick={() => {}}
-        selectedOfficeId={office?.id}
-        selectedLeaderId={selectedTeam?.leader_id || undefined}
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        mode="office-manager"
-        showQuickActions={true}
-        onTrainingCalendarClick={() => navigate('/training-calendar')}
-        onTrainingListClick={() => navigate('/training-list')}
-        onBackClick={handleBack}
-        showBackButton={currentView !== 'teams'}
-        onExportClick={() => {
-          if (kpiMetrics) {
-            exportKPIData(kpiMetrics, `kpi-office-${office?.name}-${new Date().toISOString().split('T')[0]}`);
-            toast.success('KPI данните са експортирани');
-          }
-        }}
-        teamName={office ? `${office.city?.country?.name || 'България'} → ${office.city?.name || 'Бургас'} → ${office.name}` : undefined}
-        breadcrumb={getBreadcrumb()}
-      />
-
-      {/* Main Content with AppLayout navbar */}
       <AppLayout
-        showSidebar={false}
-        onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
         customNavbarContent={
           showKPI && kpiMetrics ? (
-            <div className="flex items-center gap-1.5 sm:gap-2 ml-2 sm:ml-4">
+                <div className="flex items-center gap-1.5 sm:gap-2 ml-2 sm:ml-4">
               <StatBadge
                 icon={Users}
                 value={kpiMetrics.diagnoses || 0}
-                title="Диагнози"
+                    title="Диагнози"
                 colorScheme="blue"
               />
               <StatBadge
                 icon={TrendingUp}
                 value={kpiMetrics.deals || 0}
-                title="Сделки"
+                    title="Сделки"
                 colorScheme="green"
               />
               <StatBadge
                 icon={Award}
                 value={formatSuccessRate(kpiMetrics.successRate || 0)}
-                title="Успеваемост"
+                    title="Успеваемост"
                 colorScheme="purple"
               />
-            </div>
+                    </div>
           ) : undefined
         }
       >
@@ -996,37 +937,45 @@ const OfficeManagerDashboard = ({ userId }: OfficeManagerDashboardProps) => {
             </div>
           </div>
         )}
-        </div>
+      </div>
 
-        {/* Account Settings Dialog */}
-        {userInfo && (
-          <AccountSettingsDialog
-            open={accountSettingsOpen}
-            onOpenChange={setAccountSettingsOpen}
-            userInfo={userInfo}
-            onUpdate={fetchUserInfo}
-          />
-        )}
-
-        {/* Training Management Dialog */}
-        {selectedRealtorForTraining && (
-          <TrainingManagementDialog
-            open={trainingDialogOpen}
-            onOpenChange={setTrainingDialogOpen}
-            realtorId={selectedRealtorForTraining.id}
-            realtorName={selectedRealtorForTraining.name}
-          />
-        )}
-
-        {/* User Management Dialog */}
-        <UserManagementDialog
-          open={userManagementOpen}
-          onOpenChange={setUserManagementOpen}
+      {/* Account Settings Dialog */}
+      {userInfo && (
+        <AccountSettingsDialog
+          open={accountSettingsOpen}
+          onOpenChange={setAccountSettingsOpen}
+          userInfo={userInfo}
           onUpdate={fetchUserInfo}
         />
+      )}
+
+      {/* Training Management Dialog */}
+      {selectedRealtorForTraining && (
+        <TrainingManagementDialog
+          open={trainingDialogOpen}
+          onOpenChange={setTrainingDialogOpen}
+          realtorId={selectedRealtorForTraining.id}
+          realtorName={selectedRealtorForTraining.name}
+        />
+      )}
+
+      {/* User Management Dialog */}
+      <UserManagementDialog
+        open={userManagementOpen}
+        onOpenChange={setUserManagementOpen}
+        onUpdate={() => {
+          fetchUserInfo();
+          if (selectedTeam) {
+            fetchRealtors(selectedTeam.id);
+          }
+        }}
+        teamId={selectedTeam?.id}
+      />
       </AppLayout>
-    </div>
   );
-};
+});
+
+// Задай displayName за по-лесно дебъгване
+OfficeManagerDashboard.displayName = 'OfficeManagerDashboard';
 
 export default OfficeManagerDashboard;

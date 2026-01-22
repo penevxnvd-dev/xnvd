@@ -161,10 +161,28 @@ class SupabaseApiClient {
     if (!supabase) {
       throw new Error('Supabase client is not initialized');
     }
+    if (!countryId) {
+      throw new Error('countryId is required');
+    }
     const { data, error } = await supabase
       .from('cities')
       .select('id, name, country_id')
       .eq('country_id', countryId)
+      .order('name', { ascending: true });
+    
+    if (error) {
+      throw handleSupabaseError(error);
+    }
+    return (data as Tables<'cities'>[]) || [];
+  }
+
+  async getAllCities() {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
+    const { data, error } = await supabase
+      .from('cities')
+      .select('id, name, country_id')
       .order('name', { ascending: true });
     
     if (error) {
@@ -206,20 +224,52 @@ class SupabaseApiClient {
   }
 
   async getAllOfficesFull() {
-    const offices = await this.getAllOffices();
-    // Enrich with city and country data
-    const enriched = await Promise.all(offices.map(async (office) => {
-      const cities = await this.getCitiesByCountry(''); // Get all cities
-      const city = cities.find(c => c.id === office.city_id);
-      const countries = await this.getCountries();
-      const country = city ? countries.find(co => co.id === city.country_id) : null;
-      
-      return {
-      ...office,
-        city: city ? { ...city, country } : null,
-      };
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized');
+    }
+    
+    // Optimized: Single query with joins instead of multiple queries
+    const { data, error } = await supabase
+      .from('offices')
+      .select(`
+        id,
+        name,
+        city_id,
+        address,
+        cities!inner(
+          id,
+          name,
+          country_id,
+          countries!inner(
+            id,
+            name,
+            code
+          )
+        )
+      `)
+      .order('name', { ascending: true });
+    
+    if (error) {
+      throw handleSupabaseError(error);
+    }
+    
+    // Transform the nested structure to match expected format
+    return (data || []).map((office: any) => ({
+      id: office.id,
+      name: office.name,
+      city_id: office.city_id,
+      address: office.address,
+      city: office.cities ? {
+        id: office.cities.id,
+        name: office.cities.name,
+        country_id: office.cities.country_id,
+        country: office.cities.countries ? {
+          id: office.cities.countries.id,
+          name: office.cities.countries.name,
+          code: office.cities.countries.code,
+        } : null,
+      } : null,
     }));
-    return enriched;
   }
 
   async getOfficeFull(officeId: string) {
@@ -278,21 +328,50 @@ class SupabaseApiClient {
     }
   }
 
-  // Realtors - Supabase only
+  // Realtors - Supabase only (with profile data)
   async getRealtorsByTeam(teamId: string) {
     if (!supabase) {
       throw new Error('Supabase client is not initialized');
     }
-    const { data, error } = await supabase
+    
+    // First get realtors
+    const { data: realtors, error: realtorsError } = await supabase
       .from('realtors')
-      .select('id, user_id, team_id, level')
+      .select('id, user_id, team_id, level, confidence, sales_resilience, success_mindset')
       .eq('team_id', teamId)
       .order('level', { ascending: false });
     
-    if (error) {
-      throw handleSupabaseError(error);
+    if (realtorsError) {
+      throw handleSupabaseError(realtorsError);
     }
-    return (data as Tables<'realtors'>[]) || [];
+    
+    if (!realtors || realtors.length === 0) {
+      return [];
+    }
+    
+    // Then get profiles for those realtors
+    const userIds = realtors.map(r => r.user_id).filter(Boolean);
+    if (userIds.length === 0) {
+      return realtors.map(r => ({ ...r, profile: { full_name: 'Неизвестен', email: '' } }));
+    }
+    
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', userIds);
+    
+    if (profilesError) {
+      console.warn('Error fetching profiles:', profilesError);
+    }
+    
+    // Create a map for quick lookup
+    const profilesMap = new Map((profiles || []).map(p => [p.id, p]));
+    
+    // Combine realtors with their profiles
+    return realtors.map(realtor => ({
+      ...realtor,
+      profile: profilesMap.get(realtor.user_id) || { full_name: 'Неизвестен', email: '' }
+    }));
   }
 
   // Get all trainees and recruits (users with trainee role or realtors with level 1)

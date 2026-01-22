@@ -14,19 +14,31 @@ import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import TrainingPage from "./pages/realtor/TrainingPage";
 import TrainingCalendarPage from "./pages/realtor/TrainingCalendarPage";
-import TrainingProgressPage from "./pages/realtor/TrainingProgressPage";
 import TrainingListPage from "./pages/realtor/TrainingListPage";
+import AccountManagementPage from "./pages/AccountManagementPage";
 import { analytics } from "@/lib/analytics";
 import { SearchDialog } from "@/components/SearchDialog";
 import { useState, useEffect } from "react";
 
+// Preload Dashboard sub-components for faster navigation
+if (typeof window !== 'undefined') {
+  // Preload dashboard components when app loads
+  import('./pages/admin/AdminDashboard');
+  import('./pages/realtor/RealtorDashboard');
+  import('./pages/team-leader/TeamLeaderDashboard');
+  import('./pages/office-manager/OfficeManagerDashboard');
+  import('./pages/regional-manager/RegionalManagerDashboard');
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 2 * 60 * 1000, // 2 minutes (reduced for faster updates)
       gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
       retry: 1,
       refetchOnWindowFocus: false,
+      refetchOnMount: false, // Don't refetch if data exists in cache
+      refetchOnReconnect: true, // Refetch on reconnect for fresh data
     },
   },
 });
@@ -62,8 +74,8 @@ const App = () => {
                   <Route path="/interviews" element={<Interviews />} />
                   <Route path="/training" element={<TrainingPage />} />
                   <Route path="/training-calendar" element={<TrainingCalendarPage />} />
-                  <Route path="/training-progress" element={<TrainingProgressPage />} />
                   <Route path="/training-list" element={<TrainingListPage />} />
+                  <Route path="/account-management" element={<AccountManagementPage />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

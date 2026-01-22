@@ -3398,7 +3398,7 @@ export const TrainingCalendar = ({
                   setAccountData({ email: '', password: '', confirmPassword: '' });
 
                   // Navigate to trainee's training page
-                  navigate(`/training-progress?userId=${profileId}`);
+                  navigate(`/training-list?userId=${profileId}`);
                 } catch (error) {
                   console.error('Error creating account:', error);
                   toast({

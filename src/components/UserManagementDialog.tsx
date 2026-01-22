@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -35,6 +36,7 @@ interface UserManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdate: () => void;
+  teamId?: string | null; // Team ID for team leaders to assign new users
 }
 
 interface User {
@@ -48,6 +50,7 @@ export const UserManagementDialog = ({
   open,
   onOpenChange,
   onUpdate,
+  teamId = null,
 }: UserManagementDialogProps) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
@@ -73,14 +76,14 @@ export const UserManagementDialog = ({
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // Get all profiles with their roles
+      // Get all profiles with their roles (use left join to include users without roles)
       const { data: profiles, error } = await supabaseApi.supabase
         .from('profiles')
         .select(`
           id,
           full_name,
           email,
-          user_roles (role)
+          user_roles!left (role)
         `)
         .order('full_name', { ascending: true });
 
@@ -95,8 +98,13 @@ export const UserManagementDialog = ({
 
       setUsers(usersList);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      toast.error('Грешка при зареждане на потребители');
+      let errorMessage = 'Грешка при зареждане на потребители';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = String(error.message);
+      }
+      toast.error(errorMessage);
       console.error(error);
     } finally {
       setLoading(false);
@@ -127,7 +135,29 @@ export const UserManagementDialog = ({
         },
       });
 
-      if (signUpError) throw signUpError;
+      // Handle specific Supabase auth errors
+      if (signUpError) {
+        const errorMsg = signUpError.message || '';
+        // Rate limiting error (429)
+        if (errorMsg.includes('security purposes') || errorMsg.includes('after') || signUpError.status === 429) {
+          const seconds = errorMsg.match(/after (\d+) seconds/)?.[1] || '60';
+          throw new Error(`Моля изчакайте ${seconds} секунди преди да опитате отново.`);
+        }
+        // User already exists
+        if (errorMsg.includes('already registered') || errorMsg.includes('already exists')) {
+          throw new Error('Потребител с този имейл вече съществува.');
+        }
+        // Invalid email
+        if (errorMsg.includes('Invalid email') || errorMsg.includes('valid email')) {
+          throw new Error('Невалиден имейл адрес.');
+        }
+        // Password too weak
+        if (errorMsg.includes('Password') || errorMsg.includes('password')) {
+          throw new Error('Паролата не отговаря на изискванията.');
+        }
+        throw signUpError;
+      }
+      
       if (!authData.user) throw new Error('Неуспешно създаване на потребителски акаунт.');
 
       const newUserId = authData.user.id;
@@ -157,16 +187,24 @@ export const UserManagementDialog = ({
         }
       }
 
-      // Assign role
+      // Assign role - handle permission errors gracefully
+      // Note: 'trainee' is stored as 'realtor' with level 1 in the realtors table
+      const dbRole = newUser.role === 'trainee' ? 'realtor' : newUser.role;
       const { error: roleError } = await supabaseApi.supabase
         .from('user_roles')
         .insert({
           user_id: newUserId,
-          role: newUser.role as 'admin' | 'realtor' | 'trainee' | 'team_leader' | 'office_manager' | 'regional_manager',
+          role: dbRole as 'admin' | 'realtor' | 'team_leader' | 'office_manager' | 'regional_manager',
         });
 
-      if (roleError && !roleError.message.includes('duplicate')) {
-        throw roleError;
+      if (roleError) {
+        // Handle 403 permission error
+        if (roleError.code === '42501' || roleError.message?.includes('permission') || roleError.message?.includes('403')) {
+          console.warn('Permission denied for role assignment, user created without role');
+          // Don't throw - user was created, role assignment might need admin
+        } else if (!roleError.message?.includes('duplicate')) {
+          throw roleError;
+        }
       }
 
       // If creating a trainee or realtor, create a realtor record for training progress tracking
@@ -175,14 +213,17 @@ export const UserManagementDialog = ({
           .from('realtors')
           .insert({
             user_id: newUserId,
-            team_id: null,
+            team_id: teamId, // Assign to the team leader's team if available
             level: newUser.role === 'trainee' ? 1 : 3, // Trainees start at level 1, realtors at level 3
           });
 
-        // Ignore duplicate errors (realtor might already exist)
-        if (realtorError && !realtorError.message.includes('duplicate') && !realtorError.message.includes('unique')) {
+        // Ignore duplicate and permission errors (realtor might already exist or no permission)
+        if (realtorError && 
+            !realtorError.message?.includes('duplicate') && 
+            !realtorError.message?.includes('unique') &&
+            !realtorError.message?.includes('permission') &&
+            realtorError.code !== '42501') {
           console.warn('Warning: Could not create realtor record:', realtorError);
-          // Don't throw - role assignment succeeded, realtor record is optional
         }
       }
 
@@ -199,8 +240,13 @@ export const UserManagementDialog = ({
       fetchUsers();
       onUpdate();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(message || 'Грешка при създаване на потребител');
+      let errorMessage = 'Грешка при създаване на потребител';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = String(error.message);
+      }
+      toast.error(errorMessage);
       console.error(error);
     } finally {
       setLoading(false);
@@ -226,8 +272,13 @@ export const UserManagementDialog = ({
       fetchUsers();
       onUpdate();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(message || 'Грешка при изтриване на потребител');
+      let errorMessage = 'Грешка при изтриване на потребител';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = String(error.message);
+      }
+      toast.error(errorMessage);
       console.error(error);
     } finally {
       setLoading(false);
@@ -240,11 +291,13 @@ export const UserManagementDialog = ({
     setLoading(true);
     try {
       // Update user role
+      // Note: 'trainee' is stored as 'realtor' with level 1 in the realtors table
+      const dbRole = promoteToRole === 'trainee' ? 'realtor' : promoteToRole;
       const { error: roleError } = await supabaseApi.supabase
         .from('user_roles')
         .upsert({
           user_id: selectedUser.id,
-          role: promoteToRole as 'admin' | 'realtor' | 'trainee' | 'team_leader' | 'office_manager' | 'regional_manager',
+          role: dbRole as 'admin' | 'realtor' | 'team_leader' | 'office_manager' | 'regional_manager',
         }, {
           onConflict: 'user_id'
         });
@@ -299,8 +352,13 @@ export const UserManagementDialog = ({
       fetchUsers();
       onUpdate();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(message || 'Грешка при повишаване на потребител');
+      let errorMessage = 'Грешка при повишаване на потребител';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = String(error.message);
+      }
+      toast.error(errorMessage);
       console.error(error);
     } finally {
       setLoading(false);
@@ -329,6 +387,9 @@ export const UserManagementDialog = ({
                 <span className="hidden sm:inline">Нов акаунт</span>
               </Button>
             </DialogTitle>
+            <DialogDescription>
+              Преглед и управление на потребителски акаунти
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {/* Search */}
@@ -411,6 +472,9 @@ export const UserManagementDialog = ({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Създай нов акаунт</DialogTitle>
+            <DialogDescription>
+              Попълнете данните за новия потребител
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -489,6 +553,9 @@ export const UserManagementDialog = ({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Повиши акаунт</DialogTitle>
+            <DialogDescription>
+              Изберете нова роля за потребителя
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">

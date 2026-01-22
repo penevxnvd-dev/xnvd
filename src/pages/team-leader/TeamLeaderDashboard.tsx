@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DndContext,
@@ -19,46 +19,30 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Menu, ChevronLeft, Home, Plus, Pencil, Trash2, Calendar, ChevronDown, FileText, Target, CheckCircle2, XCircle, Award, TrendingUp, GraduationCap, BarChart3, Users, Settings, Download, BookOpen, LogOut, Stethoscope, ClipboardCheck, Activity, Handshake, DollarSign, Percent } from 'lucide-react';
+import { GripVertical, FileText, Target, CheckCircle2, XCircle, Award, TrendingUp, GraduationCap, BarChart3, Users, Stethoscope, Handshake, BookOpen, Plus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-// Avatar removed - using modern design with initials badges instead
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
 import { UserManagementDialog } from '@/components/UserManagementDialog';
-import { NotificationCenter } from '@/components/NotificationCenter';
 import { useUserRole } from '@/hooks/useUserRole';
 import { hasPermission } from '@/utils/permissions';
 import { exportKPIData, exportDeals, exportDiagnoses } from '@/lib/export';
 import { toast } from 'sonner';
 import {
-  calculateTeamKPI,
   KPIMetrics,
   formatSuccessRate,
 } from '@/utils/kpiCalculations';
 import { RealizatorCardWithKPI } from '@/components/cards/RealizatorCardWithKPI';
 import { TrainingManagementDialog } from '@/components/TrainingManagementDialog';
-import { TopologySidebar } from '@/components/TopologySidebar';
-import { transformOffices } from '@/utils/dataTransform';
-import { Office as UIOffice } from '@/types';
 import { trainingStructure, calculateTrainingProgress, TrainingSection, isTrainingFullyCompleted } from '@/data/trainingStructure';
 import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
 import { Progress } from '@/components/ui/progress';
-import { formatNameWithEmoji, formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
+import { formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
 import { AppLayout } from '@/components/layouts/AppLayout';
-import { supabase } from '@/integrations/supabase/client';
 import { supabaseApi } from '@/lib/supabaseApi';
-import { useMemo } from 'react';
 import { StatBadge } from '@/components/StatBadge';
 
 type ViewLevel = 'realtors' | 'realtor-detail';
@@ -75,6 +59,9 @@ interface Realtor {
   userId: string;
   teamId: string | null;
   level: number;
+  confidence?: boolean;
+  salesResilience?: boolean;
+  successMindset?: boolean;
   user: {
     fullName: string;
     email: string;
@@ -120,12 +107,16 @@ const SortableCard = ({ id, children, className }: { id: string; children: React
   );
 };
 
-const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
+// Мемоизирай компонента за да предотвратиш ненужни ре-рендери
+const TeamLeaderDashboard = memo(({ userId }: TeamLeaderDashboardProps) => {
   const navigate = useNavigate();
   const [currentView, setCurrentView] = useState<ViewLevel>('realtors');
   const [userInfo, setUserInfo] = useState<{fullName: string; email: string; role: string} | null>(null);
   const [team, setTeam] = useState<Team | null>(null);
   const [realtors, setRealtors] = useState<Realtor[]>([]);
+  
+  // Използвай ref за да предотвратиш повторно зареждане на данни
+  const hasFetchedData = useRef(false);
   
   const [selectedRealtor, setSelectedRealtor] = useState<Realtor | null>(null);
   const [selectedRealtorKPI, setSelectedRealtorKPI] = useState<KPIMetrics | null>(null);
@@ -133,15 +124,6 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
   const [selectedRealtorDiagnoses, setSelectedRealtorDiagnoses] = useState<Array<Record<string, unknown>>>([]);
   const [selectedRealtorTrainingData, setSelectedRealtorTrainingData] = useState<TrainingSection[]>(trainingStructure);
   const [selectedRealtorTrainingProgress, setSelectedRealtorTrainingProgress] = useState(0);
-  const [topologyOffices, setTopologyOffices] = useState<UIOffice[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    const saved = localStorage.getItem('sidebarOpen');
-    return saved !== null ? saved === 'true' : false; // Default to closed
-  });
-
-  useEffect(() => {
-    localStorage.setItem('sidebarOpen', String(sidebarOpen));
-  }, [sidebarOpen]);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [userManagementOpen, setUserManagementOpen] = useState(false);
   const [trainingDialogOpen, setTrainingDialogOpen] = useState(false);
@@ -181,6 +163,10 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
     setLoading(true);
     try {
       // Find team where user is leader
+      const { supabase } = await import('@/integrations/supabase/client');
+      if (!supabase) {
+        throw new Error('Supabase client not initialized');
+      }
       const { data: teamData, error: teamError } = await supabase
         .from('teams')
         .select('id, name, office_id, leader_id')
@@ -218,10 +204,10 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
     setLoading(true);
     try {
       const data = await api.getRealtorsByTeam(teamId);
-      const mapped = data.map((realtor: { id: string; user_id: string; team_id: string; level: number; profile?: { full_name?: string; email?: string } }) => ({
+      const mapped = data.map((realtor: { id: string; user_id: string; team_id: string | null; level: number; profile?: { full_name?: string; email?: string } }) => ({
         id: realtor.id,
         userId: realtor.user_id,
-        teamId: realtor.team_id,
+        teamId: realtor.team_id || null,
         level: realtor.level,
         user: {
           fullName: realtor.profile?.full_name || 'Неизвестен',
@@ -268,21 +254,9 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
     }
   };
 
-  const handleBack = () => {
-    if (currentView === 'realtor-detail') {
-      setCurrentView('realtors');
-      setSelectedRealtor(null);
-    }
-  };
-
-
-  const getBreadcrumb = () => {
-    const parts = ['Начало'];
-    if (team) parts.push(team.name);
-    if (currentView === 'realtor-detail' && selectedRealtor) {
-      parts.push(selectedRealtor.user.fullName);
-    }
-    return parts.join(' / ');
+  const handleLogout = async () => {
+    await supabaseApi.logout();
+    navigate('/auth');
   };
 
   // Filter realtors based on selected filter
@@ -295,10 +269,6 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
     return realtors;
   }, [realtors, realtorFilter]);
 
-  const handleHome = () => {
-    setCurrentView('realtors');
-    setSelectedRealtor(null);
-  };
 
   const handleTrainingProgressUpdate = async (
     sectionId: string,
@@ -391,28 +361,6 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
     }
   };
 
-  // Fetch topology data for sidebar
-  useEffect(() => {
-    const fetchTopology = async () => {
-      if (!team) return;
-      try {
-        const offices = await api.getAllOfficesFull();
-        // Filter to only show the office that contains this team
-        const teamOffice = offices.find((o: { teams?: Array<{ id?: string }> }) => 
-          o.teams?.some((t: { id?: string }) => t.id === team.id)
-        );
-        if (teamOffice) {
-          const transformed = transformOffices([teamOffice]);
-          setTopologyOffices(transformed);
-        }
-      } catch (error) {
-        console.error('Error fetching topology:', error);
-      }
-    };
-    if (team) {
-      fetchTopology();
-    }
-  }, [team]);
 
   // Early returns after all hooks
   if (loading && !team) {
@@ -475,39 +423,8 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
   );
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Topology Sidebar - Custom for TeamLeader */}
-      <TopologySidebar
-        offices={topologyOffices}
-        onOfficeClick={() => {}}
-        onLeaderClick={() => {}}
-        onAgentClick={() => {}}
-        selectedOfficeId={team?.office_id}
-        selectedLeaderId={team?.leader_id || undefined}
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        mode="team-leader"
-        showQuickActions={true}
-        onTrainingCalendarClick={() => navigate('/training-calendar')}
-        onTrainingListClick={() => navigate('/training-list')}
-        onBackClick={handleBack}
-        showBackButton={currentView === 'realtor-detail'}
-        onExportClick={() => {
-          if (kpiMetrics) {
-            exportKPIData(kpiMetrics, `kpi-team-${team?.name}-${new Date().toISOString().split('T')[0]}`);
-            toast.success('KPI данните са експортирани');
-          }
-        }}
-        role="team_leader"
-        teamName={team?.name ? `Екип: ${team.name}` : undefined}
-        breadcrumb={getBreadcrumb()}
-      />
-
-      {/* Main Content with AppLayout navbar */}
       <AppLayout
-        showSidebar={false}
         customNavbarContent={customNavbarContent}
-        onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
       >
         <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-6 sm:space-y-8">
         {loading ? (
@@ -767,41 +684,15 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
               </div>
             )}
 
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={
-                  currentView === 'realtors' ? filteredRealtors.map(r => r.id) : []
-                }
-                strategy={rectSortingStrategy}
-              >
-                {/* Modern Grid Layout with Better Spacing */}
+            {/* Realtors List View */}
                 {currentView === 'realtors' && filteredRealtors.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
+              <div className="bg-card border rounded-lg divide-y divide-border">
                     {filteredRealtors.map((realtor) => (
                       realtor.user && (
-                        <SortableCard 
+                    <div
                           key={realtor.id} 
-                          id={realtor.id}
-                          className="transform transition-all duration-300 hover:scale-105 hover:z-10"
-                        >
-                          <div className="relative group h-full">
-                            <RealizatorCardWithKPI
-                              realtor={{
-                                id: realtor.id,
-                                name: realtor.user.fullName,
-                                email: realtor.user.email,
-                                level: realtor.level,
-                                confidence: false,
-                                salesResilience: false,
-                                successMindset: false
-                              }}
+                      className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors cursor-pointer group"
                               onClick={async () => {
-                              // Fetch full realtor data with all fields
                               try {
                                 setSelectedRealtor({
                                   ...realtor,
@@ -810,14 +701,21 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
                                   successMindset: false,
                                 });
                                 
-                                // Parallelize all API calls
-                                const [kpi, deals, diagnoses, trainingProgress] = await Promise.all([
+                                const [kpiData, deals, diagnoses, trainingProgress] = await Promise.all([
                                   api.getRealtorKPI(realtor.userId),
                                   api.getRealtorDeals(realtor.id),
                                   api.getRealtorDiagnoses(realtor.id),
                                   api.getRealtorTrainingProgress(realtor.id)
                                 ]);
                                 
+                                const kpi: KPIMetrics = {
+                                  realtors: 1,
+                                  deals: kpiData.deals || 0,
+                                  diagnoses: diagnoses.length,
+                                  successRate: diagnoses.length > 0 ? Math.round((kpiData.deals || 0) / diagnoses.length * 100) : 0,
+                                  totalDealValue: kpiData.revenue || 0,
+                                  levelDistribution: { [realtor.level]: 1 }
+                                };
                                 setSelectedRealtorKPI(kpi);
                                 setSelectedRealtorDeals(deals as Array<Record<string, unknown>>);
                                 setSelectedRealtorDiagnoses(diagnoses as Array<Record<string, unknown>>);
@@ -856,11 +754,48 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
                                 toast.error('Грешка при зареждане на детайли');
                               }
                             }}
-                          />
+                    >
+                      {/* Left side - Avatar and Name */}
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <div className={cn(
+                          "h-12 w-12 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 shadow-sm",
+                          realtor.level === 1 
+                            ? "bg-gradient-to-br from-blue-500 to-blue-600" 
+                            : realtor.level > 3 
+                            ? "bg-gradient-to-br from-orange-500 to-orange-600"
+                            : "bg-gradient-to-br from-green-500 to-green-600"
+                        )}>
+                          {realtor.user.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold text-foreground truncate">
+                              {realtor.user.fullName}
+                            </h3>
+                            <Badge 
+                              variant="outline"
+                              className={cn(
+                                "text-xs font-medium",
+                                realtor.level === 1 
+                                  ? "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800" 
+                                  : realtor.level > 3
+                                  ? "bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800"
+                                  : "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
+                              )}
+                            >
+                              {realtor.level === 1 ? 'Курсист' : realtor.level > 3 ? 'Елит' : 'Реализатор'}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate">{realtor.user.email}</p>
+                        </div>
+                      </div>
+
+                      {/* Right side - Actions */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
                           <Button
                             variant="outline"
                             size="sm"
-                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 bg-background/95 backdrop-blur-sm hover:bg-primary hover:text-primary-foreground shadow-lg"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedRealtorForTraining({ id: realtor.id, name: realtor.user.fullName });
@@ -870,21 +805,19 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
                             <GraduationCap className="h-4 w-4 mr-1" />
                             Обучение
                           </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground"
+                        >
+                          Виж детайли →
+                        </Button>
                         </div>
-                      </SortableCard>
+                    </div>
                     )
                     ))}
                   </div>
                 )}
-              </SortableContext>
-              <DragOverlay>
-                {activeId ? (
-                  <div className="opacity-50">
-                    {/* Render a placeholder card here if needed */}
-                  </div>
-                ) : null}
-              </DragOverlay>
-            </DndContext>
           </>
         )}
 
@@ -1093,9 +1026,9 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
             </div>
           </div>
         )}
-        </div>
+      </div>
 
-        {/* Account Settings Dialog */}
+      {/* Account Settings Dialog */}
       {userInfo && (
         <AccountSettingsDialog
           open={accountSettingsOpen}
@@ -1115,15 +1048,23 @@ const TeamLeaderDashboard = ({ userId }: TeamLeaderDashboardProps) => {
         />
       )}
 
-        {/* User Management Dialog */}
-        <UserManagementDialog
-          open={userManagementOpen}
-          onOpenChange={setUserManagementOpen}
-          onUpdate={fetchUserInfo}
-        />
+      {/* User Management Dialog */}
+      <UserManagementDialog
+        open={userManagementOpen}
+        onOpenChange={setUserManagementOpen}
+        onUpdate={() => {
+          fetchUserInfo();
+          if (team) {
+            fetchRealtors(team.id);
+          }
+        }}
+        teamId={team?.id}
+      />
       </AppLayout>
-    </div>
   );
-};
+});
+
+// Задай displayName за по-лесно дебъгване
+TeamLeaderDashboard.displayName = 'TeamLeaderDashboard';
 
 export default TeamLeaderDashboard;

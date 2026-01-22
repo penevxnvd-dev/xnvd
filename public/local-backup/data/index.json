@@ -1,5 +1,5 @@
 {
-  "synced_at": "2025-12-09T10:27:15.272Z",
+  "synced_at": "2026-01-19T18:40:34.722Z",
   "tables": [
     "profiles",
     "user_roles",
@@ -16,16 +16,16 @@
     "messages"
   ],
   "counts": {
-    "profiles": 8,
-    "user_roles": 8,
+    "profiles": 14,
+    "user_roles": 12,
     "countries": 1,
     "cities": 4,
     "offices": 4,
     "teams": 6,
-    "realtors": 1,
+    "realtors": 0,
     "deals": 0,
     "diagnoses": 0,
-    "training_progress": 1,
+    "training_progress": 0,
     "realtor_goals": 0,
     "buyer_schedule": 0,
     "messages": 0

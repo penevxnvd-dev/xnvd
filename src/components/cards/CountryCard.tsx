@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, FileText, Target, TrendingUp } from 'lucide-react';
 import { KPIMetrics, formatSuccessRate } from '@/utils/kpiCalculations';
@@ -14,7 +15,7 @@ interface CountryCardProps {
   onClick?: () => void;
 }
 
-export const CountryCard = ({ country, metrics, onClick }: CountryCardProps) => {
+export const CountryCard = memo(({ country, metrics, onClick }: CountryCardProps) => {
   const successRate = metrics.successRate;
   const maxValue = Math.max(metrics.realtors, metrics.deals, metrics.diagnoses, 1);
   
@@ -105,4 +106,10 @@ export const CountryCard = ({ country, metrics, onClick }: CountryCardProps) => 
       </CardContent>
     </Card>
   );
-};
+}, (prev, next) => 
+  prev.country.id === next.country.id &&
+  prev.metrics.realtors === next.metrics.realtors &&
+  prev.metrics.deals === next.metrics.deals &&
+  prev.metrics.diagnoses === next.metrics.diagnoses &&
+  prev.metrics.successRate === next.metrics.successRate
+);
