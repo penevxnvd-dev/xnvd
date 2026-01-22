@@ -1,5 +1,5 @@
 {
-  "synced_at": "2026-01-19T18:40:34.722Z",
+  "synced_at": "2026-01-22T07:54:27.757Z",
   "tables": [
     "profiles",
     "user_roles",
@@ -16,8 +16,8 @@
     "messages"
   ],
   "counts": {
-    "profiles": 14,
-    "user_roles": 12,
+    "profiles": 19,
+    "user_roles": 17,
     "countries": 1,
     "cities": 4,
     "offices": 4,
