@@ -19,7 +19,7 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, FileText, Target, CheckCircle2, XCircle, Award, TrendingUp, GraduationCap, BarChart3, Users, Stethoscope, Handshake, BookOpen, Plus } from 'lucide-react';
+import { GripVertical, FileText, Target, CheckCircle2, XCircle, Award, TrendingUp, GraduationCap, BarChart3, Users, Stethoscope, Handshake, BookOpen, Plus, Clock, PlayCircle, Video, Briefcase, ChevronDown, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,6 +44,7 @@ import { formatNameWithoutElevenEleven } from '@/utils/nameEmojis';
 import { AppLayout } from '@/components/layouts/AppLayout';
 import { supabaseApi } from '@/lib/supabaseApi';
 import { StatBadge } from '@/components/StatBadge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 type ViewLevel = 'realtors' | 'realtor-detail';
 
@@ -135,6 +136,18 @@ const TeamLeaderDashboard = memo(({ userId }: TeamLeaderDashboardProps) => {
   const [showKPI, setShowKPI] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [realtorFilter, setRealtorFilter] = useState<'all' | 'trainees' | 'realtors'>('all');
+  
+  // Training progress tracking state
+  const [realtorProgressMap, setRealtorProgressMap] = useState<Record<string, number>>({});
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [traineeProgressData, setTraineeProgressData] = useState<Record<string, Record<string, {
+    lecture_completed?: boolean;
+    video_completed?: boolean;
+    practical_completed?: boolean;
+    handover_completed?: boolean;
+    exam_completed?: boolean;
+  }>>>({});
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -269,6 +282,178 @@ const TeamLeaderDashboard = memo(({ userId }: TeamLeaderDashboardProps) => {
     return realtors;
   }, [realtors, realtorFilter]);
 
+  // Calculate total subsections for progress display
+  const totalSubsections = useMemo(() => 
+    trainingStructure.reduce((sum, section) => sum + section.subsections.length, 0),
+    []
+  );
+
+  // Fetch training progress for all realtors
+  const fetchAllRealtorsProgress = useCallback(async () => {
+    const progressMap: Record<string, number> = {};
+    
+    for (const realtor of realtors) {
+      try {
+        const progressData = await supabaseApi.getTrainingProgress(realtor.userId);
+        
+        if (progressData && progressData.length > 0) {
+          const updatedData = trainingStructure.map((section) => ({
+            ...section,
+            subsections: section.subsections.map((subsection) => {
+              const progressItem = progressData.find(
+                (p: { section?: string; subsection?: string }) => 
+                  p.section === section.id && p.subsection === subsection.id
+              );
+              const defaultProgress = { lecture: false, video: false, practical: false, handover: false, exam: false };
+              return {
+                ...subsection,
+                progress: progressItem
+                  ? {
+                      lecture: (progressItem as { lecture_completed?: boolean }).lecture_completed || false,
+                      video: (progressItem as { video_completed?: boolean }).video_completed || false,
+                      practical: (progressItem as { practical_completed?: boolean }).practical_completed || false,
+                      handover: (progressItem as { handover_completed?: boolean }).handover_completed || false,
+                      exam: (progressItem as { exam_completed?: boolean }).exam_completed || false,
+                    }
+                  : (subsection.progress || defaultProgress),
+              };
+            }),
+          }));
+          
+          progressMap[realtor.id] = calculateTrainingProgress(updatedData);
+        } else {
+          progressMap[realtor.id] = 0;
+        }
+      } catch (error) {
+        console.error(`Error fetching progress for ${realtor.id}:`, error);
+        progressMap[realtor.id] = 0;
+      }
+    }
+    
+    setRealtorProgressMap(progressMap);
+  }, [realtors]);
+
+  // Fetch progress when realtors change
+  useEffect(() => {
+    if (realtors.length > 0) {
+      fetchAllRealtorsProgress();
+    }
+  }, [realtors, fetchAllRealtorsProgress]);
+
+  // Load individual trainee progress for dropdown
+  const loadTraineeProgress = async (realtor: Realtor) => {
+    if (!realtor.id) return;
+
+    try {
+      const progressData = await supabaseApi.getRealtorTrainingProgress(realtor.id);
+      const progressMapData: Record<string, {
+        lecture_completed?: boolean;
+        video_completed?: boolean;
+        practical_completed?: boolean;
+        handover_completed?: boolean;
+        exam_completed?: boolean;
+      }> = {};
+      
+      progressData.forEach((p: { section?: string; subsection?: string; lecture_completed?: boolean; video_completed?: boolean; practical_completed?: boolean; handover_completed?: boolean; exam_completed?: boolean }) => {
+        const key = `${p.section}-${p.subsection}`;
+        progressMapData[key] = p;
+      });
+
+      setTraineeProgressData(prev => ({
+        ...prev,
+        [realtor.id]: progressMapData
+      }));
+    } catch (error) {
+      console.error('Error loading trainee progress:', error);
+    }
+  };
+
+  // Toggle training progress section
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(sectionId)) {
+        newSet.delete(sectionId);
+      } else {
+        newSet.add(sectionId);
+      }
+      return newSet;
+    });
+  };
+
+  // Handle toggling progress for a realtor from the list
+  const handleListToggleProgress = async (
+    realtor: Realtor,
+    sectionId: string,
+    subsectionId: string,
+    progressType: 'lecture' | 'video' | 'practical' | 'handover' | 'exam'
+  ) => {
+    try {
+      const progressKey = `${sectionId}-${subsectionId}`;
+      const currentProgress = traineeProgressData[realtor.id]?.[progressKey] || {};
+      
+      const currentValue = progressType === 'lecture' ? currentProgress.lecture_completed :
+                          progressType === 'video' ? currentProgress.video_completed :
+                          progressType === 'practical' ? currentProgress.practical_completed :
+                          progressType === 'handover' ? currentProgress.handover_completed :
+                          currentProgress.exam_completed;
+
+      const newValue = !currentValue;
+
+      await supabaseApi.updateTrainingProgress({
+        realtorId: realtor.id,
+        section: sectionId,
+        subsection: subsectionId,
+        lectureCompleted: progressType === 'lecture' ? newValue : currentProgress.lecture_completed,
+        videoCompleted: progressType === 'video' ? newValue : currentProgress.video_completed,
+        practicalCompleted: progressType === 'practical' ? newValue : currentProgress.practical_completed,
+        handoverCompleted: progressType === 'handover' ? newValue : currentProgress.handover_completed,
+        examCompleted: progressType === 'exam' ? newValue : currentProgress.exam_completed,
+      });
+
+      // Update local state
+      setTraineeProgressData(prev => ({
+        ...prev,
+        [realtor.id]: {
+          ...prev[realtor.id],
+          [progressKey]: {
+            ...currentProgress,
+            lecture_completed: progressType === 'lecture' ? newValue : currentProgress.lecture_completed,
+            video_completed: progressType === 'video' ? newValue : currentProgress.video_completed,
+            practical_completed: progressType === 'practical' ? newValue : currentProgress.practical_completed,
+            handover_completed: progressType === 'handover' ? newValue : currentProgress.handover_completed,
+            exam_completed: progressType === 'exam' ? newValue : currentProgress.exam_completed,
+          }
+        }
+      }));
+
+      toast.success('Прогресът е обновен');
+      
+      // Refresh progress map
+      await fetchAllRealtorsProgress();
+    } catch (error) {
+      console.error('Error updating progress:', error);
+      toast.error('Грешка при обновяване на прогреса');
+    }
+  };
+
+  // Calculate completed subsections for a realtor
+  const getCompletedSubsections = (realtorId: string): number => {
+    const progressData = traineeProgressData[realtorId];
+    if (!progressData) return 0;
+    
+    let completed = 0;
+    Object.values(progressData).forEach(progress => {
+      if (progress.lecture_completed && 
+          progress.video_completed && 
+          progress.practical_completed && 
+          progress.handover_completed && 
+          progress.exam_completed) {
+        completed++;
+      }
+    });
+    return completed;
+  };
 
   const handleTrainingProgressUpdate = async (
     sectionId: string,
@@ -285,8 +470,9 @@ const TeamLeaderDashboard = memo(({ userId }: TeamLeaderDashboardProps) => {
           ...section,
           subsections: section.subsections.map((subsection) => {
             if (subsection.id === subsectionId) {
+              const currentProgress = subsection.progress || { lecture: false, video: false, practical: false, handover: false, exam: false };
               const newProgress = {
-                ...subsection.progress,
+                ...currentProgress,
                 [field]: checked,
               };
               
@@ -326,15 +512,16 @@ const TeamLeaderDashboard = memo(({ userId }: TeamLeaderDashboardProps) => {
         ?.subsections.find((ss) => ss.id === subsectionId);
 
       if (subsection) {
+        const progress = subsection.progress || { lecture: false, video: false, practical: false, handover: false, exam: false };
         await api.updateTrainingProgress({
           realtorId: selectedRealtor.id,
           section: sectionId,
           subsection: subsectionId,
-          lectureCompleted: subsection.progress.lecture,
-          videoCompleted: subsection.progress.video,
-          practicalCompleted: subsection.progress.practical,
-          handoverCompleted: subsection.progress.handover,
-          examCompleted: subsection.progress.exam,
+          lectureCompleted: progress.lecture,
+          videoCompleted: progress.video,
+          practicalCompleted: progress.practical,
+          handoverCompleted: progress.handover,
+          examCompleted: progress.exam,
         });
 
         // Check if training is fully completed and promote trainee to realtor
@@ -684,140 +871,236 @@ const TeamLeaderDashboard = memo(({ userId }: TeamLeaderDashboardProps) => {
               </div>
             )}
 
-            {/* Realtors List View */}
-                {currentView === 'realtors' && filteredRealtors.length > 0 && (
-              <div className="bg-card border rounded-lg divide-y divide-border">
-                    {filteredRealtors.map((realtor) => (
-                      realtor.user && (
-                    <div
-                          key={realtor.id} 
-                      className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors cursor-pointer group"
-                              onClick={async () => {
-                              try {
-                                setSelectedRealtor({
-                                  ...realtor,
-                                  confidence: false,
-                                  salesResilience: false,
-                                  successMindset: false,
-                                });
-                                
-                                const [kpiData, deals, diagnoses, trainingProgress] = await Promise.all([
-                                  api.getRealtorKPI(realtor.userId),
-                                  api.getRealtorDeals(realtor.id),
-                                  api.getRealtorDiagnoses(realtor.id),
-                                  api.getRealtorTrainingProgress(realtor.id)
-                                ]);
-                                
-                                const kpi: KPIMetrics = {
-                                  realtors: 1,
-                                  deals: kpiData.deals || 0,
-                                  diagnoses: diagnoses.length,
-                                  successRate: diagnoses.length > 0 ? Math.round((kpiData.deals || 0) / diagnoses.length * 100) : 0,
-                                  totalDealValue: kpiData.revenue || 0,
-                                  levelDistribution: { [realtor.level]: 1 }
-                                };
-                                setSelectedRealtorKPI(kpi);
-                                setSelectedRealtorDeals(deals as Array<Record<string, unknown>>);
-                                setSelectedRealtorDiagnoses(diagnoses as Array<Record<string, unknown>>);
-                                
-                                if (trainingProgress && trainingProgress.length > 0) {
-                                  const updatedTrainingData = trainingStructure.map((section) => ({
-                                    ...section,
-                                    subsections: section.subsections.map((subsection) => {
-                                      const progressItem = trainingProgress.find(
-                                        (p: { section?: string; subsection?: string }) => p.section === section.id && p.subsection === subsection.id
-                                      );
-                                      return {
-                                        ...subsection,
-                                        progress: progressItem
-                                          ? {
-                                              lecture: (progressItem as { lecture_completed?: boolean }).lecture_completed || false,
-                                              video: (progressItem as { video_completed?: boolean }).video_completed || false,
-                                              practical: (progressItem as { practical_completed?: boolean }).practical_completed || false,
-                                              handover: (progressItem as { handover_completed?: boolean }).handover_completed || false,
-                                              exam: (progressItem as { exam_completed?: boolean }).exam_completed || false,
-                                            }
-                                          : subsection.progress,
-                                      };
-                                    }),
-                                  }));
-                                  setSelectedRealtorTrainingData(updatedTrainingData);
-                                  setSelectedRealtorTrainingProgress(calculateTrainingProgress(updatedTrainingData));
-                                } else {
-                                  setSelectedRealtorTrainingData(trainingStructure);
-                                  setSelectedRealtorTrainingProgress(0);
-                                }
-                                
-                                setCurrentView('realtor-detail');
-                              } catch (error) {
-                                console.error('Error fetching realtor details:', error);
-                                toast.error('Грешка при зареждане на детайли');
-                              }
-                            }}
-                    >
-                      {/* Left side - Avatar and Name */}
-                      <div className="flex items-center gap-4 flex-1 min-w-0">
-                        <div className={cn(
-                          "h-12 w-12 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 shadow-sm",
-                          realtor.level === 1 
-                            ? "bg-gradient-to-br from-blue-500 to-blue-600" 
-                            : realtor.level > 3 
-                            ? "bg-gradient-to-br from-orange-500 to-orange-600"
-                            : "bg-gradient-to-br from-green-500 to-green-600"
-                        )}>
-                          {realtor.user.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-semibold text-foreground truncate">
-                              {realtor.user.fullName}
-                            </h3>
-                            <Badge 
-                              variant="outline"
-                              className={cn(
-                                "text-xs font-medium",
-                                realtor.level === 1 
-                                  ? "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800" 
-                                  : realtor.level > 3
-                                  ? "bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800"
-                                  : "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
-                              )}
-                            >
-                              {realtor.level === 1 ? 'Курсист' : realtor.level > 3 ? 'Елит' : 'Реализатор'}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground truncate">{realtor.user.email}</p>
-                        </div>
-                      </div>
-
-                      {/* Right side - Actions */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedRealtorForTraining({ id: realtor.id, name: realtor.user.fullName });
-                              setTrainingDialogOpen(true);
-                            }}
+            {/* Realtors List View with Training Progress */}
+            {currentView === 'realtors' && filteredRealtors.length > 0 && (
+              <div className="space-y-3">
+                {filteredRealtors.map((realtor) => (
+                  realtor.user && (
+                    <div key={realtor.id} className="relative w-full">
+                      <DropdownMenu 
+                        modal={false}
+                        open={openDropdown === realtor.id} 
+                        onOpenChange={(open) => setOpenDropdown(open ? realtor.id : null)}
+                      >
+                        <DropdownMenuTrigger asChild>
+                          <Card
+                            className={cn(
+                              "transition-all duration-300 hover:shadow-lg hover:scale-[1.01] border-border/60 hover:border-primary/40 cursor-pointer w-full",
+                              (realtorProgressMap[realtor.id] || 0) === 100 && "border-2 border-green-500/50 bg-gradient-to-br from-green-50/50 to-green-100/30 dark:from-green-950/20 dark:to-green-900/10"
+                            )}
                           >
-                            <GraduationCap className="h-4 w-4 mr-1" />
-                            Обучение
-                          </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground"
+                            <CardContent className="p-5">
+                              <div className="flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-4 flex-1 min-w-0">
+                                  <div className={cn(
+                                    "h-14 w-14 rounded-full flex items-center justify-center text-primary font-bold text-lg border-2 flex-shrink-0 transition-all duration-200",
+                                    (realtorProgressMap[realtor.id] || 0) === 100 
+                                      ? "bg-gradient-to-br from-green-500/20 to-green-400/10 border-green-500/40 text-green-700 dark:text-green-300" 
+                                      : realtor.level === 1 
+                                      ? "bg-gradient-to-br from-blue-500/20 to-blue-400/10 border-blue-500/40 text-blue-700 dark:text-blue-300"
+                                      : "bg-gradient-to-br from-primary/20 to-primary/10 border-primary/30"
+                                  )}>
+                                    {realtor.user.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                                      <h3 className="text-base font-semibold text-foreground">
+                                        {realtor.user.fullName}
+                                      </h3>
+                                      <Badge 
+                                        variant="outline"
+                                        className={cn(
+                                          "text-xs font-medium",
+                                          realtor.level === 1 
+                                            ? "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800" 
+                                            : realtor.level > 3
+                                            ? "bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800"
+                                            : "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
+                                        )}
+                                      >
+                                        {realtor.level === 1 ? 'Курсист' : realtor.level > 3 ? 'Елит' : 'Реализатор'}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground truncate mb-1">{realtor.user.email}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Завършени {getCompletedSubsections(realtor.id)} от {totalSubsections} подточки
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-3 min-w-[140px]">
+                                  <div className="text-right">
+                                    <div className={cn(
+                                      "text-2xl font-bold mb-2",
+                                      (realtorProgressMap[realtor.id] || 0) === 100 ? "text-green-600 dark:text-green-400" : 
+                                      (realtorProgressMap[realtor.id] || 0) > 0 ? "text-blue-600 dark:text-blue-400" : 
+                                      "text-muted-foreground"
+                                    )}>
+                                      {realtorProgressMap[realtor.id] || 0}%
+                                    </div>
+                                    <Progress 
+                                      value={realtorProgressMap[realtor.id] || 0} 
+                                      className={cn(
+                                        "h-2.5 w-full",
+                                        (realtorProgressMap[realtor.id] || 0) === 100 && "bg-green-500/20"
+                                      )} 
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {(realtorProgressMap[realtor.id] || 0) === 100 ? (
+                                      <Badge className="bg-green-500 hover:bg-green-600 text-white border-0">
+                                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                                        Завършено
+                                      </Badge>
+                                    ) : (realtorProgressMap[realtor.id] || 0) > 0 ? (
+                                      <Badge className="bg-blue-500 hover:bg-blue-600 text-white border-0">
+                                        <PlayCircle className="h-3 w-3 mr-1" />
+                                        В процес
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="border-border/60">
+                                        <Clock className="h-3 w-3 mr-1" />
+                                        Незапочнато
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent 
+                          align="start" 
+                          side="bottom"
+                          className="max-h-[80vh] overflow-y-auto"
+                          style={{
+                            width: 'var(--radix-dropdown-menu-trigger-width)',
+                            minWidth: 'var(--radix-dropdown-menu-trigger-width)',
+                          }}
+                          onOpenAutoFocus={(e) => {
+                            e.preventDefault();
+                            loadTraineeProgress(realtor);
+                          }}
                         >
-                          Виж детайли →
-                        </Button>
-                        </div>
+                          <DropdownMenuLabel className="sticky top-0 bg-popover z-10 pb-2 border-b">
+                            <div className="flex flex-col">
+                              <span className="font-semibold">{realtor.user.fullName}</span>
+                              <span className="text-xs text-muted-foreground font-normal">{realtor.user.email}</span>
+                              <div className="mt-2 flex items-center gap-2">
+                                <Progress value={realtorProgressMap[realtor.id] || 0} className="h-2 flex-1" />
+                                <span className="text-xs font-medium">{realtorProgressMap[realtor.id] || 0}%</span>
+                              </div>
+                            </div>
+                          </DropdownMenuLabel>
+                          <div className="p-2 space-y-1">
+                            {trainingStructure.map((section) => {
+                              const isExpanded = expandedSections.has(section.id);
+                              return (
+                                <div key={section.id} className="space-y-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleSection(section.id)}
+                                    className="w-full flex items-center justify-between px-2 py-1.5 text-sm font-medium hover:bg-accent rounded-md transition-colors"
+                                  >
+                                    <span>{section.title}</span>
+                                    {isExpanded ? (
+                                      <ChevronDown className="h-4 w-4" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                  {isExpanded && (
+                                    <div className="ml-4 space-y-1 border-l-2 border-border/50 pl-2">
+                                      {section.subsections.map((subsection) => {
+                                        const progressKey = `${section.id}-${subsection.id}`;
+                                        const progress = traineeProgressData[realtor.id]?.[progressKey] || {};
+                                        
+                                        const lectureCompleted = progress.lecture_completed || false;
+                                        const videoCompleted = progress.video_completed || false;
+                                        const practicalCompleted = progress.practical_completed || false;
+                                        const handoverCompleted = progress.handover_completed || false;
+                                        const examCompleted = progress.exam_completed || false;
+
+                                        return (
+                                          <div key={subsection.id} className="space-y-1.5 py-1">
+                                            <div className="text-xs font-semibold text-foreground/80">{subsection.title}</div>
+                                            <div className="space-y-1">
+                                              <button
+                                                type="button"
+                                                onClick={() => handleListToggleProgress(realtor, section.id, subsection.id, 'lecture')}
+                                                className={cn(
+                                                  "w-full flex items-center gap-2 px-2 py-1 text-xs rounded hover:bg-accent transition-colors",
+                                                  lectureCompleted && "bg-green-500/10 text-green-700 dark:text-green-400"
+                                                )}
+                                              >
+                                                <BookOpen className={cn("h-3 w-3", lectureCompleted && "text-green-600 dark:text-green-400")} />
+                                                <span className="flex-1 text-left">Лекция</span>
+                                                {lectureCompleted && <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />}
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleListToggleProgress(realtor, section.id, subsection.id, 'video')}
+                                                className={cn(
+                                                  "w-full flex items-center gap-2 px-2 py-1 text-xs rounded hover:bg-accent transition-colors",
+                                                  videoCompleted && "bg-green-500/10 text-green-700 dark:text-green-400"
+                                                )}
+                                              >
+                                                <Video className={cn("h-3 w-3", videoCompleted && "text-green-600 dark:text-green-400")} />
+                                                <span className="flex-1 text-left">Видео</span>
+                                                {videoCompleted && <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />}
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleListToggleProgress(realtor, section.id, subsection.id, 'practical')}
+                                                className={cn(
+                                                  "w-full flex items-center gap-2 px-2 py-1 text-xs rounded hover:bg-accent transition-colors",
+                                                  practicalCompleted && "bg-green-500/10 text-green-700 dark:text-green-400"
+                                                )}
+                                              >
+                                                <Briefcase className={cn("h-3 w-3", practicalCompleted && "text-green-600 dark:text-green-400")} />
+                                                <span className="flex-1 text-left">Практика</span>
+                                                {practicalCompleted && <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />}
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleListToggleProgress(realtor, section.id, subsection.id, 'handover')}
+                                                className={cn(
+                                                  "w-full flex items-center gap-2 px-2 py-1 text-xs rounded hover:bg-accent transition-colors",
+                                                  handoverCompleted && "bg-green-500/10 text-green-700 dark:text-green-400"
+                                                )}
+                                              >
+                                                <Handshake className={cn("h-3 w-3", handoverCompleted && "text-green-600 dark:text-green-400")} />
+                                                <span className="flex-1 text-left">Предаване</span>
+                                                {handoverCompleted && <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />}
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleListToggleProgress(realtor, section.id, subsection.id, 'exam')}
+                                                className={cn(
+                                                  "w-full flex items-center gap-2 px-2 py-1 text-xs rounded hover:bg-accent transition-colors",
+                                                  examCompleted && "bg-green-500/10 text-green-700 dark:text-green-400"
+                                                )}
+                                              >
+                                                <FileText className={cn("h-3 w-3", examCompleted && "text-green-600 dark:text-green-400")} />
+                                                <span className="flex-1 text-left">Изпит</span>
+                                                {examCompleted && <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                    )
-                    ))}
-                  </div>
-                )}
+                  )
+                ))}
+              </div>
+            )}
           </>
         )}
 

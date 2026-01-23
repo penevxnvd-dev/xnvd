@@ -14,7 +14,6 @@ import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import TrainingPage from "./pages/realtor/TrainingPage";
 import TrainingCalendarPage from "./pages/realtor/TrainingCalendarPage";
-import TrainingListPage from "./pages/realtor/TrainingListPage";
 import AccountManagementPage from "./pages/AccountManagementPage";
 import { analytics } from "@/lib/analytics";
 import { SearchDialog } from "@/components/SearchDialog";
@@ -74,7 +73,6 @@ const App = () => {
                   <Route path="/interviews" element={<Interviews />} />
                   <Route path="/training" element={<TrainingPage />} />
                   <Route path="/training-calendar" element={<TrainingCalendarPage />} />
-                  <Route path="/training-list" element={<TrainingListPage />} />
                   <Route path="/account-management" element={<AccountManagementPage />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />

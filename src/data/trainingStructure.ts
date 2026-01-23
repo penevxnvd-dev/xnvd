@@ -446,7 +446,8 @@ export const calculateTrainingProgress = (structure: TrainingSection[]): number 
   structure.forEach((section) => {
     section.subsections.forEach((subsection) => {
       totalRows++;
-      const { lecture, video, practical, handover, exam } = subsection.progress;
+      const progress = subsection.progress || { lecture: false, video: false, practical: false, handover: false, exam: false };
+      const { lecture, video, practical, handover, exam } = progress;
       if (lecture && video && practical && handover && exam) {
         completedRows++;
       }
@@ -459,7 +460,7 @@ export const calculateTrainingProgress = (structure: TrainingSection[]): number 
 // Функция за проверка дали обучението е напълно завършено (всички изпити са минати)
 export const isTrainingFullyCompleted = (structure: TrainingSection[]): boolean => {
   return structure.every((section) =>
-    section.subsections.every((subsection) => subsection.progress.exam === true)
+    section.subsections.every((subsection) => subsection.progress?.exam === true)
   );
 };
 
@@ -469,11 +470,12 @@ export const hasCompletedIntroductoryTraining = (structure: TrainingSection[]): 
   if (!firstSection) return false;
   
   // Проверяваме дали всички подсекции в първата секция имат минат изпит
-  return firstSection.subsections.every((subsection) => subsection.progress.exam === true);
+  return firstSection.subsections.every((subsection) => subsection.progress?.exam === true);
 };
 
 // Функция за проверка дали ред е завършен
-export const isRowCompleted = (progress: TrainingSubsection['progress']): boolean => {
+export const isRowCompleted = (progress: TrainingSubsection['progress'] | null | undefined): boolean => {
+  if (!progress) return false;
   return (
     progress.lecture &&
     progress.video &&

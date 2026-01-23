@@ -328,7 +328,7 @@ class SupabaseApiClient {
     }
   }
 
-  // Realtors - Supabase only (with profile data)
+  // Realtors - Supabase only (with profile data, only active)
   async getRealtorsByTeam(teamId: string) {
     if (!supabase) {
       throw new Error('Supabase client is not initialized');
@@ -349,29 +349,35 @@ class SupabaseApiClient {
       return [];
     }
     
-    // Then get profiles for those realtors
+    // Then get profiles for those realtors (only active ones)
     const userIds = realtors.map(r => r.user_id).filter(Boolean);
     if (userIds.length === 0) {
-      return realtors.map(r => ({ ...r, profile: { full_name: 'Неизвестен', email: '' } }));
+      return realtors.map(r => ({ ...r, profile: { full_name: 'Неизвестен', email: '', status: 'active' } }));
     }
     
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, full_name, email')
-      .in('id', userIds);
+      .select('id, full_name, email, status')
+      .in('id', userIds)
+      .eq('status', 'active'); // Only get active profiles
     
     if (profilesError) {
       console.warn('Error fetching profiles:', profilesError);
     }
     
+    // Create a set of active user IDs
+    const activeUserIds = new Set((profiles || []).map(p => p.id));
+    
     // Create a map for quick lookup
     const profilesMap = new Map((profiles || []).map(p => [p.id, p]));
     
-    // Combine realtors with their profiles
-    return realtors.map(realtor => ({
-      ...realtor,
-      profile: profilesMap.get(realtor.user_id) || { full_name: 'Неизвестен', email: '' }
-    }));
+    // Combine realtors with their profiles, filtering out inactive ones
+    return realtors
+      .filter(realtor => activeUserIds.has(realtor.user_id)) // Only include realtors with active profiles
+      .map(realtor => ({
+        ...realtor,
+        profile: profilesMap.get(realtor.user_id) || { full_name: 'Неизвестен', email: '', status: 'active' }
+      }));
   }
 
   // Get all trainees and recruits (users with trainee role or realtors with level 1)

@@ -15,7 +15,6 @@ import {
   Users,
   BarChart3,
   Briefcase,
-  GraduationCap,
   Calendar,
   ListChecks,
   UserCog,
@@ -354,18 +353,6 @@ export function HierarchySidebar({ isOpen, onToggle }: Props) {
               >
                 <Calendar className="h-4 w-4" />
                 Календар
-              </Button>
-
-              <Button
-                type="button"
-                variant={isActive("/training-list") ? "default" : "outline"}
-                size="sm"
-                disabled={!canViewTraining}
-                className="w-full justify-start gap-2"
-                onClick={() => handleNavigate("/training-list")}
-              >
-                <GraduationCap className="h-4 w-4" />
-                Списък
               </Button>
             </div>
           </div>

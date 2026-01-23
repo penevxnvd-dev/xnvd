@@ -270,6 +270,15 @@ const AccountManagementPage = () => {
 
     setOperationLoading(true);
     try {
+      // First, delete from training_group_trainees by email (no foreign key constraint)
+      if (selectedUser.email) {
+        await supabaseApi.supabase
+          .from('training_group_trainees')
+          .delete()
+          .eq('email', selectedUser.email);
+      }
+
+      // Then delete the profile (cascades to realtors, user_roles, etc.)
       const { error: profileError } = await supabaseApi.supabase
         .from('profiles')
         .delete()
