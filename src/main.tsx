@@ -9,7 +9,7 @@ if (typeof window !== 'undefined') {
   const originalError = console.error;
   const originalWarn = console.warn;
   
-  // Filter CORS errors from Lovable development API
+  // Filter out development-only warnings that don't affect functionality
   console.error = (...args: unknown[]) => {
     const message = args[0]?.toString() || '';
     const allArgsStr = args.map(arg => {
@@ -27,11 +27,7 @@ if (typeof window !== 'undefined') {
       return; // Silently ignore old project connection attempts
     }
     
-    // Filter out CORS errors from api.lovable.dev (development tools)
-    if (message.includes('Cross-Origin Request Blocked') && message.includes('api.lovable.dev')) {
-      return; // Silently ignore these development-only errors
-    }
-    // Filter out 403 errors from development tools (Lovable, BrowserAutomation, etc.)
+    // Filter out 403 errors from development tools (BrowserAutomation, etc.)
     if (message.includes('Failed to load resource') && message.includes('register-iframe')) {
       return; // Silently ignore these development-only errors
     }
@@ -135,13 +131,9 @@ if (typeof window !== 'undefined') {
     originalError.apply(console, args);
   };
   
-  // Filter preload warnings from Lovable assets
+  // Filter out development-only warnings
   console.warn = (...args: unknown[]) => {
     const message = args[0]?.toString() || '';
-    // Filter out preload warnings for Lovable fonts (optimization hints, not errors)
-    if (message.includes('preloaded with link preload was not used') && message.includes('lovable.dev')) {
-      return; // Silently ignore these optimization warnings
-    }
     // Filter out SES (Secure EcmaScript) lockdown warnings about removing intrinsics
     // These are normal security-related messages and don't affect functionality
     const allWarnArgsStr = args.map(arg => String(arg)).join(' ').toLowerCase();

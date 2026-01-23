@@ -1,78 +1,87 @@
-# Welcome to your Lovable project
+# XNVD - Управление на реализатори
 
-## Project info
+Платформа за управление на реализатори, сделки, диагнози и обучение.
 
-**URL**: https://lovable.dev/projects/68725b4e-91c3-4ac6-8199-2b27abd35408
+## Технологии
 
-## How can I edit this code?
+Проектът е изграден с:
 
-There are several ways of editing your application.
+- **Vite** - Build tool и dev server
+- **TypeScript** - Type-safe JavaScript
+- **React** - UI библиотека
+- **shadcn-ui** - UI компоненти
+- **Tailwind CSS** - Utility-first CSS framework
+- **Supabase** - Backend-as-a-Service (база данни, автентикация, RLS)
+- **React Query** - Data fetching и caching
+- **React Router** - Client-side routing
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/68725b4e-91c3-4ac6-8199-2b27abd35408) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Инсталация
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# Клониране на репозитория
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Навигация към директорията на проекта
+cd xnvd
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Инсталиране на зависимости
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Стартиране на development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Конфигурация
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Създайте `.env` файл в root директорията с:
 
-**Use GitHub Codespaces**
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Скриптове
 
-## What technologies are used for this project?
+- `npm run dev` - Стартира development server
+- `npm run build` - Build за production
+- `npm run preview` - Preview на production build
+- `npm run lint` - Проверка на код с ESLint
+- `npm test` - Стартиране на тестове
 
-This project is built with:
+## Deployment
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Проектът използва **GitHub Actions** за автоматизиран deployment към **Vercel**. Всеки push към `main` branch тригерира:
 
-## How can I deploy this project?
+- Автоматично тестване и linting
+- Production deployment към Vercel (ако тестовете минават)
 
-Simply open [Lovable](https://lovable.dev/projects/68725b4e-91c3-4ac6-8199-2b27abd35408) and click on Share -> Publish.
+## Структура на проекта
 
-**Automated CI/CD Deployment:**
-This project uses GitHub Actions for automated deployment to Vercel. Every push to the `main` branch triggers:
-- Automated testing and linting
-- Production deployment to Vercel (if tests pass)
+```
+xnvd/
+├── src/
+│   ├── components/     # React компоненти
+│   ├── pages/          # Страници
+│   ├── hooks/          # Custom React hooks
+│   ├── lib/            # Utility функции и API клиенти
+│   ├── data/           # Статични данни и структури
+│   └── utils/          # Helper функции
+├── supabase/
+│   └── migrations/     # Database миграции
+└── public/             # Статични файлове
+```
 
-## Can I connect a custom domain to my Lovable project?
+## Роли и права
 
-Yes, you can!
+Системата поддържа следните роли:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- **admin** - Пълен достъп
+- **regional_manager** - Управление на региони
+- **office_manager** - Управление на офиси
+- **team_leader** - Управление на екипи
+- **realtor** - Реализатор (с различни нива)
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Лиценз
+
+Приватен проект - всички права запазени.
