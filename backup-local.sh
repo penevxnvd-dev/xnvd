@@ -59,12 +59,9 @@ backup_item() {
     fi
 }
 
-# Backup accounts export
+# Backup accounts documentation
 echo -e "${BLUE}📊 Backing up accounts data...${NC}"
-backup_item "accounts-export.json" "${BACKUP_PATH}/accounts-export.json" "Accounts JSON"
-backup_item "accounts-export.csv" "${BACKUP_PATH}/accounts-export.csv" "Accounts CSV"
-backup_item "accounts-export.md" "${BACKUP_PATH}/accounts-export.md" "Accounts Markdown"
-backup_item "ACCOUNTS_EXTRACTED.md" "${BACKUP_PATH}/ACCOUNTS_EXTRACTED.md" "Accounts Report"
+backup_item "ACCOUNTS_EXTRACTED_GENERATED.md" "${BACKUP_PATH}/ACCOUNTS_EXTRACTED_GENERATED.md" "Accounts Markdown"
 
 # Backup environment files (if they exist and are readable)
 echo ""

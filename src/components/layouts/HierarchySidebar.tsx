@@ -81,6 +81,7 @@ export function HierarchySidebar({ isOpen, onToggle }: Props) {
     },
     [role, roleLoading, cachedPermissions]
   );
+  const isRealtor = role === "realtor";
 
   // Memoize isActive check
   const isActive = useCallback(
@@ -276,25 +277,27 @@ export function HierarchySidebar({ isOpen, onToggle }: Props) {
             <div className="text-sm font-semibold">Навигация</div>
 
             {/* Admin (top) - Always visible, static */}
-            <div className="mt-3 pt-3 border-t border-border space-y-2">
-              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1">
-                Админ
+            {!isRealtor && (
+              <div className="mt-3 pt-3 border-t border-border space-y-2">
+                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1">
+                  Админ
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!canManageUsers}
+                  className={cn(
+                    "w-full justify-start gap-2",
+                    isActive("/account-management") && "bg-accent text-accent-foreground"
+                  )}
+                  onClick={() => handleNavigate("/account-management")}
+                >
+                  <UserCog className="h-4 w-4" />
+                  Управление на акаунти
+                </Button>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!canManageUsers}
-                className={cn(
-                  "w-full justify-start gap-2",
-                  isActive("/account-management") && "bg-accent text-accent-foreground"
-                )}
-                onClick={() => handleNavigate("/account-management")}
-              >
-                <UserCog className="h-4 w-4" />
-                Управление на акаунти
-              </Button>
-            </div>
+            )}
 
             {/* Search removed by request */}
 
@@ -314,55 +317,63 @@ export function HierarchySidebar({ isOpen, onToggle }: Props) {
                 Начало
               </Button>
 
-              <Button
-                type="button"
-                variant={isActive("/analytics") ? "default" : "outline"}
-                size="sm"
-                className="w-full justify-start gap-2"
-                onClick={() => handleNavigate("/analytics")}
-              >
-                <BarChart3 className="h-4 w-4" />
-                Калсация
-              </Button>
+              {!isRealtor && (
+                <Button
+                  type="button"
+                  variant={isActive("/analytics") ? "default" : "outline"}
+                  size="sm"
+                  className="w-full justify-start gap-2"
+                  onClick={() => handleNavigate("/analytics")}
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  Калсация
+                </Button>
+              )}
 
-              <Button
-                type="button"
-                variant={isActive("/interviews") ? "default" : "outline"}
-                size="sm"
-                className="w-full justify-start gap-2"
-                onClick={() => handleNavigate("/interviews")}
-              >
-                <Briefcase className="h-4 w-4" />
-                Интервюта
-              </Button>
+              {!isRealtor && (
+                <Button
+                  type="button"
+                  variant={isActive("/interviews") ? "default" : "outline"}
+                  size="sm"
+                  className="w-full justify-start gap-2"
+                  onClick={() => handleNavigate("/interviews")}
+                >
+                  <Briefcase className="h-4 w-4" />
+                  Интервюта
+                </Button>
+              )}
             </div>
 
             {/* Training - Always visible, static */}
-            <div className="mt-3 pt-3 border-t border-border space-y-2">
-              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1">
-                Обучение
-              </div>
+            {!isRealtor && (
+              <div className="mt-3 pt-3 border-t border-border space-y-2">
+                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1">
+                  Обучение
+                </div>
 
-              <Button
-                type="button"
-                variant={isActive("/training-calendar") ? "default" : "outline"}
-                size="sm"
-                disabled={!canViewTraining}
-                className="w-full justify-start gap-2"
-                onClick={() => handleNavigate("/training-calendar")}
-              >
-                <Calendar className="h-4 w-4" />
-                Календар
-              </Button>
-            </div>
+                <Button
+                  type="button"
+                  variant={isActive("/training-calendar") ? "default" : "outline"}
+                  size="sm"
+                  disabled={!canViewTraining}
+                  className="w-full justify-start gap-2"
+                  onClick={() => handleNavigate("/training-calendar")}
+                >
+                  <Calendar className="h-4 w-4" />
+                  Календар
+                </Button>
+              </div>
+            )}
           </div>
 
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-1">
               {!canViewHierarchy ? (
-                <div className="text-xs text-muted-foreground p-2">
-                  Няма права за преглед на йерархията.
-                </div>
+                isRealtor ? null : (
+                  <div className="text-xs text-muted-foreground p-2">
+                    Няма права за преглед на йерархията.
+                  </div>
+                )
               ) : loadingTree ? (
                 <div className="text-xs text-muted-foreground p-2">
                   Зареждане...

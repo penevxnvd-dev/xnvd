@@ -22,11 +22,15 @@ import logo from '@/assets/logo.jpeg';
 interface AppLayoutProps {
   children: React.ReactNode;
   customNavbarContent?: React.ReactNode;
+  defaultSidebarOpen?: boolean;
+  wideNavbar?: boolean;
 }
 
 export const AppLayout = ({ 
   children, 
-  customNavbarContent
+  customNavbarContent,
+  defaultSidebarOpen = false,
+  wideNavbar = false
 }: AppLayoutProps) => {
   const navigate = useNavigate();
   const { role } = useUserRole();
@@ -34,7 +38,7 @@ export const AppLayout = ({
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     const saved = localStorage.getItem('sidebarOpen');
-    return saved !== null ? saved === 'true' : false;
+    return saved !== null ? saved === 'true' : defaultSidebarOpen;
   });
 
   useEffect(() => {
@@ -68,6 +72,7 @@ export const AppLayout = ({
   const handleHome = () => {
     navigate('/dashboard');
   };
+  const isCompactHeader = !customNavbarContent;
 
   return (
     <div className="min-h-screen bg-background flex flex-1">
@@ -82,16 +87,18 @@ export const AppLayout = ({
         {/* Navbar */}
         <header className={cn(
           "border-b border-border bg-card/95 backdrop-blur-lg shadow-sm sticky top-0 z-30 w-full",
-          customNavbarContent && "py-2 sm:py-3"
+          customNavbarContent ? "py-2 sm:py-3" : "py-1.5 sm:py-2"
         )}>
-          <div className="container mx-auto px-2 sm:px-3 md:px-4">
+          <div className={cn(
+            wideNavbar ? "w-full max-w-none px-3 sm:px-4 md:px-6" : "container mx-auto px-2 sm:px-3 md:px-4"
+          )}>
             <div className={cn(
-              "flex items-start justify-between flex-wrap gap-1.5 sm:gap-2 md:gap-3",
-              customNavbarContent && "flex-col sm:flex-row"
+              "flex justify-between gap-2 sm:gap-3",
+              isCompactHeader ? "items-center flex-nowrap" : "items-start flex-wrap flex-col sm:flex-row"
             )}>
               <div className={cn(
-                "flex items-start gap-2 sm:gap-4 min-w-0",
-                customNavbarContent && "flex-col sm:flex-row w-full sm:w-auto"
+                "flex gap-2 sm:gap-4 min-w-0",
+                isCompactHeader ? "items-center" : "items-start flex-col sm:flex-row w-full sm:w-auto"
               )}>
                 {/* Hamburger Button - Always visible */}
                 <Button
@@ -107,14 +114,17 @@ export const AppLayout = ({
                 {/* Logo */}
                 <button 
                   onClick={handleHome} 
-                  className="hover:opacity-80 transition-opacity cursor-pointer flex-shrink-0 mt-0.5"
+                  className={cn(
+                    "hover:opacity-80 transition-opacity cursor-pointer flex-shrink-0",
+                    isCompactHeader ? "" : "mt-0.5"
+                  )}
                 >
                   <img src={logo} alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 object-contain" />
                 </button>
                 {/* Custom Navbar Content */}
                 {customNavbarContent}
               </div>
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <NotificationCenter />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

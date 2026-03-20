@@ -1,93 +1,45 @@
-# Създаване на админски акаунт
+# Create Admin Account
 
-## Вариант 1: Чрез Supabase Dashboard (Препоръчително)
+Каноничен документ за създаване на admin потребител.
 
-### Стъпка 1: Създайте auth потребителя
+## Option A (Recommended): Supabase Dashboard + SQL
 
-1. Отидете в Supabase Dashboard:
-   - https://supabase.com/dashboard/project/qxompdwqdnemsntssjot/auth/users
+1. Създайте user в `auth.users` (Dashboard -> Authentication -> Users):
+   - Email: `admin@xnvd.com`
+   - Password: задайте сигурна парола
+   - Auto Confirm: enabled
 
-2. Кликнете на "Add user" → "Create new user"
-
-3. Попълнете:
-   - **Email:** `admin@xnvd.com`
-   - **Password:** `Admin123!`
-   - **Auto Confirm User:** ✅ (важно!)
-
-4. Кликнете "Create user"
-
-### Стъпка 2: Създайте профил и роля
-
-1. Отидете в SQL Editor:
-   - https://supabase.com/dashboard/project/qxompdwqdnemsntssjot/sql/new
-
-2. Изпълнете следния SQL:
+2. Изпълнете SQL в SQL Editor:
 
 ```sql
--- Create profile for admin
-INSERT INTO public.profiles (id, full_name, email)
-SELECT 
-    id,
-    'Администратор',
-    'admin@xnvd.com'
-FROM auth.users
-WHERE email = 'admin@xnvd.com'
-ON CONFLICT (id) 
-DO UPDATE SET 
-    full_name = 'Администратор',
-    email = 'admin@xnvd.com';
+insert into public.profiles (id, full_name, email)
+select id, 'Администратор', 'admin@xnvd.com'
+from auth.users
+where email = 'admin@xnvd.com'
+on conflict (id) do update
+set full_name = excluded.full_name,
+    email = excluded.email,
+    updated_at = now();
 
--- Add admin role
-INSERT INTO public.user_roles (user_id, role)
-SELECT 
-    id,
-    'admin'::app_role
-FROM auth.users
-WHERE email = 'admin@xnvd.com'
-ON CONFLICT (user_id, role) DO NOTHING;
-
--- Verify
-SELECT 
-    u.email,
-    p.full_name,
-    ur.role
-FROM auth.users u
-LEFT JOIN public.profiles p ON u.id = p.id
-LEFT JOIN public.user_roles ur ON u.id = ur.user_id
-WHERE u.email = 'admin@xnvd.com';
+insert into public.user_roles (user_id, role)
+select id, 'admin'::app_role
+from auth.users
+where email = 'admin@xnvd.com'
+on conflict do nothing;
 ```
 
-## Вариант 2: Чрез скрипт (изисква Service Role Key)
+## Option B: Script
 
-1. Добавете Service Role Key в `.env`:
-```bash
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+- Нужен е `SUPABASE_SERVICE_ROLE_KEY` в `.env`.
+- Стартирайте admin script-а за акаунт създаване.
+
+## Verify
+
+```sql
+select u.email, p.full_name, ur.role
+from auth.users u
+left join public.profiles p on p.id = u.id
+left join public.user_roles ur on ur.user_id = u.id
+where u.email = 'admin@xnvd.com';
 ```
-
-2. Стартирайте скрипта:
-```bash
-node scripts/create-admin-account.js
-```
-
-## Данни за вход
-
-- **Email:** `admin@xnvd.com`
-- **Password:** `Admin123!`
-- **Име:** `Администратор`
-- **Роля:** `admin`
-
-## Важни бележки
-
-- ⚠️ **SERVICE_ROLE_KEY** е секретен ключ - не го споделяйте!
-- ⚠️ Сменете паролата след първо влизане
-- ⚠️ Уверете се, че email confirmation е активиран
-
-## Проверка
-
-След създаване на акаунта, влезте в приложението на:
-**http://localhost:5174/auth**
-
-С данните:
-- Email: `admin@xnvd.com`
-- Password: `Admin123!`
 

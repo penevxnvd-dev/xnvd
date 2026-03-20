@@ -46,7 +46,7 @@ if (!SUPABASE_SERVICE_KEY) {
   console.error('   - Не го споделяйте публично');
   console.error('   - Не го commit-вайте в Git');
   console.error('   - Използвайте го само за административни скриптове\n');
-  console.error('📖 Вижте SETUP_SERVICE_ROLE_KEY.md за повече информация\n');
+  console.error('📖 Вижте HOW_TO_GET_SERVICE_ROLE_KEY.md за повече информация\n');
   process.exit(1);
 }
 

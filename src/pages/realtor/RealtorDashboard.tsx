@@ -79,17 +79,8 @@ const RealtorDashboard = memo(({ userId }: RealtorDashboardProps) => {
   const [diagnoses, setDiagnoses] = useState<Diagnosis[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Realtor dashboard shows only the "Diagnosis" part of the intro training.
-  // (Keep original structure in code; we only filter/rename for this page.)
-  const realtorTrainingStructure = (structure: TrainingSection[]): TrainingSection[] =>
-    structure.map((section) => {
-      if (section.id !== 'work-with-buyer') return section;
-      return {
-        ...section,
-        title: 'Диагноза',
-        subsections: section.subsections.filter((s) => s.id === 'diagnosis'),
-      };
-    });
+  // Realtor dashboard follows the full Stage 1 structure.
+  const realtorTrainingStructure = (structure: TrainingSection[]): TrainingSection[] => structure;
 
   const [trainingData, setTrainingData] = useState<TrainingSection[]>(
     realtorTrainingStructure(trainingStructure)
@@ -468,6 +459,7 @@ const RealtorDashboard = memo(({ userId }: RealtorDashboardProps) => {
       />
     </div>
   );
+  const showHeaderStats = false;
 
   const completedSectionsCount = trainingData.filter((section) =>
     section.subsections.every(
@@ -483,10 +475,14 @@ const RealtorDashboard = memo(({ userId }: RealtorDashboardProps) => {
   const stageTitle = completedSectionsCount === trainingData.length && trainingData.length > 0
     ? 'Обучение - Завършено'
     : `Обучение - Етап ${currentStage}`;
+  const totalSubsectionsCount = trainingData.reduce((total, section) => total + section.subsections.length, 0);
+  const completedSubsections = Math.round((trainingProgress / 100) * totalSubsectionsCount);
 
   return (
       <AppLayout
-        customNavbarContent={customNavbarContent}
+        customNavbarContent={showHeaderStats ? customNavbarContent : undefined}
+        defaultSidebarOpen={true}
+        wideNavbar={true}
                 >
         <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
           {/* Personal Goals */}
@@ -656,7 +652,7 @@ const RealtorDashboard = memo(({ userId }: RealtorDashboardProps) => {
                         </div>
                       </div>
                       <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-background border border-primary/30 px-2 py-0.5 text-[10px] sm:text-xs font-semibold text-primary whitespace-nowrap">
-                        Завършени {Math.round((trainingProgress / 100) * 17)} от 17
+                        Завършени {completedSubsections} от {totalSubsectionsCount}
                       </div>
                     </div>
                   </div>

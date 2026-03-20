@@ -14,10 +14,7 @@ The backup system automatically runs:
 ### What Gets Backed Up
 
 1. **Accounts Data**
-   - `accounts-export.json`
-   - `accounts-export.csv`
-   - `accounts-export.md`
-   - `ACCOUNTS_EXTRACTED.md`
+   - `ACCOUNTS_EXTRACTED_GENERATED.md`
 
 2. **Configuration Files**
    - `.env` (if accessible)
@@ -39,8 +36,7 @@ Structure:
 ```
 ~/.xnvd-backups/
 ├── backup_20251206_120000/
-│   ├── accounts-export.json
-│   ├── accounts-export.csv
+│   ├── ACCOUNTS_EXTRACTED_GENERATED.md
 │   ├── .env
 │   ├── package.json
 │   └── BACKUP_MANIFEST.txt
@@ -75,10 +71,10 @@ cat ~/.xnvd-backups/latest/BACKUP_MANIFEST.txt
 
 ```bash
 # Copy files from latest backup
-cp ~/.xnvd-backups/latest/accounts-export.json ./
+cp ~/.xnvd-backups/latest/ACCOUNTS_EXTRACTED_GENERATED.md ./
 
 # Or from specific backup
-cp ~/.xnvd-backups/backup_20251206_120000/accounts-export.json ./
+cp ~/.xnvd-backups/backup_20251206_120000/ACCOUNTS_EXTRACTED_GENERATED.md ./
 ```
 
 ## Backup Retention
@@ -138,8 +134,6 @@ The script will warn you about missing files but continue with the backup.
 📦 Starting Local Backup...
 
 📊 Backing up accounts data...
-✅ Accounts JSON backed up
-✅ Accounts CSV backed up
 ✅ Accounts Markdown backed up
 
 🔐 Backing up environment configuration...

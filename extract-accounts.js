@@ -236,7 +236,7 @@ async function extractAccounts() {
     );
   });
 
-  const mdFile = join(__dirname, 'accounts-export.md');
+  const mdFile = join(__dirname, 'ACCOUNTS_EXTRACTED_GENERATED.md');
   writeFileSync(mdFile, mdRows.join('\n'), 'utf8');
   log(`✅ Accounts exported to: ${mdFile}`, 'green');
 

@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, ChevronDown, Circle, GraduationCap, PlayCircle, ShieldCheck, Swords, Video } from 'lucide-react';
 import { TrainingSubsection } from '@/data/trainingStructure';
@@ -19,6 +18,65 @@ interface TrainingSubsectionCardProps {
   editable?: boolean;
 }
 
+type ChallengeStep = {
+  id: string;
+  key?: 'lecture' | 'video' | 'practical' | 'handover' | 'exam';
+  label: string;
+  icon: typeof Video;
+  count?: number;
+  checked?: boolean;
+  accent: string;
+  border: string;
+  bg: string;
+  hasSubmenu?: boolean;
+};
+
+const DEFAULT_SUBMENU_ITEMS = ['Подменю 1', 'Подменю 2'];
+const FIVE_SUBMENU_ITEMS = ['Подменю 1', 'Подменю 2', 'Подменю 3', 'Подменю 4', 'Подменю 5'];
+
+const SUBSECTION_SUBMENU_CONFIG: Record<
+  string,
+  Partial<Record<'practical' | 'practical-demo', string[]>>
+> = {
+  // Only explicitly configured subsection keys get custom submenu sizes.
+  'work-with-buyer:diagnosis': {
+    practical: FIVE_SUBMENU_ITEMS,
+    'practical-demo': FIVE_SUBMENU_ITEMS,
+  },
+  'view-organization:filter-placement': {
+    practical: FIVE_SUBMENU_ITEMS,
+    'practical-demo': FIVE_SUBMENU_ITEMS,
+  },
+  'view-organization:property-selection': {
+    practical: DEFAULT_SUBMENU_ITEMS,
+    'practical-demo': DEFAULT_SUBMENU_ITEMS,
+  },
+  'view-organization:listening': {
+    practical: DEFAULT_SUBMENU_ITEMS,
+    'practical-demo': DEFAULT_SUBMENU_ITEMS,
+  },
+  'view-organization:strategy-selection': {
+    practical: DEFAULT_SUBMENU_ITEMS,
+    'practical-demo': DEFAULT_SUBMENU_ITEMS,
+  },
+  'seller-conversation:main-script': {
+    practical: ['x25', 'x25'],
+    'practical-demo': DEFAULT_SUBMENU_ITEMS,
+  },
+  'conducting-views:introduction': {
+    practical: ['Подменю 1'],
+    'practical-demo': ['Подменю 1'],
+  },
+  'conducting-views:behavior-during-view': {
+    practical: ['Подменю 1'],
+    'practical-demo': ['Подменю 1'],
+  },
+  'conducting-views:closing': {
+    practical: ['Подменю 1'],
+    'practical-demo': ['Подменю 1'],
+  },
+};
+
 export const TrainingSubsectionCard = ({
   subsection,
   sectionId,
@@ -28,10 +86,7 @@ export const TrainingSubsectionCard = ({
   const [openSubmenus, setOpenSubmenus] = useState<Set<string>>(new Set());
   const { lecture, video, practical, handover, exam } = subsection.progress;
   const completed = lecture && video && practical && handover && exam;
-  const totalSteps = 5;
-  const completedSteps = [lecture, video, practical, handover, exam].filter(Boolean).length;
-  const progressPercentage = (completedSteps / totalSteps) * 100;
-  const challengeSteps = [
+  const defaultChallengeSteps: ChallengeStep[] = [
     {
       id: 'video',
       key: 'video' as const,
@@ -68,7 +123,7 @@ export const TrainingSubsectionCard = ({
     {
       id: 'practical',
       key: 'practical' as const,
-      label: subsection.practicalType === 'roleplay' ? 'Ролева игра' : 'Практическа тренировка',
+      label: subsection.practicalType === 'roleplay' ? 'Ролева игра част 1' : 'Практическа тренировка част 1',
       icon: Swords,
       count: subsection.counts?.practical,
       checked: practical,
@@ -91,7 +146,7 @@ export const TrainingSubsectionCard = ({
     {
       id: 'practical-demo',
       key: 'handover' as const,
-      label: 'Практическа тренировка',
+      label: subsection.practicalType === 'roleplay' ? 'Ролева игра' : 'Практическа тренировка',
       icon: PlayCircle,
       count: subsection.counts?.handover,
       checked: handover,
@@ -101,6 +156,57 @@ export const TrainingSubsectionCard = ({
       hasSubmenu: true,
     },
   ];
+
+  const salesPrinciplesSteps: ChallengeStep[] = [
+    {
+      id: 'video-demo',
+      key: 'handover' as const,
+      label: 'Видео демонстрация',
+      icon: PlayCircle,
+      count: subsection.counts?.handover,
+      checked: handover,
+      accent: 'text-amber-400',
+      border: 'border-amber-500/30',
+      bg: 'bg-amber-500/10',
+    },
+    {
+      id: 'discussion',
+      key: 'lecture' as const,
+      label: 'Дискусия',
+      icon: GraduationCap,
+      count: subsection.counts?.lecture,
+      checked: lecture,
+      accent: 'text-indigo-400',
+      border: 'border-indigo-500/30',
+      bg: 'bg-indigo-500/10',
+    },
+  ];
+
+  const closingExtraSteps: ChallengeStep[] = [
+    {
+      id: 'objections-part-1',
+      label: 'Възражения и оборване част 1',
+      icon: Swords,
+      accent: 'text-violet-400',
+      border: 'border-violet-500/30',
+      bg: 'bg-violet-500/10',
+    },
+    {
+      id: 'objections',
+      label: 'Възражения и оборване',
+      icon: Swords,
+      accent: 'text-violet-400',
+      border: 'border-violet-500/30',
+      bg: 'bg-violet-500/10',
+    },
+  ];
+
+  const challengeSteps =
+    sectionId === 'sales-principles'
+      ? salesPrinciplesSteps
+      : sectionId === 'conducting-views' && subsection.id === 'closing'
+        ? [...defaultChallengeSteps, ...closingExtraSteps]
+        : defaultChallengeSteps;
 
   const toggleSubmenu = (stepId: string) => {
     setOpenSubmenus((prev) => {
@@ -112,6 +218,12 @@ export const TrainingSubsectionCard = ({
       }
       return next;
     });
+  };
+
+  const getSubmenuItems = (stepId: string): string[] => {
+    if (stepId !== 'practical' && stepId !== 'practical-demo') return DEFAULT_SUBMENU_ITEMS;
+    const subsectionKey = `${sectionId}:${subsection.id}`;
+    return SUBSECTION_SUBMENU_CONFIG[subsectionKey]?.[stepId] ?? DEFAULT_SUBMENU_ITEMS;
   };
 
   return (
@@ -128,7 +240,6 @@ export const TrainingSubsectionCard = ({
             "text-sm sm:text-base md:text-lg flex-1 break-words text-slate-900",
             completed && "text-emerald-700 font-semibold"
           )}>
-            <span className="mr-2 text-[10px] uppercase tracking-[0.25em] text-cyan-700/70">Challenge</span>
             {subsection.title}
             {completed && (
               <span className="ml-2 text-emerald-600">✓</span>
@@ -169,14 +280,18 @@ export const TrainingSubsectionCard = ({
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <Checkbox
-                    checked={step.checked}
-                    disabled={!editable}
-                    onCheckedChange={(checked) =>
-                      onProgressUpdate(sectionId, subsection.id, step.key, checked as boolean)
-                    }
-                    className="data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-400 border-slate-400"
-                  />
+                  {step.key ? (
+                    <Checkbox
+                      checked={step.checked}
+                      disabled={!editable}
+                      onCheckedChange={(checked) =>
+                        onProgressUpdate(sectionId, subsection.id, step.key!, checked as boolean)
+                      }
+                      className="data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-400 border-slate-400"
+                    />
+                  ) : (
+                    <div className="h-4 w-4 shrink-0 rounded-full border border-slate-300 bg-white" />
+                  )}
                   <div className={cn(
                     "rounded-lg p-2 border border-slate-200 bg-slate-50",
                     step.checked && step.border
@@ -189,9 +304,6 @@ export const TrainingSubsectionCard = ({
                       step.checked ? "text-slate-900" : "text-slate-700"
                     )}>
                       {step.label}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      {typeof step.count === 'number' ? `${step.count} задачи` : 'Критична стъпка'}
                     </p>
                   </div>
                   {step.hasSubmenu && (
@@ -209,10 +321,12 @@ export const TrainingSubsectionCard = ({
                   )}
                 </div>
                 {step.hasSubmenu && isSubmenuOpen && (
-                  <div className="mt-3 flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
-                    <div className="rounded-md bg-white px-2 py-1 text-xs text-slate-700">Подменю 1</div>
-                    <div className="rounded-md bg-white px-2 py-1 text-xs text-slate-700">Подменю 2</div>
-                    <div className="rounded-md bg-white px-2 py-1 text-xs text-slate-700">Подменю 3</div>
+                  <div className="mt-3 flex flex-wrap justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                    {getSubmenuItems(step.id).map((item) => (
+                      <div key={item} className="rounded-md bg-white px-2 py-1 text-xs text-slate-700">
+                        {item}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

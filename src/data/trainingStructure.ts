@@ -30,65 +30,11 @@ export interface TrainingSubsection {
 export const trainingStructure: TrainingSection[] = [
   {
     id: 'work-with-buyer',
-    title: 'Работа с купувач',
+    title: 'Диагноза',
     subsections: [
       {
         id: 'diagnosis',
         title: 'Диагноза',
-        progress: {
-          lecture: false,
-          video: false,
-          practical: false,
-          handover: false,
-          exam: false,
-        },
-        counts: {
-          lecture: 1,
-          video: 3,
-          practical: 7,
-          handover: 1,
-        },
-        practicalType: 'practice',
-      },
-      {
-        id: 'list-maintenance',
-        title: 'Поддръжка на списък с купувачи',
-        progress: {
-          lecture: false,
-          video: false,
-          practical: false,
-          handover: false,
-          exam: false,
-        },
-        counts: {
-          lecture: 1,
-          video: 3,
-          practical: 3,
-          handover: 1,
-        },
-        practicalType: 'practice',
-      },
-      {
-        id: 'buyer-transfer',
-        title: 'Прехвърляне на купувач',
-        progress: {
-          lecture: false,
-          video: false,
-          practical: false,
-          handover: false,
-          exam: false,
-        },
-        counts: {
-          lecture: 1,
-          video: 3,
-          practical: 3,
-          handover: 1,
-        },
-        practicalType: 'practice',
-      },
-      {
-        id: 'motivation-space',
-        title: 'Мотивиране куп. Свободно простр.',
         progress: {
           lecture: false,
           video: false,
@@ -206,60 +152,6 @@ export const trainingStructure: TrainingSection[] = [
         },
         practicalType: 'practice',
       },
-      {
-        id: 'conversation-view-goal',
-        title: 'Разговор с цел оглед',
-        progress: {
-          lecture: false,
-          video: false,
-          practical: false,
-          handover: false,
-          exam: false,
-        },
-        counts: {
-          lecture: 1,
-          video: 1,
-          practical: 10,
-          handover: 1,
-        },
-        practicalType: 'practice',
-      },
-      {
-        id: 'conversation-commission-goal',
-        title: 'Разговор с цел комисионна',
-        progress: {
-          lecture: false,
-          video: false,
-          practical: false,
-          handover: false,
-          exam: false,
-        },
-        counts: {
-          lecture: 1,
-          video: 1,
-          practical: 10,
-          handover: 1,
-        },
-        practicalType: 'practice',
-      },
-      {
-        id: 'conversation-price-comment',
-        title: 'Разговор с цел коментар по цена',
-        progress: {
-          lecture: false,
-          video: false,
-          practical: false,
-          handover: false,
-          exam: false,
-        },
-        counts: {
-          lecture: 1,
-          video: 1,
-          practical: 10,
-          handover: 1,
-        },
-        practicalType: 'practice',
-      },
     ],
   },
   {
@@ -327,8 +219,26 @@ export const trainingStructure: TrainingSection[] = [
     title: 'Основни търговски принципи',
     subsections: [
       {
+        id: 'principle-search-focus',
+        title: 'Принцип 1 акцент на търсене',
+        progress: {
+          lecture: false,
+          video: false,
+          practical: false,
+          handover: false,
+          exam: false,
+        },
+        counts: {
+          lecture: 1,
+          video: 1,
+          practical: 0,
+          handover: 1,
+        },
+        practicalType: 'practice',
+      },
+      {
         id: 'funnel-logic',
-        title: 'Фуния и логика на сделката с купувач',
+        title: 'Фуния и логика на сделката',
         progress: {
           lecture: false,
           video: false,
@@ -375,60 +285,6 @@ export const trainingStructure: TrainingSection[] = [
         counts: {
           lecture: 2,
           video: 1,
-          practical: 0,
-          handover: 1,
-        },
-        practicalType: 'practice',
-      },
-      {
-        id: 'sales-resilience',
-        title: 'Търговски непукизъм',
-        progress: {
-          lecture: false,
-          video: false,
-          practical: false,
-          handover: false,
-          exam: false,
-        },
-        counts: {
-          lecture: 2,
-          video: 1,
-          practical: 0,
-          handover: 1,
-        },
-        practicalType: 'practice',
-      },
-      {
-        id: 'success-mindset',
-        title: 'Успешен начин на мислене',
-        progress: {
-          lecture: false,
-          video: false,
-          practical: false,
-          handover: false,
-          exam: false,
-        },
-        counts: {
-          lecture: 2,
-          video: 1,
-          practical: 0,
-          handover: 1,
-        },
-        practicalType: 'practice',
-      },
-      {
-        id: 'basic-property-training',
-        title: 'Базово обучение за имоти',
-        progress: {
-          lecture: false,
-          video: false,
-          practical: false,
-          handover: false,
-          exam: false,
-        },
-        counts: {
-          lecture: 2,
-          video: 3,
           practical: 0,
           handover: 1,
         },
