@@ -122,8 +122,8 @@ export const trainingStructure: TrainingSection[] = [
         },
         counts: {
           lecture: 1,
-          video: 2,
-          practical: 5,
+          video: 3,
+          practical: 3,
           handover: 1,
         },
         practicalType: 'practice',
@@ -141,7 +141,7 @@ export const trainingStructure: TrainingSection[] = [
         counts: {
           lecture: 1,
           video: 3,
-          practical: 5,
+          practical: 3,
           handover: 1,
         },
         practicalType: 'practice',
@@ -158,7 +158,7 @@ export const trainingStructure: TrainingSection[] = [
         },
         counts: {
           lecture: 1,
-          video: 1,
+          video: 3,
           practical: 3,
           handover: 1,
         },
@@ -176,8 +176,8 @@ export const trainingStructure: TrainingSection[] = [
         },
         counts: {
           lecture: 1,
-          video: 2,
-          practical: 5,
+          video: 3,
+          practical: 3,
           handover: 1,
         },
         practicalType: 'practice',

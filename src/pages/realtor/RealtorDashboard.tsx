@@ -12,9 +12,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { AccountSettingsDialog } from '@/components/AccountSettingsDialog';
-import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, Users, Target, CheckCircle2, XCircle, BookOpen, Zap, Award, BarChart3 } from 'lucide-react';
+import { TrendingUp, Users, Target, CheckCircle2, XCircle, BookOpen, Zap, Award, BarChart3, Sparkles } from 'lucide-react';
 import { exportKPIData, exportDeals, exportDiagnoses, exportTrainingProgress } from '@/lib/export';
 import { trainingStructure, calculateTrainingProgress, TrainingSection } from '@/data/trainingStructure';
 import { TrainingSectionCard } from '@/components/cards/TrainingSectionCard';
@@ -79,7 +78,22 @@ const RealtorDashboard = memo(({ userId }: RealtorDashboardProps) => {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [diagnoses, setDiagnoses] = useState<Diagnosis[]>([]);
   const [loading, setLoading] = useState(true);
-  const [trainingData, setTrainingData] = useState<TrainingSection[]>(trainingStructure);
+
+  // Realtor dashboard shows only the "Diagnosis" part of the intro training.
+  // (Keep original structure in code; we only filter/rename for this page.)
+  const realtorTrainingStructure = (structure: TrainingSection[]): TrainingSection[] =>
+    structure.map((section) => {
+      if (section.id !== 'work-with-buyer') return section;
+      return {
+        ...section,
+        title: 'Диагноза',
+        subsections: section.subsections.filter((s) => s.id === 'diagnosis'),
+      };
+    });
+
+  const [trainingData, setTrainingData] = useState<TrainingSection[]>(
+    realtorTrainingStructure(trainingStructure)
+  );
   const [trainingProgress, setTrainingProgress] = useState(0);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
@@ -90,6 +104,12 @@ const RealtorDashboard = memo(({ userId }: RealtorDashboardProps) => {
     members: Array<{ id: string; name: string; level: string }>;
     teamName: string;
   } | null>(null);
+
+  // Temporarily hide these sections until the next user instruction.
+  // (Keep code in place; we only toggle visibility.)
+  const hidePersonalGoals = true;
+  const hideWeeklySchedule = true;
+  const hideDeals = true;
 
   // Използвай ref за да предотвратиш повторно зареждане на данни
   const hasFetchedData = useRef(false);
@@ -159,6 +179,13 @@ const RealtorDashboard = memo(({ userId }: RealtorDashboardProps) => {
     }
   }, [realtorData?.team_id]);
 
+  // Realtor dashboard currently does not render topology UI.
+  // This function is kept as a safe placeholder to avoid runtime crashes
+  // from legacy code that still calls `fetchTopologyData()`.
+  const fetchTopologyData = useCallback(async () => {
+    // no-op
+  }, []);
+
   const fetchTrainingProgress = useCallback(async () => {
     try {
       if (!realtorData?.id) return;
@@ -166,7 +193,7 @@ const RealtorDashboard = memo(({ userId }: RealtorDashboardProps) => {
       const progressData = await supabaseApi.getTrainingProgress();
 
       if (progressData && progressData.length > 0) {
-        const updatedData = trainingStructure.map((section) => ({
+        const updatedData = realtorTrainingStructure(trainingStructure).map((section) => ({
           ...section,
           subsections: section.subsections.map((subsection) => {
             const progressItem = progressData.find(
@@ -190,14 +217,14 @@ const RealtorDashboard = memo(({ userId }: RealtorDashboardProps) => {
         const progress = calculateTrainingProgress(updatedData);
         setTrainingProgress(progress);
       } else {
-        // If no progress data, use default structure
-        setTrainingData(trainingStructure);
+        // If no progress data, use default (filtered) structure
+        setTrainingData(realtorTrainingStructure(trainingStructure));
         setTrainingProgress(0);
       }
     } catch (error) {
       console.error('Error fetching training progress:', error);
       // On error, use default structure
-      setTrainingData(trainingStructure);
+      setTrainingData(realtorTrainingStructure(trainingStructure));
       setTrainingProgress(0);
     }
   }, [realtorData?.id]);
@@ -208,7 +235,14 @@ const RealtorDashboard = memo(({ userId }: RealtorDashboardProps) => {
       fetchTopologyData();
       fetchCurrentTeam();
     }
-  }, [realtorData?.id, realtorData?.user?.email, realtorData?.team_id, fetchTrainingProgress, fetchCurrentTeam]);
+  }, [
+    realtorData?.id,
+    realtorData?.user?.email,
+    realtorData?.team_id,
+    fetchTrainingProgress,
+    fetchCurrentTeam,
+    fetchTopologyData,
+  ]);
 
   const fetchRealtorData = async () => {
     setLoading(true);
@@ -389,26 +423,6 @@ const RealtorDashboard = memo(({ userId }: RealtorDashboardProps) => {
     }).length;
   };
 
-  const QualityIndicator = ({ active, label }: { active: boolean; label: string }) => (
-    <div className={cn(
-      "flex items-center justify-between p-3 sm:p-4 rounded-xl transition-all duration-300",
-      "bg-gradient-to-r border",
-      active 
-        ? "from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200 dark:border-green-800 shadow-sm hover:shadow-md" 
-        : "from-gray-50 to-slate-50 dark:from-gray-900 dark:to-slate-900 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700"
-    )}>
-      <span className="text-xs sm:text-sm font-medium break-words">{label}</span>
-      {active ? (
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
-          <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
-        </div>
-      ) : (
-        <XCircle className="h-5 w-5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
-      )}
-    </div>
-  );
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center">
@@ -455,6 +469,21 @@ const RealtorDashboard = memo(({ userId }: RealtorDashboardProps) => {
     </div>
   );
 
+  const completedSectionsCount = trainingData.filter((section) =>
+    section.subsections.every(
+      (subsection) =>
+        subsection.progress.lecture &&
+        subsection.progress.video &&
+        subsection.progress.practical &&
+        subsection.progress.handover &&
+        subsection.progress.exam
+    )
+  ).length;
+  const currentStage = Math.min(completedSectionsCount + 1, Math.max(trainingData.length, 1));
+  const stageTitle = completedSectionsCount === trainingData.length && trainingData.length > 0
+    ? 'Обучение - Завършено'
+    : `Обучение - Етап ${currentStage}`;
+
   return (
       <AppLayout
         customNavbarContent={customNavbarContent}
@@ -462,17 +491,21 @@ const RealtorDashboard = memo(({ userId }: RealtorDashboardProps) => {
         <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
           {/* Personal Goals */}
           {realtorData && (
-            <PersonalGoalsCard
-              realtorId={realtorData.id}
-              currentDeals={deals.length}
-              currentKeys={getCurrentKeys()}
-              currentExclusives={getCurrentExclusives()}
-            />
+            <div className={hidePersonalGoals ? 'hidden' : undefined}>
+              <PersonalGoalsCard
+                realtorId={realtorData.id}
+                currentDeals={deals.length}
+                currentKeys={getCurrentKeys()}
+                currentExclusives={getCurrentExclusives()}
+              />
+            </div>
           )}
 
           {/* Weekly Buyer Schedule */}
           {realtorData && (
-            <WeeklyBuyerSchedule realtorId={realtorData.id} />
+            <div className={hideWeeklySchedule ? 'hidden' : undefined}>
+              <WeeklyBuyerSchedule realtorId={realtorData.id} />
+            </div>
           )}
 
           {/* Team Section - Modern Design */}
@@ -538,91 +571,128 @@ const RealtorDashboard = memo(({ userId }: RealtorDashboardProps) => {
             </Card>
           )}
 
-          {/* Personal Qualities - Enhanced */}
-          <Card className="border-2 hover:shadow-lg transition-all duration-300">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Sparkles className="h-5 w-5 text-primary" />
-                Личностни качества
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <QualityIndicator active={realtorData.confidence} label="Увереност" />
-              <QualityIndicator active={realtorData.salesResilience} label="Търговски непукизъм" />
-              <QualityIndicator active={realtorData.successMindset} label="Успешен начин на мислене" />
-            </CardContent>
-          </Card>
-
           {/* Recent Deals - Enhanced */}
-          <Card className="border-2 hover:shadow-lg transition-all duration-300">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                Последни сделки
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {deals.length > 0 ? (
-                <div className="space-y-3">
-                  {deals.slice(0, 5).map((deal) => (
-                    <div
-                      key={deal.id}
-                      className="group p-4 rounded-xl bg-gradient-to-r from-muted/50 to-muted/30 hover:from-muted hover:to-muted border border-border hover:border-primary/50 transition-all duration-300 hover:shadow-md"
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="text-sm font-semibold break-words">{deal.clientName}</p>
-                            {deal.isKey && (
-                              <Badge variant="default" className="text-xs">Ключ</Badge>
-                            )}
-                            {deal.isExclusive && (
-                              <Badge variant="secondary" className="text-xs">Ексклузив</Badge>
-                            )}
+          <div className={hideDeals ? 'hidden' : undefined}>
+            <Card className="border-2 hover:shadow-lg transition-all duration-300">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  Последни сделки
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {deals.length > 0 ? (
+                  <div className="space-y-3">
+                    {deals.slice(0, 5).map((deal) => (
+                      <div
+                        key={deal.id}
+                        className="group p-4 rounded-xl bg-gradient-to-r from-muted/50 to-muted/30 hover:from-muted hover:to-muted border border-border hover:border-primary/50 transition-all duration-300 hover:shadow-md"
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="text-sm font-semibold break-words">{deal.clientName}</p>
+                              {deal.isKey && (
+                                <Badge variant="default" className="text-xs">Ключ</Badge>
+                              )}
+                              {deal.isExclusive && (
+                                <Badge variant="secondary" className="text-xs">Ексклузив</Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(deal.dealDate).toLocaleDateString('bg-BG', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                              })}
+                            </p>
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(deal.dealDate).toLocaleDateString('bg-BG', { 
-                              day: 'numeric', 
-                              month: 'long', 
-                              year: 'numeric' 
-                            })}
-                          </p>
+                          <Badge variant="secondary" className="text-sm font-bold px-3 py-1">
+                            {deal.dealValue.toLocaleString('bg-BG')} лв
+                          </Badge>
                         </div>
-                        <Badge variant="secondary" className="text-sm font-bold px-3 py-1">
-                          {deal.dealValue.toLocaleString('bg-BG')} лв
-                        </Badge>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Target className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-                  <p className="text-sm text-muted-foreground">Все още няма сделки за този месец</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Target className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+                    <p className="text-sm text-muted-foreground">Все още няма сделки за този месец</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Training Structure - Enhanced */}
           <div className="space-y-6">
-            <Card className="border-2 hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-primary/5 to-primary/10">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <BookOpen className="h-5 w-5 text-primary" />
-                    <span>Обучение - Етап 1</span>
-                  </CardTitle>
-                  <Badge variant="secondary" className="text-base px-3 py-1">
-                    {trainingProgress}%
-                  </Badge>
+            <Card className="relative overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-background to-primary/5 hover:border-primary/40 hover:shadow-lg transition-all duration-300">
+              <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-primary/10 blur-3xl" />
+              <CardContent className="pt-6">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-6">
+                  <div className="shrink-0 flex flex-col items-center gap-2">
+                    <h3 className="text-lg font-semibold tracking-tight">{stageTitle}</h3>
+                    <div className="relative h-28 w-28 sm:h-32 sm:w-32">
+                      <svg className="h-full w-full -rotate-90" viewBox="0 0 120 120" aria-hidden="true">
+                        <circle cx="60" cy="60" r="52" strokeWidth="10" className="stroke-muted/60 fill-none" />
+                        <circle
+                          cx="60"
+                          cy="60"
+                          r="52"
+                          strokeWidth="10"
+                          className="stroke-primary fill-none transition-all duration-500 ease-out"
+                          strokeLinecap="round"
+                          strokeDasharray={2 * Math.PI * 52}
+                          strokeDashoffset={2 * Math.PI * 52 * (1 - trainingProgress / 100)}
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="h-16 w-16 sm:h-18 sm:w-18 rounded-full bg-primary/10 border border-primary/30 overflow-hidden flex items-center justify-center">
+                          <img
+                            src="https://rickandmortyapi.com/api/character/avatar/1.jpeg"
+                            alt="Rick and Morty avatar"
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      </div>
+                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-background border border-primary/30 px-2 py-0.5 text-[10px] sm:text-xs font-semibold text-primary whitespace-nowrap">
+                        Завършени {Math.round((trainingProgress / 100) * 17)} от 17
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                      <div />
+                      <div className="flex flex-col items-end gap-1.5 sm:max-w-[320px]">
+                        <p className="text-[11px] uppercase tracking-[0.2em] font-bold text-slate-900 dark:text-slate-100 mb-1">
+                          Лични качества
+                        </p>
+                        {[
+                          { key: 'confidence', label: 'Увереност', active: realtorData.confidence },
+                          { key: 'salesResilience', label: 'Търговски непукизъм', active: realtorData.salesResilience },
+                          { key: 'successMindset', label: 'Успешен начин на мислене', active: realtorData.successMindset },
+                        ].map((trait) => (
+                          <div
+                            key={trait.key}
+                            className={cn(
+                              "group cursor-default rounded-lg px-2 py-1 border transition-all duration-300",
+                              "bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-primary/30",
+                              trait.active
+                                ? "opacity-100 shadow-sm"
+                                : "opacity-50 saturate-0"
+                            )}
+                            title={trait.label}
+                          >
+                            <span className="text-[10px] sm:text-xs font-medium text-primary leading-none">
+                              {trait.label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <Progress value={trainingProgress} className="h-3 mb-3" />
-                <p className="text-sm text-muted-foreground">
-                  Завършени {Math.round((trainingProgress / 100) * 17)} от 17 подточки
-                </p>
               </CardContent>
             </Card>
 
