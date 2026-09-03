@@ -1,7 +1,7 @@
 {
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!realistimo\\.xml$|alo\\.json$|feed/).*)",
       "destination": "/index.html"
     }
   ],
@@ -14,7 +14,22 @@
           "value": "public, max-age=31536000, immutable"
         }
       ]
+    },
+    {
+      "source": "/realistimo.xml",
+      "headers": [
+        { "key": "Content-Type", "value": "application/xml; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=300, s-maxage=300" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    },
+    {
+      "source": "/alo.json",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=300, s-maxage=300" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
     }
   ]
 }
-
