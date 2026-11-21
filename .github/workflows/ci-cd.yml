@@ -55,11 +55,11 @@ jobs:
       - name: Check Vercel Token
         id: check_token
         run: |
-          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
-            echo "⚠️ VERCEL_TOKEN secret is not set. Skipping deployment."
+          if [ -z "${{ secrets.VERCEL_SECRET }}" ]; then
+            echo "⚠️ VERCEL_SECRET secret is not set. Skipping deployment."
             echo "token_exists=false" >> $GITHUB_OUTPUT
           else
-            echo "✅ VERCEL_TOKEN is set. Proceeding with deployment."
+            echo "✅ VERCEL_SECRET is set. Proceeding with deployment."
             echo "token_exists=true" >> $GITHUB_OUTPUT
           fi
 
@@ -69,19 +69,19 @@ jobs:
 
       - name: Pull Vercel Environment Information
         if: steps.check_token.outputs.token_exists == 'true'
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_SECRET }}
 
       - name: Build Project Artifacts
         if: steps.check_token.outputs.token_exists == 'true'
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --prod --token=${{ secrets.VERCEL_SECRET }}
 
       - name: Deploy Project Artifacts to Vercel
         if: steps.check_token.outputs.token_exists == 'true'
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_SECRET }}
 
       - name: Deployment Skipped
         if: steps.check_token.outputs.token_exists == 'false'
         run: |
-          echo "⚠️ Deployment skipped because VERCEL_TOKEN is not configured."
-          echo "📖 See VERCEL_TOKEN_SETUP.md for instructions on how to set it up."
+          echo "⚠️ Deployment skipped because VERCEL_SECRET is not configured."
+          echo "📖 See VERCEL_SECRET_SETUP.md for instructions on how to set it up."
           exit 0
