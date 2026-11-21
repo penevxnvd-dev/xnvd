@@ -14,8 +14,6 @@ import {
   MapPin,
   Users,
   BarChart3,
-  Briefcase,
-  Calendar,
   ListChecks,
   UserCog,
 } from "lucide-react";
@@ -330,40 +328,8 @@ export function HierarchySidebar({ isOpen, onToggle }: Props) {
                 </Button>
               )}
 
-              {!isRealtor && (
-                <Button
-                  type="button"
-                  variant={isActive("/interviews") ? "default" : "outline"}
-                  size="sm"
-                  className="w-full justify-start gap-2"
-                  onClick={() => handleNavigate("/interviews")}
-                >
-                  <Briefcase className="h-4 w-4" />
-                  Интервюта
-                </Button>
-              )}
             </div>
 
-            {/* Training - Always visible, static */}
-            {!isRealtor && (
-              <div className="mt-3 pt-3 border-t border-border space-y-2">
-                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1">
-                  Обучение
-                </div>
-
-                <Button
-                  type="button"
-                  variant={isActive("/training-calendar") ? "default" : "outline"}
-                  size="sm"
-                  disabled={!canViewTraining}
-                  className="w-full justify-start gap-2"
-                  onClick={() => handleNavigate("/training-calendar")}
-                >
-                  <Calendar className="h-4 w-4" />
-                  Календар
-                </Button>
-              </div>
-            )}
           </div>
 
           <ScrollArea className="flex-1">
