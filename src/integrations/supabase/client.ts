@@ -45,77 +45,24 @@ export const supabase = (() => {
 
     supabaseInstance = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
       auth: {
-        persistSession: true, // Enable session persistence
-        autoRefreshToken: true, // Enable automatic token refresh
-        detectSessionInUrl: true, // Enable automatic session detection
-        flowType: 'pkce', // Use PKCE flow for better security
-        storage: typeof window !== 'undefined' ? window.localStorage : undefined, // Use localStorage in browser
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        flowType: 'pkce',
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
       },
-      // Completely disable Realtime to prevent WebSocket connection errors
       realtime: {
-        disabled: true, // Disable Realtime completely
         params: {
-          eventsPerSecond: 0, // Set to 0 to prevent any connection attempts
+          eventsPerSecond: 0,
         },
       },
-      // Global configuration for better data fetching
       global: {
         headers: {
           'x-client-info': 'xnvd-app',
-          'apikey': SUPABASE_PUBLISHABLE_KEY, // Ensure API key is always sent
-        },
-        // Override fetch to prevent connections to old project and WebSocket
-        fetch: (url, options = {}) => {
-          const urlString = typeof url === 'string' ? url : url.toString();
-          
-          // Block connections to very old project (ufpeftuanzmkiryohesd)
-          if (urlString.includes('ufpeftuanzmkiryohesd')) {
-            console.warn('[Supabase] Blocked connection attempt to very old project:', urlString);
-            return Promise.reject(new Error('Very old project connection blocked'));
-          }
-          
-          // Block WebSocket connections (Realtime is disabled)
-          if (urlString.includes('wss://') || 
-              urlString.includes('ws://') || 
-              urlString.includes('realtime/v1/websocket') ||
-              urlString.includes('/realtime/')) {
-            // Silently block - don't even log to reduce console noise
-            return Promise.reject(new Error('WebSocket connections disabled'));
-          }
-          
-          // Ensure API key is in headers for REST API calls
-          const headers = new Headers(options.headers);
-          // Only add apikey for REST API calls, not for auth calls (auth handles it differently)
-          if (urlString.includes('/rest/v1/') && !headers.has('apikey')) {
-            headers.set('apikey', SUPABASE_PUBLISHABLE_KEY);
-          }
-          // Don't override Authorization header if it's already set (for authenticated requests)
-          if (!headers.has('Authorization') && urlString.includes('/rest/v1/')) {
-            headers.set('Authorization', `Bearer ${SUPABASE_PUBLISHABLE_KEY}`);
-          }
-          
-          // Add retry logic for network errors
-          return fetch(url, {
-            ...options,
-            headers,
-            // Add timeout
-            signal: AbortSignal.timeout(30000), // 30 second timeout
-          }).catch((error) => {
-            // Retry once on network errors
-            if (error.name === 'AbortError' || error.message.includes('Failed to fetch')) {
-              console.warn('⚠️ Network error, retrying...');
-              return fetch(url, {
-                ...options,
-                headers,
-                signal: AbortSignal.timeout(30000),
-              });
-            }
-            throw error;
-          });
         },
       },
       db: {
-        schema: 'public', // Explicitly set schema
+        schema: 'public',
       },
     });
   }
