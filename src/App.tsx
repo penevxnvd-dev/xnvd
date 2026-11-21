@@ -9,11 +9,9 @@ import { EnvCheck } from "@/components/EnvCheck";
 import '@/i18n/config';
 import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
-import Interviews from "./pages/Interviews";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import TrainingPage from "./pages/realtor/TrainingPage";
-import TrainingCalendarPage from "./pages/realtor/TrainingCalendarPage";
 import AccountManagementPage from "./pages/AccountManagementPage";
 import { analytics } from "@/lib/analytics";
 import { SearchDialog } from "@/components/SearchDialog";
@@ -70,9 +68,7 @@ const App = () => {
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/analytics" element={<Analytics />} />
-                  <Route path="/interviews" element={<Interviews />} />
                   <Route path="/training" element={<TrainingPage />} />
-                  <Route path="/training-calendar" element={<TrainingCalendarPage />} />
                   <Route path="/account-management" element={<AccountManagementPage />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
