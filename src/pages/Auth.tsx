@@ -61,6 +61,21 @@ const Auth = () => {
     }
   };
 
+  const handleReset = async () => {
+    if (!email) {
+      toast({ title: "Грешка", description: "Въведете имейл за възстановяване", variant: "destructive" });
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + "/auth",
+    });
+    if (error) {
+      toast({ title: "Грешка", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Изпратено", description: "Проверете имейла си за линк за нова парола" });
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
@@ -109,6 +124,15 @@ const Auth = () => {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Зареждане..." : isLogin ? "Влез" : "Регистрирай се"}
             </Button>
+            {isLogin && (
+              <button
+                type="button"
+                onClick={handleReset}
+                className="w-full text-xs text-muted-foreground hover:text-foreground underline"
+              >
+                Забравена парола?
+              </button>
+            )}
           </form>
           <div className="mt-4 space-y-2">
             <div className="text-center">
