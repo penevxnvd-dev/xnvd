@@ -328,56 +328,38 @@ class SupabaseApiClient {
     }
   }
 
-  // Realtors - Supabase only (with profile data, only active)
+  // Realtors - single query with profile join (active only)
   async getRealtorsByTeam(teamId: string) {
     if (!supabase) {
       throw new Error('Supabase client is not initialized');
     }
-    
-    // First get realtors
-    const { data: realtors, error: realtorsError } = await supabase
+
+    const { data, error } = await supabase
       .from('realtors')
-      .select('id, user_id, team_id, level, confidence, sales_resilience, success_mindset')
+      .select(`
+        id, user_id, team_id, level, confidence, sales_resilience, success_mindset,
+        profiles!inner(id, full_name, email, status)
+      `)
       .eq('team_id', teamId)
+      .eq('profiles.status', 'active')
       .order('level', { ascending: false });
-    
-    if (realtorsError) {
-      throw handleSupabaseError(realtorsError);
+
+    if (error) {
+      throw handleSupabaseError(error);
     }
-    
-    if (!realtors || realtors.length === 0) {
-      return [];
-    }
-    
-    // Then get profiles for those realtors (only active ones)
-    const userIds = realtors.map(r => r.user_id).filter(Boolean);
-    if (userIds.length === 0) {
-      return realtors.map(r => ({ ...r, profile: { full_name: 'Неизвестен', email: '', status: 'active' } }));
-    }
-    
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, status')
-      .in('id', userIds)
-      .eq('status', 'active'); // Only get active profiles
-    
-    if (profilesError) {
-      console.warn('Error fetching profiles:', profilesError);
-    }
-    
-    // Create a set of active user IDs
-    const activeUserIds = new Set((profiles || []).map(p => p.id));
-    
-    // Create a map for quick lookup
-    const profilesMap = new Map((profiles || []).map(p => [p.id, p]));
-    
-    // Combine realtors with their profiles, filtering out inactive ones
-    return realtors
-      .filter(realtor => activeUserIds.has(realtor.user_id)) // Only include realtors with active profiles
-      .map(realtor => ({
-        ...realtor,
-        profile: profilesMap.get(realtor.user_id) || { full_name: 'Неизвестен', email: '', status: 'active' }
-      }));
+
+    return (data || []).map((r: any) => ({
+      id: r.id,
+      user_id: r.user_id,
+      team_id: r.team_id,
+      level: r.level,
+      confidence: r.confidence,
+      sales_resilience: r.sales_resilience,
+      success_mindset: r.success_mindset,
+      profile: r.profiles
+        ? { id: r.profiles.id, full_name: r.profiles.full_name, email: r.profiles.email, status: r.profiles.status }
+        : { full_name: 'Неизвестен', email: '', status: 'active' },
+    }));
   }
 
   // Get all trainees and recruits (users with trainee role or realtors with level 1)
@@ -499,72 +481,45 @@ class SupabaseApiClient {
     return data as { id: string; name: string; office_id: string; leader_id: string } | null;
   }
 
-  // Get office ID for a realtor by their user_id
+  // Get office ID for a realtor by their user_id (single join)
   async getRealtorOffice(userId: string): Promise<string | null> {
     try {
-      // Get realtor by user_id
-      const { data: realtor, error: realtorError } = await supabase
+      const { data, error } = await supabase
         .from('realtors')
-        .select('team_id')
+        .select('team_id, teams!inner(office_id)')
         .eq('user_id', userId)
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (realtorError || !realtor || !realtor.team_id) {
-        return null;
-      }
-
-      // Get team to get office_id
-      const { data: team, error: teamError } = await supabase
-      .from('teams')
-        .select('office_id')
-        .eq('id', realtor.team_id)
-        .limit(1)
-      .single();
-
-      if (teamError || !team) {
-        return null;
-      }
-
-      return team.office_id;
+      if (error || !data?.teams) return null;
+      return (data.teams as any).office_id ?? null;
     } catch (error) {
       console.error('Error fetching realtor office:', error);
       return null;
     }
   }
 
-  // Get city and office for a team leader by leaderId
+  // Get city and office for a team leader by leaderId (single nested query)
   async getLeaderCityAndOffice(leaderId: string) {
     try {
-      // Get team by leader_id
-      const { data: team, error: teamError } = await supabase
-      .from('teams')
-        .select('office_id')
+      const { data, error } = await supabase
+        .from('teams')
+        .select(`
+          office_id,
+          offices!inner(
+            id, name, city_id,
+            cities!inner(id, name)
+          )
+        `)
         .eq('leader_id', leaderId)
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (teamError || !team) return null;
+      if (error || !data?.offices) return null;
 
-      // Get office by office_id
-      const { data: office, error: officeError } = await supabase
-        .from('offices')
-        .select('id, name, city_id')
-        .eq('id', team.office_id)
-        .limit(1)
-        .single();
-
-      if (officeError || !office) return null;
-
-      // Get city by city_id
-      const { data: city, error: cityError } = await supabase
-        .from('cities')
-        .select('id, name')
-        .eq('id', office.city_id)
-        .limit(1)
-        .single();
-
-      if (cityError || !city) return null;
+      const office = data.offices as any;
+      const city = office.cities;
+      if (!city) return null;
 
       return {
         cityId: city.id,
