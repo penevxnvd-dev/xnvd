@@ -96,7 +96,7 @@ const Dashboard = memo(() => {
     );
   }
 
-  if (effectiveRole === 'realtor') {
+  if (effectiveRole === 'realtor' || effectiveRole === 'trainee') {
     return (
       <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><div className="text-muted-foreground">Зареждане...</div></div>}>
         <RealtorDashboard userId={userId!} />
